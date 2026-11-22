@@ -175,3 +175,16 @@ export const usage = {
   },
   get: (day) => one('SELECT * FROM usage_daily WHERE day = ?', day),
 };
+
+/** Hard AI spend cap in micro-USD, enforced atomically (reserve worst case first, then settle). */
+export const spend = {
+  async reserve({ micros, capMicros }) {
+    await run("INSERT IGNORE INTO ai_spend (scope) VALUES ('total')");
+    const r = await run("UPDATE ai_spend SET micros = micros + ?, calls = calls + 1 WHERE scope = 'total' AND micros + ? <= ?", micros, micros, capMicros);
+    return affected(r) === 1;
+  },
+  async adjust({ deltaMicros }) {
+    if (deltaMicros) await run("UPDATE ai_spend SET micros = GREATEST(0, micros + ?) WHERE scope = 'total'", deltaMicros);
+  },
+  get: () => one("SELECT micros, calls FROM ai_spend WHERE scope = 'total'"),
+};

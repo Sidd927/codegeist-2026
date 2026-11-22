@@ -44,6 +44,12 @@ modules:
   sql:
     - key: main
       engine: mysql
+  # Forge LLM (Atlassian-hosted; no external egress). Approved for development on 22 Nov 2026.
+  # Calls are gated by A25_AI_ENABLED, a daily call budget and a hard spend cap (A25_AI_SPEND_CAP_USD).
+  llm:
+    - key: extraction
+      model:
+        - claude
   function:
     - key: resolver
       handler: index.handler

@@ -9,8 +9,8 @@ import { evaluate, RULES_VERSION } from './rules.js';
 import { TEXT_VERSION } from './screening-text.js';
 
 /** Version of everything that can change a screening result for the same text. */
-export function pipelineVersion(mode) {
-  return [TEXT_VERSION, RULES_VERSION, FALLBACK_VERSION, mode === 'ai' ? EXTRACTOR_VERSION : 'noai'].join('.');
+export function pipelineVersion(mode, model = null) {
+  return [TEXT_VERSION, RULES_VERSION, FALLBACK_VERSION, mode === 'ai' ? `${EXTRACTOR_VERSION}:${model ?? 'unknown'}` : 'noai'].join('.');
 }
 
 const tag = (signals, provenance) => {
@@ -44,7 +44,7 @@ function mergeFloor(ai, floor) {
  * @param {'ai'|'rules'} mode
  * @returns {{ ok: true, result: object, quality: object } | { ok: false, reason: 'malformed_output', quality: object }}
  */
-export function analyse(screeningText, raw, mode, inventory) {
+export function analyse(screeningText, raw, mode, inventory, model = null) {
   const floorValidation = validateExtraction(extractWithRules(screeningText.text));
   const floor = tag(verifySignals(floorValidation.signals, screeningText).signals, 'rules');
   const quality = { dropped: 0, droppedReasons: {}, rejected: 0, rejectedReasons: {} };
@@ -61,7 +61,7 @@ export function analyse(screeningText, raw, mode, inventory) {
     signals = mergeFloor(tag(verified, 'ai'), floor);
   }
   const result = evaluate(signals, { mode, inventory });
-  return { ok: true, result: { ...result, mode, pipelineVersion: pipelineVersion(mode), purposes: signals.purposes, dataSubjects: signals.dataSubjects, changeType: signals.changeType }, quality };
+  return { ok: true, result: { ...result, mode, pipelineVersion: pipelineVersion(mode, model), purposes: signals.purposes, dataSubjects: signals.dataSubjects, changeType: signals.changeType }, quality };
 }
 
 function countBy(items) {

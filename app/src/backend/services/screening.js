@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { buildScreeningText } from '../../core/screening-text.js';
 import { analyse, pipelineVersion } from '../../core/analyse.js';
 import { AI_STATUS } from '../adapters/llm.js';
+import { estimateInputTokens } from '../adapters/pricing.js';
 import { AppError, ErrorCode } from '../lib/errors.js';
 
 export const LEASE_MS = 150_000; // > consumer timeout (120 s), so a crashed worker's lease expires
@@ -21,8 +22,9 @@ const dayOf = (now) => new Date(now).toISOString().slice(0, 10);
 /**
  * @param {object} deps { repos: {workItems, screenings, usage}, jira, llm, queue, log, clock, settings }
  */
-export function createScreeningService({ repos, jira, llm, queue, log, clock = () => Date.now(), settings }) {
-  const { workItems, screenings, usage } = repos;
+export function createScreeningService({ repos, jira, llm, queue, log, clock = () => Date.now(), settings, pricing }) {
+  const { workItems, screenings, usage, spend } = repos;
+  const versionFor = (mode) => pipelineVersion(mode, mode === 'ai' ? llm.model : null);
 
   /** Called from the issue trigger: record + enqueue. Must stay fast and never block Jira. */
   async function onIssueEvent({ issueId, issueKey, projectKey, contentChange, eventAt }) {
@@ -48,13 +50,23 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
     return { status: 'queued' };
   }
 
+  /**
+   * AI extraction guarded by (1) the approved module + switch, (2) an atomic daily call budget and
+   * (3) a HARD cumulative spend cap: the worst-case cost is reserved atomically before the call and
+   * settled to the actual token cost afterwards. Any guard failing → labelled rule-based check.
+   */
   async function extract(text) {
-    if (!llm.available || !settings.aiEnabled) return { mode: 'rules', aiStatus: AI_STATUS.NOT_ENABLED };
-    const reserved = await usage.reserveAiCall({ day: dayOf(clock()), budget: settings.dailyAiBudget });
-    if (!reserved) return { mode: 'rules', aiStatus: AI_STATUS.OVER_BUDGET };
+    if (!llm.available || !settings.aiEnabled || !settings.aiSpendCapMicros || !pricing || !spend) return { mode: 'rules', aiStatus: AI_STATUS.NOT_ENABLED };
+    const withinDaily = await usage.reserveAiCall({ day: dayOf(clock()), budget: settings.dailyAiBudget });
+    if (!withinDaily) return { mode: 'rules', aiStatus: AI_STATUS.OVER_BUDGET };
+    const reserved = await pricing.costMicros(llm.model, estimateInputTokens(text.length + 16), llm.maxTokens);
+    if (!(await spend.reserve({ micros: reserved, capMicros: settings.aiSpendCapMicros }))) return { mode: 'rules', aiStatus: AI_STATUS.OVER_BUDGET };
     const r = await llm.extract(text);
-    if (r.status !== AI_STATUS.OK) return { mode: 'rules', aiStatus: r.status, usage: r.usage, modelMs: r.ms };
-    return { mode: 'ai', aiStatus: AI_STATUS.OK, raw: r.raw, usage: r.usage, modelMs: r.ms };
+    // Settle to the actual cost when usage is reported; otherwise keep the (worst-case) reservation.
+    const actual = Number.isFinite(r.usage?.tokensIn) ? await pricing.costMicros(llm.model, r.usage.tokensIn, r.usage.tokensOut ?? 0) : reserved;
+    await spend.adjust({ deltaMicros: actual - reserved });
+    if (r.status !== AI_STATUS.OK) return { mode: 'rules', aiStatus: r.status, usage: r.usage, modelMs: r.ms, costMicros: actual };
+    return { mode: 'ai', aiStatus: AI_STATUS.OK, raw: r.raw, usage: r.usage, modelMs: r.ms, costMicros: actual };
   }
 
   /**
@@ -93,7 +105,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       const st = buildScreeningText(issue);
       // 1) Identical content already screened with the same pipeline version? Reuse it (no AI call).
       for (const mode of ['ai', 'rules']) {
-        const existingId = screeningIdOf(issueId, st.fingerprint, pipelineVersion(mode));
+        const existingId = screeningIdOf(issueId, st.fingerprint, versionFor(mode));
         const existing = await timed('dbMs', () => screenings.get(existingId));
         if (existing && (mode === 'ai' || !settings.aiEnabled || !llm.available)) {
           const ok = await workItems.finalize({ issueId, token, screeningId: existingId, fp: st.fingerprint, outcome: existing.outcome, seqAtClaim, now: clock() });
@@ -105,7 +117,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
 
       // 2) Extract → verify → rules.
       const ex = await extract(st.text);
-      let analysis = analyse(st, ex.raw ?? null, ex.mode, NO_INVENTORY);
+      let analysis = analyse(st, ex.raw ?? null, ex.mode, NO_INVENTORY, ex.mode === 'ai' ? llm.model : null);
       let aiStatus = ex.aiStatus;
       if (!analysis.ok) {
         // AI output failed validation: fall back to the deterministic floor, labelled, never "clean" by default.
@@ -113,7 +125,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
         analysis = analyse(st, null, 'rules', NO_INVENTORY);
       }
       const mode = analysis.result.mode;
-      const version = pipelineVersion(mode);
+      const version = versionFor(mode);
       const screeningId = screeningIdOf(issueId, st.fingerprint, version);
       const now = clock();
       await timed('dbMs', () => screenings.insert({
@@ -125,7 +137,12 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       await timed('dbMs', () => usage.record({ day: dayOf(now), fallback: mode !== 'ai', tokensIn: ex.usage?.tokensIn ?? 0, tokensOut: ex.usage?.tokensOut ?? 0 }));
       const ok = await timed('dbMs', () => workItems.finalize({ issueId, token, screeningId, fp: st.fingerprint, outcome: analysis.result.outcome, seqAtClaim, now }));
       await followUpIfNeeded(issueId, seqAtClaim);
-      log.info({ evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined, dbMs: timing.dbMs, jiraMs: timing.jiraMs, modelMs: ex.modelMs, count: analysis.result.findings.length });
+      log.info({
+        evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, aiStatus, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined,
+        dbMs: timing.dbMs, jiraMs: timing.jiraMs, modelMs: ex.modelMs, count: analysis.result.findings.length,
+        rejected: analysis.quality.rejected, dropped: analysis.quality.dropped, sensitive: analysis.result.findings.some((f) => f.kind === 'sensitive_data') ? 1 : 0,
+        tokensIn: ex.usage?.tokensIn ?? undefined, tokensOut: ex.usage?.tokensOut ?? undefined, costMicros: ex.costMicros,
+      });
       return { status: ok ? 'screened' : 'lease_lost', screeningId, outcome: analysis.result.outcome, mode, aiStatus };
     } catch (e) {
       const code = e?.code ?? 'INTERNAL';

@@ -61,6 +61,14 @@ export const MIGRATIONS = [
       tokens_out BIGINT NOT NULL DEFAULT 0
     )`,
   ],
+  [
+    'v004_ai_spend',
+    `CREATE TABLE IF NOT EXISTS ai_spend (
+      scope VARCHAR(16) PRIMARY KEY,
+      micros BIGINT NOT NULL DEFAULT 0,
+      calls INT NOT NULL DEFAULT 0
+    )`,
+  ],
 ];
 
 /** Apply pending migrations. Called only from the migration queue consumer (never per request). */

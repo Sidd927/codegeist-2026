@@ -17,7 +17,7 @@ export function presentScreening(row, screening, currentFp = null) {
   if (!result) return { state: 'NOT_SCREENED', result: null };
   if (currentFp && row.screened_fp && currentFp !== row.screened_fp) return { state: 'RESCREEN_REQUIRED', reason: 'content_changed', result };
   // Version-aware: a result produced by older rules/extractor code is out of date even for identical text.
-  if (result.pipelineVersion && result.pipelineVersion !== pipelineVersion(result.mode)) return { state: 'RESCREEN_REQUIRED', reason: 'pipeline_changed', result };
+  if (result.pipelineVersion && result.pipelineVersion !== pipelineVersion(result.mode, result.mode === 'ai' ? result.model : null)) return { state: 'RESCREEN_REQUIRED', reason: 'pipeline_changed', result };
   return { state: result.outcome, result };
 }
 

@@ -106,5 +106,18 @@ export function createFakeRepos() {
     get: async (day) => use.get(day) ?? null,
   };
 
-  return { repos: { workItems, screenings, usage }, items, scr, use, counters };
+  const spendState = { micros: 0, calls: 0 };
+  const spend = {
+    async reserve({ micros, capMicros }) {
+      if (spendState.micros + micros > capMicros) return false;
+      spendState.micros += micros;
+      spendState.calls++;
+      return true;
+    },
+    async adjust({ deltaMicros }) {
+      spendState.micros = Math.max(0, spendState.micros + deltaMicros);
+    },
+    get: async () => ({ ...spendState }),
+  };
+  return { repos: { workItems, screenings, usage, spend }, items, scr, use, counters, spendState };
 }

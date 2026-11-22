@@ -5,6 +5,10 @@ import { createFakeRepos } from './fakes.mjs';
 import { createScreeningService, MAX_ATTEMPTS, LEASE_MS } from '../src/backend/services/screening.js';
 import { createLlmAdapter, AI_STATUS } from '../src/backend/adapters/llm.js';
 import { settingsFromEnv } from '../src/backend/lib/config.js';
+import { createPricing } from '../src/backend/adapters/pricing.js';
+
+// Haiku 5.5 runtime pricing as observed in Stage 1: 5 credits per 1M tokens ($0.50 in / $2.50 out).
+const PRICING = createPricing(async () => ({ models: [{ model: 'claude-haiku-5-5', pricing: { inputCreditsPerMillionTokens: 5, outputCreditsPerMillionTokens: 5 } }, { model: 'claude-sonnet-5-5', pricing: { inputCreditsPerMillionTokens: 20, outputCreditsPerMillionTokens: 20 } }] }));
 import { AppError, ErrorCode } from '../src/backend/lib/errors.js';
 
 const silent = { info() {}, warn() {}, error() {} };
@@ -19,8 +23,8 @@ const AI_ARGS = {
   transfers: [], retention: [], purposes: [], no_personal_data_statement: [], data_subjects: ['shoppers'], open_questions: [], change_type: 'new_processing',
 };
 
-function setup({ issues = { 10001: { key: 'SHOP-1', projectKey: 'SHOP', ...RISKY } }, chat = null, env = {}, jiraHook } = {}) {
-  const fake = createFakeRepos();
+function setup({ issues = { 10001: { key: 'SHOP-1', projectKey: 'SHOP', ...RISKY } }, chat = null, env = {}, jiraHook, model = 'claude-haiku-5-5', fake: givenFake } = {}) {
+  const fake = givenFake ?? createFakeRepos();
   let now = 1_800_000_000_000;
   const clock = () => now;
   const advance = (ms) => (now += ms);
@@ -35,9 +39,9 @@ function setup({ issues = { 10001: { key: 'SHOP-1', projectKey: 'SHOP', ...RISKY
       return { id, key: i.key, projectKey: i.projectKey, summary: i.summary, description: i.description };
     },
   };
-  const llm = createLlmAdapter({ chat: chat ? async (req) => (chatCalls.push(req), chat(req)) : null, model: 'claude-haiku-5-5', timeoutMs: 1000 });
-  const settings = settingsFromEnv({ A25_AI_ENABLED: chat ? 'true' : 'false', ...env });
-  const svc = createScreeningService({ repos: fake.repos, jira, llm, queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings });
+  const llm = createLlmAdapter({ chat: chat ? async (req) => (chatCalls.push(req), chat(req)) : null, model, timeoutMs: 1000 });
+  const settings = settingsFromEnv({ A25_AI_ENABLED: chat ? 'true' : 'false', A25_AI_SPEND_CAP_USD: '2', A25_AI_MODEL: model, ...env });
+  const svc = createScreeningService({ repos: fake.repos, jira, llm, queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings, pricing: PRICING });
   return { svc, fake, queue, issues, advance, chatCalls, clock };
 }
 const drain = async (s) => {
@@ -248,4 +252,39 @@ test('screening ids are deterministic per (issue, content, pipeline version): id
   await s.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
   await drain(s);
   assert.equal(s.fake.scr.size, 1);
+});
+
+test('hard spend cap: a call whose worst-case cost exceeds the remaining cap is never made', async () => {
+  const s = setup({ chat: async () => toolResponse(AI_ARGS), env: { A25_AI_SPEND_CAP_USD: '0.001' } });
+  await s.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
+  const [r] = await drain(s);
+  assert.equal(r.aiStatus, AI_STATUS.OVER_BUDGET);
+  assert.equal(s.chatCalls.length, 0);
+  assert.equal(s.fake.spendState.micros, 0);
+});
+test('spend is reserved at worst case, then settled to the actual token cost', async () => {
+  const s = setup({ chat: async () => toolResponse(AI_ARGS) });
+  await s.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
+  await drain(s);
+  // usage 1200 in / 300 out at Haiku rates: 1200*0.5 + 300*2.5 = 1350 micro-USD
+  assert.equal(s.fake.spendState.micros, 1350);
+  assert.equal(s.fake.spendState.calls, 1);
+});
+test('AI disabled when no spend cap is configured, even if the switch is on', async () => {
+  const s = setup({ chat: async () => toolResponse(AI_ARGS), env: { A25_AI_SPEND_CAP_USD: '0' } });
+  await s.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
+  assert.equal((await drain(s))[0].aiStatus, AI_STATUS.NOT_ENABLED);
+  assert.equal(s.chatCalls.length, 0);
+});
+test('a different model is never served a reused result from another model', async () => {
+  const fake = createFakeRepos();
+  const a = setup({ chat: async () => toolResponse(AI_ARGS), fake });
+  await a.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
+  await drain(a);
+  const b = setup({ chat: async () => toolResponse(AI_ARGS), fake, model: 'claude-sonnet-5-5' });
+  await b.svc.requestManual({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP' });
+  const [r] = await drain(b);
+  assert.equal(r.status, 'screened');
+  assert.equal(b.chatCalls.length, 1);
+  assert.equal(fake.scr.size, 2);
 });

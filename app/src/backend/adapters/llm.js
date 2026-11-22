@@ -20,6 +20,7 @@ export function createLlmAdapter({ chat, model, timeoutMs, maxTokens = 900 }) {
   return {
     available: typeof chat === 'function',
     model,
+    maxTokens,
     /** @returns {Promise<{ status: string, raw?: object, usage?: object, ms: number }>} */
     async extract(text) {
       const t0 = Date.now();

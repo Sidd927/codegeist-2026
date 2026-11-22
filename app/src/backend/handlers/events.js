@@ -2,6 +2,8 @@
 // scheduled reconciler. Triggers only record + enqueue (fast, never blocking Jira); all screening
 // work happens in the queue consumer, which is idempotent because delivery is at-least-once.
 import { Queue, InvocationError, InvocationErrorCode } from '@forge/events';
+import { chat, list } from '@forge/llm';
+import { createPricing } from '../adapters/pricing.js';
 import { createJiraAdapter } from '../adapters/jira.js';
 import { createLlmAdapter } from '../adapters/llm.js';
 import { createScreeningService } from '../services/screening.js';
@@ -15,8 +17,9 @@ export const MAINTENANCE_QUEUE = 'a25-maintenance';
 const screeningQueue = new Queue({ key: SCREENING_QUEUE });
 const maintenanceQueue = new Queue({ key: MAINTENANCE_QUEUE });
 
-// The LLM transport stays null until the `llm` manifest module is approved (M2 spending gate).
-const LLM_CHAT = null;
+// Forge LLM transport (the `llm` module is declared in the manifest, approved 22 Nov 2026 for development).
+// Calls still require A25_AI_ENABLED=true, a daily call budget and a hard spend cap (settingsFromEnv).
+const pricing = createPricing(list);
 
 export function buildScreening(environmentType) {
   const config = configFor(environmentType);
@@ -24,7 +27,8 @@ export function buildScreening(environmentType) {
   return createScreeningService({
     repos,
     jira: createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs }),
-    llm: createLlmAdapter({ chat: LLM_CHAT, model: settings.aiModel, timeoutMs: 25_000 }),
+    llm: createLlmAdapter({ chat, model: settings.aiModel, timeoutMs: 25_000 }),
+    pricing,
     queue: { push: (body) => screeningQueue.push({ body }) },
     log,
     settings,
