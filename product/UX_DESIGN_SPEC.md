@@ -59,6 +59,7 @@
 | Out of scope | A single line, "Not in Article25 scope", in muted text. Panel collapsed. No actions. |
 | Not screened (pre-install items) | "Not checked yet" + **[Check now]**. Gate line: "Gated transitions are blocked until this is checked." |
 | Screening | Lozenge "Checking…" + ADS spinner (≤ 30 s expected) + "You can keep working; this updates automatically." The panel polls every 3 s for up to 60 s, then shows "Taking longer than usual · [Refresh]". |
+| Check failed | Lozenge "Check failed" + "We couldn't check this work item (3 attempts). Gated transitions stay blocked." + **[Check again]** |
 | Clear | A compact single row: ✓ "No review needed" · checked time · AI/rules glyph · "How this was decided ▸". Nothing else. |
 | Known processing (INVENTORY_UPDATE) | As Clear, plus "Uses known data: contact, financial" (collapsed). |
 | Needs info | Questions as a numbered list + **[Send to reviewer anyway]**. Hint: "Editing the description re-checks automatically." |

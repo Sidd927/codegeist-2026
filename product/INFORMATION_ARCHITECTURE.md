@@ -93,20 +93,23 @@ Rules:
 - Confluence register visibility follows Confluence space permissions (the customer chooses the space; Get started warns about this).
 
 ## 6. States shown to users (vocabulary)
-| Internal | Label | Tone (ADS lozenge appearance) |
-|---|---|---|
-| NOT_SCREENED | Not checked yet | default |
-| SCREENING | Checking… | inprogress |
-| CLEAR | No review needed | success |
-| INVENTORY_UPDATE | Known processing | default |
-| NEEDS_INFO | Needs information | moved |
-| PENDING_REVIEW (REVIEW_REQUIRED) | Review required | moved |
-| PENDING_REVIEW (DPIA_LIKELY) | DPIA likely | removed (bold) |
-| APPROVED | Approved | success |
-| APPROVED_WITH_CONDITIONS | Approved with conditions | success + condition count |
-| CHANGES_REQUESTED | Changes requested | moved |
-| REJECTED | Rejected | removed |
-| STALE | Changed since approval | removed |
-| OUT_OF_SCOPE | Not in scope | default (panel collapsed) |
+States are defined in [DATA_AND_SECURITY_MODEL.md §2](DATA_AND_SECURITY_MODEL.md), which is the single source of truth. Where a state covers several screening outcomes, the label comes from the outcome.
 
-How these labels map to a gate effect is defined in [DATA_AND_SECURITY_MODEL.md §2](DATA_AND_SECURITY_MODEL.md).
+| State (outcome) | Label | Tone (ADS lozenge appearance) | Gate |
+|---|---|---|---|
+| OUT_OF_SCOPE | Not in scope | default (panel collapsed) | allow |
+| NOT_SCREENED | Not checked yet | default | block |
+| SCREENING | Checking… | inprogress | block |
+| SCREENING_FAILED | Check failed | removed | block |
+| CLEARED_AUTO (CLEAR) | No review needed | success | allow |
+| CLEARED_AUTO (INVENTORY_UPDATE) | Known processing | default | allow |
+| NEEDS_INFO | Needs information | moved | block (policy) |
+| PENDING_REVIEW (REVIEW_REQUIRED) | Review required | moved | block |
+| PENDING_REVIEW (DPIA_LIKELY) | DPIA likely | removed (bold) | block |
+| APPROVED | Approved | success | allow |
+| APPROVED_WITH_CONDITIONS | Approved with conditions | success + condition count | allow |
+| CHANGES_REQUESTED | Changes requested | moved | block |
+| REJECTED | Rejected | removed | block |
+| STALE | Changed since approval | removed | block |
+
+Monitor mode overrides every "block" to "allow + logged", with a banner.

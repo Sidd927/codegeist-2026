@@ -31,7 +31,7 @@ The `#` column uses the numbering of the 12 roadmap areas in the Stage 2 brief. 
 | 9 | **Administration & configuration** | Get started; settings sections; inventory editor; sample scenario; gate health UI | 2, 6, 7 | Wed 9 – Fri 11 Dec | M8 criteria |
 | 10 | **Security & reliability** | Recovery port (M9); M10 tests; authorisation tests per resolver; bulk-transition test (Q7); performance budgets; a11y audit (axe + keyboard walkthrough) | 5, 7, 9 | Fri 11 – Sun 13 Dec | M9, M10 criteria; NFR-5, NFR-7 measured |
 | 8 | **Teamwork Graph context** (S1, if D2 = keep) | Declared-purpose section; failure handling | 5, D2 | Sun 13 Dec (0.5–1 d) | Works on the demo site; hidden on failure |
-| — | **Should items** | S3 → S5 → S2 → S6 → S4, only if all Must criteria are green | Musts | Mon 14 – Tue 15 Dec | Each item's own checks |
+| — | **Should items** | S3 → S5 → S2 → S6 → S4 (S1 is phase 8), only if all Must criteria are green | Musts | Mon 14 – Tue 15 Dec | Each item's own checks |
 | 4b | **AI evaluation run** | Extended synthetic set (≥ 64 incl. injection); billable run **with explicit approval** (expected < $2) | 4 | Mon 14 Dec | Metrics recorded honestly |
 | 11b | **Clean-site rehearsal #2** | Full judge path ([USER_JOURNEYS.md J9](USER_JOURNEYS.md)) on the clean site from the sharing link; timed; fix list | all Musts, frozen manifest | Tue 15 – Wed 16 Dec | ≤ 10 min Get started; every J9 step passes |
 | — | **Code freeze** | — | — | **Thu 17 Dec EOD** | Tagged release; production deployed |

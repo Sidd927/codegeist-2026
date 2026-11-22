@@ -26,7 +26,7 @@ Scored 1–5 on each criterion. Effort is in developer-days (one developer).
 | S5 | Blocked-transition count in the inbox strip | 3 | 5 | 3 | 4 | 3 | 0.5 | Should |
 | S6 | Admin page entry (`jira:adminPage`) | 2 | 5 | 1 | 2 | 3 | 0.25 | Should |
 
-**Must total ≈ 25 developer-days** against 25 calendar days from 23 Nov to the 17 Dec code freeze. **There is essentially no slack**, which is why the Must list is already the minimum coherent product. Should items are pulled in only when the Must acceptance criteria pass, in the order S3 → S5 → S1 → S2 → S6 → S4. If the schedule slips, the cut order is: polish on Settings (keep functionality) → Decisions filters → inbox views beyond Pending and Changed. Never the gate, decisions, authorisation or ledger.
+**Must total ≈ 25 developer-days** against 25 calendar days from 23 Nov to the 17 Dec code freeze. **There is essentially no slack**, which is why the Must list is already the minimum coherent product. Should items are pulled in only when the Must acceptance criteria pass. S1 is scheduled on 13 Dec if decision D2 keeps the Teamwork Graph scopes; the others follow in the order S3 → S5 → S2 → S6 → S4. If the schedule slips, the cut order is: polish on Settings (keep functionality) → Decisions filters → inbox views beyond Pending and Changed. Never the gate, decisions, authorisation or ledger.
 
 ## 2. Must-have features and acceptance criteria
 Each criterion is testable. "Verified" means a test (unit/component) or a scripted live check with recorded evidence.
