@@ -40,6 +40,7 @@ export const copy = {
     refresh: 'Refresh',
     failed: "Article25 couldn't check this work item after several attempts. It is not treated as clean.",
     rescreen: 'The text changed since the last check, so these findings may be out of date.',
+    rescreenPipeline: "Article25's screening rules were updated since this check, so these findings may be out of date.",
     notScreened: 'Article25 has not checked this work item yet.',
     outOfScope: 'This project is not in Article25 scope.',
     checkNow: 'Check now',

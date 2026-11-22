@@ -5,7 +5,7 @@
 // (research doc 15: held-out escalation recall 0.11), so the rules engine never lets a fallback
 // result become CLEAR without an explicit negation.
 
-export const FALLBACK_VERSION = 'f1';
+export const FALLBACK_VERSION = 'f2'; // f2: vendor names matched case-sensitively (live finding, M2)
 
 const LEXICON = [
   ['contact', ['e-?mail(?: address)?', 'phone(?: number)?', 'mobile(?: number)?', 'postal address', 'home address', 'billing address']],
@@ -36,9 +36,9 @@ const NEGATION = ['no personal data', 'no customer-level data', 'anonymi[sz]ed',
 const CHANGE_NEUTRAL = ['fix (?:the )?(?:bug|typo|template)', 'refactor\\w*', 'bump\\w*', 'upgrade\\w*', 'rename\\w*'];
 const VAGUE = ['tbd', 'to be decided', 'details later', 'more context later'];
 
-function firstMatch(text, terms) {
+function firstMatch(text, terms, flags = 'i') {
   for (const t of terms) {
-    const m = new RegExp(`\\b(?:${t})\\b`, 'i').exec(text);
+    const m = new RegExp(`\\b(?:${t})\\b`, flags).exec(text);
     if (m) return m[0]; // verbatim substring of the source text
   }
   return null;
@@ -58,7 +58,8 @@ export function extractWithRules(text) {
   }
   const recipients = [];
   for (const v of KNOWN_VENDORS) {
-    const q = firstMatch(text, [v.replace(/ /g, '\\s+')]);
+    // Vendor names are proper nouns: match case-sensitively ("segment shoppers" is not Segment).
+    const q = firstMatch(text, [v.replace(/ /g, '\\s+')], '');
     if (q) recipients.push({ name: v, external: true, evidence_quote: q });
   }
   const negation = firstMatch(text, NEGATION);

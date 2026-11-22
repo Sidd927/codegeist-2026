@@ -110,7 +110,7 @@ export function PanelView({ resource, onOpenDesk, onRecheck }) {
   const stale = state === 'RESCREEN_REQUIRED';
   return (
     <section className="a25-panel" aria-label={copy.panel.title}>
-      <StatusHeader state={stale ? 'RESCREEN_REQUIRED' : result.outcome} why={stale ? S.rescreen : whyLine(result)}>
+      <StatusHeader state={stale ? 'RESCREEN_REQUIRED' : result.outcome} why={stale ? (view.reason === 'pipeline_changed' ? S.rescreenPipeline : S.rescreen) : whyLine(result)}>
         {stale ? <p className="a25-subtle a25-small">{S.previousResult}: {copy.states[result.outcome]}</p> : null}
         <ModeNote result={result} />
       </StatusHeader>

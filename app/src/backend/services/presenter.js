@@ -1,5 +1,6 @@
 // Pure presentation of screening state for the UI. Converts storage rows into the display contract
 // and decides the DISPLAY state (never a decision). Personal identifiers are never included.
+import { pipelineVersion } from '../../core/analyse.js';
 
 const PENDING = new Set(['QUEUED', 'SCREENING']);
 
@@ -14,7 +15,9 @@ export function presentScreening(row, screening, currentFp = null) {
   if (PENDING.has(row.state)) return { state: 'SCREENING', since: row.updated_at, result };
   if (row.state === 'SCREENING_FAILED') return { state: 'SCREENING_FAILED', errorCode: row.last_error ?? null, result };
   if (!result) return { state: 'NOT_SCREENED', result: null };
-  if (currentFp && row.screened_fp && currentFp !== row.screened_fp) return { state: 'RESCREEN_REQUIRED', result };
+  if (currentFp && row.screened_fp && currentFp !== row.screened_fp) return { state: 'RESCREEN_REQUIRED', reason: 'content_changed', result };
+  // Version-aware: a result produced by older rules/extractor code is out of date even for identical text.
+  if (result.pipelineVersion && result.pipelineVersion !== pipelineVersion(result.mode)) return { state: 'RESCREEN_REQUIRED', reason: 'pipeline_changed', result };
   return { state: result.outcome, result };
 }
 

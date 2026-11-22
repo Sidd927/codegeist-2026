@@ -78,3 +78,13 @@ export function relativeTime(ms, now = Date.now()) {
 export function rangesFrom(findings) {
   return findings.filter((f) => f.source && f.index).map((f) => ({ id: f.id, blockIndex: f.source.blockIndex, start: f.source.start, end: f.source.end }));
 }
+
+/** Compact duration for "oldest waiting": minutes, hours or days. */
+export function duration(ms) {
+  if (!ms || ms < 0) return '–';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${Math.max(1, m)} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h`;
+  return `${Math.round(h / 24)} d`;
+}

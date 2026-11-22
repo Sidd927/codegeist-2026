@@ -178,3 +178,8 @@ test('fallback extractor returns verbatim substrings only', () => {
   const r = extractWithRules(text);
   for (const item of [...r.categories, ...r.criteria, ...r.recipients]) assert.ok(text.includes(item.evidence_quote));
 });
+
+test('fallback vendor matching is case-sensitive: "segment shoppers" is not the vendor Segment (live finding)', () => {
+  assert.deepEqual(extractWithRules('Record sessions with ReplayCloud and segment shoppers').recipients.map((r) => r.name), ['ReplayCloud']);
+  assert.deepEqual(extractWithRules('Send events to Segment').recipients.map((r) => r.name), ['Segment']);
+});

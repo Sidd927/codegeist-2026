@@ -19,9 +19,13 @@ const ALLOWED_FIELDS = new Set([
   'mode', // 'ai' | 'rules'
   'reason', // job reason code
   'shape', // structural key names only (e.g. changelog item keys), never values
+  'dbMs', // time spent in SQL statements
+  'jiraMs', // time spent reading Jira
+  'modelMs', // time spent in the LLM call
+  'queueMs', // enqueue → processing start
 ]);
 
-const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count']);
+const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count', 'dbMs', 'jiraMs', 'modelMs', 'queueMs']);
 const SAFE_STRING = /^[A-Za-z0-9_.:\-/]{1,64}$/;
 
 /** Keep only allow-listed fields with safe primitive values. Exported for tests. */

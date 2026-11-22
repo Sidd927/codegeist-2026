@@ -33,11 +33,18 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
 
   const aiActive = () => settings.aiEnabled && screening.aiAvailable === true;
 
-  async function loadScreening(issueId, currentFp) {
-    const row = await repos.workItems.get(String(issueId));
-    const s = row?.screening_id ? await repos.screenings.get(row.screening_id) : null;
-    return presentScreening(row, s, currentFp);
+  /**
+   * Read the as-user Jira document and the stored screening IN PARALLEL. The SQL result is only used
+   * after the as-user read succeeded, so a user without browse permission still receives nothing.
+   */
+  async function readWithScreening(idOrKey, storedIssueId) {
+    const viewP = storedIssueId ? repos.workItems.getView(String(storedIssueId)) : null;
+    viewP?.catch(() => undefined); // never an unhandled rejection if the Jira read fails first
+    const doc = await jira.getIssueDocument(idOrKey);
+    const stored = viewP ? await viewP : await repos.workItems.getView(String(doc.id));
+    return { doc, stored };
   }
+  const present = (doc, stored) => presentScreening(stored.row, stored.screening, buildScreeningText(doc).fingerprint);
 
   return {
     async appContext() {
@@ -55,26 +62,26 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     async panelState(extensionIssue) {
       const id = validate.issueId(extensionIssue?.id);
       let doc;
+      let stored;
       try {
-        doc = await jira.getIssueDocument(id);
+        ({ doc, stored } = await readWithScreening(id, id));
       } catch (e) {
         if (e?.code === ErrorCode.NOT_FOUND) return { access: 'denied', issue: null, screening: null, features: FEATURES };
         throw e;
       }
-      if (!settings.isProjectInScope(doc.projectKey)) return { access: 'granted', issue: { id: doc.id, key: doc.key, projectKey: doc.projectKey }, screening: { state: 'OUT_OF_SCOPE', result: null }, features: FEATURES };
-      const currentFp = buildScreeningText(doc).fingerprint;
-      return { access: 'granted', issue: { id: doc.id, key: doc.key, projectKey: doc.projectKey }, screening: await loadScreening(doc.id, currentFp), features: FEATURES, ai: aiActive() ? 'on' : 'off' };
+      const issue = { id: doc.id, key: doc.key, projectKey: doc.projectKey };
+      if (!settings.isProjectInScope(doc.projectKey)) return { access: 'granted', issue, screening: { state: 'OUT_OF_SCOPE', result: null }, features: FEATURES };
+      return { access: 'granted', issue, screening: present(doc, stored), features: FEATURES, ai: aiActive() ? 'on' : 'off' };
     },
 
     /** Review workspace (Margin): current text as the reviewer sees it + the latest screening. */
     async workspace(rawKey) {
       const key = validate.issueKey(rawKey);
-      const doc = await jira.getIssueDocument(key);
+      const { doc, stored } = await readWithScreening(key, null);
       const { blocks, truncated } = adfToBlocks(doc.description);
-      const current = buildScreeningText(doc);
-      const view = settings.isProjectInScope(doc.projectKey) ? await loadScreening(doc.id, current.fingerprint) : { state: 'OUT_OF_SCOPE', result: null };
+      const view = settings.isProjectInScope(doc.projectKey) ? present(doc, stored) : { state: 'OUT_OF_SCOPE', result: null };
       // Highlights are only valid against exactly the text that was screened.
-      const marksValid = view.result && !['RESCREEN_REQUIRED', 'SCREENING'].includes(view.state) && view.state !== 'SCREENING_FAILED';
+      const marksValid = view.result && !['SCREENING', 'SCREENING_FAILED'].includes(view.state) && view.reason !== 'content_changed';
       return {
         issue: { id: doc.id, key: doc.key, summary: doc.summary, status: doc.status, statusCategory: doc.statusCategory, projectKey: doc.projectKey, projectName: doc.projectName, issueType: doc.issueType },
         document: { summary: doc.summary, blocks, truncated },

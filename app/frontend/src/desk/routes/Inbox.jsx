@@ -5,7 +5,7 @@ import Button from '@atlaskit/button/new';
 import { api } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState, StatusLozenge } from '../../shared/components/States.jsx';
-import { findingLabel, relativeTime } from '../../shared/findings.js';
+import { findingLabel, relativeTime, duration } from '../../shared/findings.js';
 import { copy } from '../../shared/copy/en.js';
 import { useRouter } from '../router.jsx';
 
@@ -50,7 +50,6 @@ function OpenWorkItem() {
 
 function SummaryStrip({ counts, onView }) {
   if (!counts) return null;
-  const days = counts.oldestPendingMs ? Math.max(1, Math.round(counts.oldestPendingMs / 86_400_000)) : null;
   const stat = (label, value, view) => (
     <li>
       <button type="button" className="a25-stat" onClick={() => onView(view)}>
@@ -64,7 +63,7 @@ function SummaryStrip({ counts, onView }) {
       {stat(I.strip.pending, counts.pending, 'pending')}
       {stat(I.strip.dpiaLikely, counts.dpiaLikely, 'pending')}
       {stat(I.strip.needsInfo, counts.needsInfo, 'needs-info')}
-      {stat(I.strip.oldest, days ? `${days} d` : '–', 'pending')}
+      {stat(I.strip.oldest, duration(counts.oldestPendingMs), 'pending')}
     </ul>
   );
 }

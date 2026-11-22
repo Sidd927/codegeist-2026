@@ -1,6 +1,6 @@
 {
   "name": "article25",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Article25: the privacy review desk that lives inside Jira (Forge app).",
   "license": "UNLICENSED",

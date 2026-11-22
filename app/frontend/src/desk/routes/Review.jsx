@@ -170,7 +170,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
       </div>
 
       {displayState === 'SCREENING' ? <SectionMessage appearance="information">{S.checking}</SectionMessage> : null}
-      {displayState === 'RESCREEN_REQUIRED' ? <SectionMessage appearance="warning">{S.rescreen}</SectionMessage> : null}
+      {displayState === 'RESCREEN_REQUIRED' ? <SectionMessage appearance="warning">{screening.reason === 'pipeline_changed' ? S.rescreenPipeline : S.rescreen}</SectionMessage> : null}
       {displayState === 'SCREENING_FAILED' ? <SectionMessage appearance="error">{S.failed}</SectionMessage> : null}
 
       <div className="a25-review__tabs" role="group" aria-label={copy.review.tabsLabel}>

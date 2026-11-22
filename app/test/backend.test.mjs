@@ -8,6 +8,7 @@ import { configFor, FEATURES, settingsFromEnv } from '../src/backend/lib/config.
 import { createFakeRepos } from './fakes.mjs';
 import { buildScreeningText } from '../src/core/screening-text.js';
 import { presentScreening } from '../src/backend/services/presenter.js';
+import { pipelineVersion } from '../src/core/analyse.js';
 import { adfToBlocks } from '../src/core/text.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
 
@@ -91,7 +92,7 @@ test('adfToBlocks keeps block structure and inline breaks, skips empty paragraph
 
 // ---- services (desk): access control and real screening state
 const SCREENING_ROW = (fp) => ({ issue_id: '10042', issue_key: 'SHOP-42', project_key: 'SHOP', state: 'SCREENED', outcome: 'REVIEW_REQUIRED', screening_id: 'sid', screened_fp: fp, request_seq: 1, processed_seq: 1, lease_token: null, lease_until: null, attempts: 0, last_error: null, version: 1, created_at: 1, updated_at: 1 });
-const SCREENING = { screeningId: 'sid', issueId: '10042', fp: 'x', pipelineVersion: 't1.r1.0.0.f1.noai', mode: 'rules', outcome: 'REVIEW_REQUIRED', result: { rulesVersion: 'r1.0.0', reasons: [{ ruleId: 'R-SENS', outcome: 'REVIEW_REQUIRED', params: {} }], trace: [], findings: [{ id: 'f1', index: 1, kind: 'sensitive_data', signal: 'health', certainty: 'stated', severity: 'high', isNew: false, provenance: 'rules', evidence: { start: 0, end: 4, source: { field: 'summary', blockIndex: -1, start: 0, end: 4 }, excerpt: 'Add ' } }] }, quality: { rejected: 0, dropped: 0 }, aiStatus: 'not_enabled', createdAt: 5 };
+const SCREENING = { screeningId: 'sid', issueId: '10042', fp: 'x', pipelineVersion: pipelineVersion('rules'), mode: 'rules', outcome: 'REVIEW_REQUIRED', result: { rulesVersion: 'r1.0.0', reasons: [{ ruleId: 'R-SENS', outcome: 'REVIEW_REQUIRED', params: {} }], trace: [], findings: [{ id: 'f1', index: 1, kind: 'sensitive_data', signal: 'health', certainty: 'stated', severity: 'high', isNew: false, provenance: 'rules', evidence: { start: 0, end: 4, source: { field: 'summary', blockIndex: -1, start: 0, end: 4 }, excerpt: 'Add ' } }] }, quality: { rejected: 0, dropped: 0 }, aiStatus: 'not_enabled', createdAt: 5 };
 const currentFp = buildScreeningText({ summary: 'Add session replay', description: ADF }).fingerprint;
 async function seeded(fp) {
   const fake = createFakeRepos();
@@ -166,4 +167,11 @@ test('presenter: queued/screening and failed states never present a result as cu
 });
 test('only screening is switched on; decision, gate and register features stay off until their milestones', () => {
   assert.deepEqual(FEATURES, { screening: true, decisions: false, gate: false, register: false });
+});
+
+test('version-aware: a stored result from an older pipeline version is shown as rescreening required', () => {
+  const row = { state: 'SCREENED', screened_fp: 'a' };
+  const old = { ...SCREENING, pipelineVersion: 't1.r0.9.0.f1.noai' };
+  assert.deepEqual([presentScreening(row, old, 'a').state, presentScreening(row, old, 'a').reason], ['RESCREEN_REQUIRED', 'pipeline_changed']);
+  assert.equal(presentScreening(row, SCREENING, 'a').state, 'REVIEW_REQUIRED');
 });

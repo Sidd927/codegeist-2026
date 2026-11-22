@@ -63,16 +63,25 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
    */
   async function processJob(job, { retryCount = 0 } = {}) {
     const t0 = clock();
+    const timing = { dbMs: 0, jiraMs: 0 };
+    const timed = async (bucket, fn) => {
+      const s = clock();
+      try {
+        return await fn();
+      } finally {
+        timing[bucket] += clock() - s;
+      }
+    };
     const token = randomUUID();
     const issueId = String(job.issueId);
-    const row = await workItems.claim({ issueId, token, now: t0, leaseMs: LEASE_MS });
+    const row = await timed('dbMs', () => workItems.claim({ issueId, token, now: t0, leaseMs: LEASE_MS }));
     if (!row) return { status: 'busy' }; // another worker holds the lease; it will pick up newer events
     const seqAtClaim = row.request_seq;
 
     try {
       let issue;
       try {
-        issue = await jira.getIssueForScreening(issueId);
+        issue = await timed('jiraMs', () => jira.getIssueForScreening(issueId));
       } catch (e) {
         if (e?.code === ErrorCode.NOT_FOUND) {
           await onIssueDeleted({ issueId });
@@ -85,11 +94,11 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       // 1) Identical content already screened with the same pipeline version? Reuse it (no AI call).
       for (const mode of ['ai', 'rules']) {
         const existingId = screeningIdOf(issueId, st.fingerprint, pipelineVersion(mode));
-        const existing = await screenings.get(existingId);
+        const existing = await timed('dbMs', () => screenings.get(existingId));
         if (existing && (mode === 'ai' || !settings.aiEnabled || !llm.available)) {
           const ok = await workItems.finalize({ issueId, token, screeningId: existingId, fp: st.fingerprint, outcome: existing.outcome, seqAtClaim, now: clock() });
           await followUpIfNeeded(issueId, seqAtClaim);
-          log.info({ evt: 'screening.reused', issueId, outcome: existing.outcome, mode, ms: clock() - t0 });
+          log.info({ evt: 'screening.reused', issueId, outcome: existing.outcome, mode, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined, dbMs: timing.dbMs, jiraMs: timing.jiraMs });
           return { status: ok ? 'reused' : 'lease_lost', screeningId: existingId, outcome: existing.outcome };
         }
       }
@@ -107,16 +116,16 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       const version = pipelineVersion(mode);
       const screeningId = screeningIdOf(issueId, st.fingerprint, version);
       const now = clock();
-      await screenings.insert({
+      await timed('dbMs', () => screenings.insert({
         screeningId, issueId, fp: st.fingerprint, pipelineVersion: version, mode, model: mode === 'ai' ? llm.model : null,
         outcome: analysis.result.outcome, result: { ...analysis.result, truncated: st.truncated }, quality: analysis.quality, aiStatus,
         tokensIn: ex.usage?.tokensIn ?? null, tokensOut: ex.usage?.tokensOut ?? null, modelMs: ex.modelMs ?? null,
         totalMs: now - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : null, createdAt: now,
-      });
-      await usage.record({ day: dayOf(now), fallback: mode !== 'ai', tokensIn: ex.usage?.tokensIn ?? 0, tokensOut: ex.usage?.tokensOut ?? 0 });
-      const ok = await workItems.finalize({ issueId, token, screeningId, fp: st.fingerprint, outcome: analysis.result.outcome, seqAtClaim, now });
+      }));
+      await timed('dbMs', () => usage.record({ day: dayOf(now), fallback: mode !== 'ai', tokensIn: ex.usage?.tokensIn ?? 0, tokensOut: ex.usage?.tokensOut ?? 0 }));
+      const ok = await timed('dbMs', () => workItems.finalize({ issueId, token, screeningId, fp: st.fingerprint, outcome: analysis.result.outcome, seqAtClaim, now }));
       await followUpIfNeeded(issueId, seqAtClaim);
-      log.info({ evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, ms: now - t0, value: job.enqueuedAt ? t0 - job.enqueuedAt : undefined, count: analysis.result.findings.length });
+      log.info({ evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined, dbMs: timing.dbMs, jiraMs: timing.jiraMs, modelMs: ex.modelMs, count: analysis.result.findings.length });
       return { status: ok ? 'screened' : 'lease_lost', screeningId, outcome: analysis.result.outcome, mode, aiStatus };
     } catch (e) {
       const code = e?.code ?? 'INTERNAL';

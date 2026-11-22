@@ -85,6 +85,21 @@ export const workItems = {
 
   get: (issueId) => one('SELECT * FROM work_items WHERE issue_id = ?', issueId),
 
+  /** Work item + its current screening in ONE query (panel/workspace hot path). */
+  async getView(issueId) {
+    const r = await one(
+      `SELECT w.*, s.screening_id AS s_id, s.outcome AS s_outcome, s.mode AS s_mode, s.model AS s_model, s.result AS s_result, s.quality AS s_quality,
+              s.pipeline_version AS s_pipeline_version, s.ai_status AS s_ai_status, s.created_at AS s_created_at
+       FROM work_items w LEFT JOIN screenings s ON s.screening_id = w.screening_id WHERE w.issue_id = ?`,
+      issueId,
+    );
+    if (!r) return { row: null, screening: null };
+    const screening = r.s_id
+      ? { screening_id: r.s_id, outcome: r.s_outcome, mode: r.s_mode, model: r.s_model, result: JSON.parse(r.s_result), quality: JSON.parse(r.s_quality), pipeline_version: r.s_pipeline_version, ai_status: r.s_ai_status, created_at: r.s_created_at }
+      : null;
+    return { row: r, screening };
+  },
+
   async listByOutcomes(outcomes, states, limit) {
     return many(
       `SELECT issue_id, issue_key, project_key, state, outcome, screening_id, updated_at FROM work_items

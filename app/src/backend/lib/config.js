@@ -16,7 +16,7 @@ export const FEATURES = Object.freeze({
   register: false, // Confluence decision register
 });
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 
 export function configFor(environmentType) {
   return ENVIRONMENTS[String(environmentType ?? '').toUpperCase()] ?? ENVIRONMENTS.PRODUCTION;

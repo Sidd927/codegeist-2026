@@ -53,6 +53,11 @@ export function createFakeRepos() {
       if (r?.lease_token === token) Object.assign(r, { lease_token: null, lease_until: null, updated_at: now });
     },
     get: async (issueId) => (items.has(issueId) ? { ...items.get(issueId) } : null),
+    async getView(issueId) {
+      const row = items.has(issueId) ? { ...items.get(issueId) } : null;
+      const s = row?.screening_id && scr.has(row.screening_id) ? JSON.parse(JSON.stringify(scr.get(row.screening_id))) : null;
+      return { row, screening: s };
+    },
     listStuck: async ({ olderThan, now, limit }) => [...items.values()].filter((r) => ['QUEUED', 'SCREENING'].includes(r.state) && r.updated_at < olderThan && (r.lease_until === null || r.lease_until < now)).slice(0, limit).map((r) => ({ ...r })),
     async markFailedIfStuck({ issueId, code, now }) {
       const r = items.get(issueId);
