@@ -13,7 +13,7 @@ export default [
     rules: {
       // Only the content-free logger may write to the console (NFR-3).
       'no-console': 'error',
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
   {
@@ -34,7 +34,7 @@ export default [
       'react-hooks/exhaustive-deps': 'error',
       'react/prop-types': 'off',
       'no-console': 'error',
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
   {
