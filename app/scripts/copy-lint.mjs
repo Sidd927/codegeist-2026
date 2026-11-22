@@ -3,14 +3,14 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const BANNED = [/\bcompliant\b/i, /\bcompliance guaranteed\b/i, /\blegal advice\b/i, /\bguarantee[sd]?\b/i, /\bapproved by ai\b/i];
-const ROOTS = ['frontend/src/copy'];
+const ROOTS = ['frontend/src'];
 
 const files = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p);
-    else if (/\.(js|jsx|json)$/.test(name)) files.push(p);
+    else if (/\.(js|jsx|json)$/.test(name) && !/\.test\./.test(name)) files.push(p);
   }
 };
 ROOTS.forEach(walk);
