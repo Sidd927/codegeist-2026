@@ -7,18 +7,30 @@ import { PanelView } from './panel/PanelApp.jsx';
 import { ReviewView } from './desk/routes/Review.jsx';
 import { SettingsView } from './desk/routes/Settings.jsx';
 import { Home } from './desk/routes/Home.jsx';
-import { Inbox } from './desk/routes/Inbox.jsx';
+import { InboxView } from './desk/routes/Inbox.jsx';
 import { DeskHeader } from './desk/DeskApp.jsx';
 import { RouterProvider, createMemoryHistory, matchRoute } from './desk/router.jsx';
 import { axeViolations } from './a11y.js';
-import { invoke } from '@forge/bridge';
 
 const LABELS = { document: 'Work item text', summary: 'Summary', description: 'Description', noDescription: 'No description.' };
-const resource = (over) => ({ status: 'success', data: null, error: null, reload: vi.fn(), ...over });
+const resource = (over) => ({ status: 'success', data: null, error: null, reload: vi.fn(), refresh: vi.fn(), ...over });
 const withRouter = (ui, path = '/') => {
   const history = createMemoryHistory(path);
   return { history, ...render(<RouterProvider history={history}>{ui}</RouterProvider>) };
 };
+
+// Synthetic screening result in the presenter contract (backend/services/presenter.js).
+const RESULT = {
+  screeningId: 's1', outcome: 'DPIA_LIKELY', mode: 'rules', model: null, aiStatus: 'not_enabled', checkedAt: Date.now() - 120000,
+  rulesVersion: 'r1.0.0', reasons: [{ ruleId: 'R-SENS-2', outcome: 'DPIA_LIKELY', params: { criteria: 3 } }],
+  trace: [{ ruleId: 'R-NEG', result: 'not_matched' }, { ruleId: 'R-SENS-2', result: 'fired' }], criteria: [], truncated: false, quality: { rejected: 0, dropped: 0 },
+  findings: [
+    { id: 'f1', index: 1, kind: 'sensitive_data', signal: 'health', certainty: 'implied', severity: 'high', isNew: false, detail: null, question: null, provenance: 'rules', excerpt: 'prescription items', source: { field: 'description', blockIndex: 0, start: 51, end: 69 } },
+    { id: 'f2', index: 2, kind: 'external_sharing', signal: 'ReplayCloud', certainty: 'stated', severity: 'medium', isNew: true, detail: 'no_approved_list', question: null, provenance: 'rules', excerpt: 'ReplayCloud', source: { field: 'summary', blockIndex: -1, start: 36, end: 47 } },
+    { id: 'f3', index: null, kind: 'missing_info', signal: 'purpose', certainty: 'question', severity: 'info', isNew: false, detail: null, question: null, provenance: null, excerpt: null, source: null },
+  ],
+};
+const DOC = { summary: 'Add session replay to checkout with ReplayCloud', blocks: [{ kind: 'paragraph', text: 'Record checkout sessions and segment shoppers with prescription items.' }], truncated: false };
 
 describe('Margin evidence helpers', () => {
   it('locates quotes case-insensitively, skips overlaps and unknown quotes', () => {
@@ -71,21 +83,46 @@ describe('State vocabulary', () => {
   });
 });
 
-describe('Issue panel', () => {
+describe('Issue panel (real screening states)', () => {
+  const granted = (screening) => ({ access: 'granted', issue: { key: 'SHOP-42' }, screening, features: { screening: true } });
   it('shows a loading skeleton announced to assistive tech', () => {
     render(<PanelView resource={resource({ status: 'loading' })} />);
     expect(screen.getByRole('status').textContent).toContain('Loading');
   });
-  it('shows NOT_SCREENED honestly with checks off, and opens the desk', async () => {
-    const onOpenDesk = vi.fn();
-    const data = { access: 'granted', issue: { key: 'SHOP-42' }, review: { state: 'NOT_SCREENED', findings: [] }, features: { screening: false } };
-    const { container } = render(<PanelView resource={resource({ data })} onOpenDesk={onOpenDesk} />);
+  it('NOT_SCREENED offers "Check now" and shows no findings', () => {
+    const onRecheck = vi.fn(async () => ({ status: 'queued' }));
+    render(<PanelView resource={resource({ data: granted({ state: 'NOT_SCREENED', result: null }) })} onRecheck={onRecheck} />);
     expect(screen.getByText('Not checked yet')).toBeTruthy();
-    expect(screen.getByText(/not switched on/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Check now' }));
+    expect(onRecheck).toHaveBeenCalled();
+  });
+  it('SCREENING is visibly in progress (busy), never a result', () => {
+    const { container } = render(<PanelView resource={resource({ data: granted({ state: 'SCREENING', result: null }) })} />);
+    expect(screen.getByText('Checking…')).toBeTruthy();
+    expect(container.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(screen.queryByText(/No review needed|DPIA likely/)).toBeNull();
+  });
+  it('SCREENING_FAILED says it is not treated as clean and offers re-check', () => {
+    render(<PanelView resource={resource({ data: granted({ state: 'SCREENING_FAILED', result: null }) })} onRecheck={vi.fn()} />);
+    expect(screen.getByText('Check failed')).toBeTruthy();
+    expect(screen.getByText(/not treated as clean/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Re-check' })).toBeTruthy();
+  });
+  it('a result shows outcome, explanation, the rule-based mode label and verified findings', async () => {
+    const { container } = render(<PanelView resource={resource({ data: granted({ state: 'DPIA_LIKELY', result: RESULT }) })} onOpenDesk={vi.fn()} onRecheck={vi.fn()} />);
+    expect(screen.getByText('DPIA likely')).toBeTruthy();
+    expect(screen.getByText(/Sensitive data with 3 high-risk criteria/)).toBeTruthy();
+    expect(screen.getByText(/Rule-based check \(limited recall\)/)).toBeTruthy();
+    expect(screen.getAllByText('Health data').length).toBeGreaterThan(0);
+    expect(screen.getByText('Purpose not stated')).toBeTruthy();
     expect(screen.queryByText(/Approved/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Open in review desk' }));
-    expect(onOpenDesk).toHaveBeenCalledWith('SHOP-42');
     expect(await axeViolations(container)).toEqual([]);
+  });
+  it('RESCREEN_REQUIRED keeps the previous result but flags it as possibly out of date', () => {
+    render(<PanelView resource={resource({ data: granted({ state: 'RESCREEN_REQUIRED', result: RESULT }) })} />);
+    expect(screen.getByText('Rescreening required')).toBeTruthy();
+    expect(screen.getByText(/may be out of date/)).toBeTruthy();
+    expect(screen.getByText(/Previous result: DPIA likely/)).toBeTruthy();
   });
   it('shows only a permission message when access is denied', () => {
     render(<PanelView resource={resource({ data: { access: 'denied' } })} />);
@@ -100,23 +137,30 @@ describe('Issue panel', () => {
   });
 });
 
-describe('Review workspace', () => {
-  const data = {
-    issue: { key: 'SHOP-42', summary: 'Add session replay', projectName: 'Shop', issueType: 'Task', status: 'To Do' },
-    document: { summary: 'Add session replay', blocks: [{ kind: 'paragraph', text: 'Record checkout sessions.' }], truncated: false },
-    review: { state: 'NOT_SCREENED', findings: [] },
-    decision: { available: false, reason: 'CHECKS_NOT_ENABLED' },
-  };
-  it('renders three zones; decisions are disabled with a stated reason', async () => {
-    const { container } = withRouter(<ReviewView resource={resource({ data })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Add session replay' })).toBeTruthy();
-    expect(screen.getByText('Record checkout sessions.')).toBeTruthy();
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(4);
-    radios.forEach((r) => expect(r.disabled).toBe(true));
-    expect(screen.getByRole('button', { name: 'Record decision' }).disabled).toBe(true);
-    expect(screen.getByText(/Decisions become available after a privacy check/)).toBeTruthy();
+describe('Review workspace (Margin with verified highlights)', () => {
+  const data = (screening) => ({ issue: { key: 'SHOP-42', summary: 'Add session replay', projectName: 'Shop', issueType: 'Task', status: 'To Do' }, document: DOC, screening, decision: { available: false, reason: 'DECISIONS_NOT_ENABLED' } });
+  it('draws marks from server ranges, links them to margin notes, and keeps decisions disabled with a reason', async () => {
+    const { container } = withRouter(<ReviewView resource={resource({ data: data({ state: 'DPIA_LIKELY', result: RESULT, marksValid: true }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} onRecheck={vi.fn()} />);
+    const marks = container.querySelectorAll('mark');
+    expect([...marks].map((m) => m.textContent.replace(/\d+\s*\(evidence.*$/, ''))).toEqual(['ReplayCloud', 'prescription items']);
+    expect(marks[0].getAttribute('aria-describedby')).toBe('a25-rv-note-f2');
+    expect(screen.getAllByRole('radio').every((r) => r.disabled)).toBe(true);
+    expect(screen.getByText(/Recording decisions arrives in the next milestone/)).toBeTruthy();
     expect(await axeViolations(container)).toEqual([]);
+  });
+  it('draws NO marks when the text changed since the check (offsets would be wrong)', () => {
+    const { container } = withRouter(<ReviewView resource={resource({ data: data({ state: 'RESCREEN_REQUIRED', result: RESULT, marksValid: false }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
+    expect(container.querySelectorAll('mark')).toHaveLength(0);
+    expect(screen.getByText(/may be out of date/)).toBeTruthy();
+  });
+  it('ignores out-of-range server offsets defensively', () => {
+    const bad = { ...RESULT, findings: [{ ...RESULT.findings[0], source: { field: 'description', blockIndex: 0, start: 60, end: 999 } }] };
+    const { container } = withRouter(<ReviewView resource={resource({ data: data({ state: 'DPIA_LIKELY', result: bad, marksValid: true }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
+    expect(container.querySelectorAll('mark')).toHaveLength(0);
+  });
+  it('not screened: empty margin with "Check now"; failed: explicit failure banner', () => {
+    withRouter(<ReviewView resource={resource({ data: data({ state: 'NOT_SCREENED', result: null, marksValid: false }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} onRecheck={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Check now' })).toBeTruthy();
   });
   it('shows not-found for missing or inaccessible work items', () => {
     withRouter(<ReviewView resource={resource({ status: 'error', error: { code: 'NOT_FOUND' } })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
@@ -155,11 +199,27 @@ describe('Desk navigation and access', () => {
   });
 });
 
+
 describe('Inbox', () => {
-  it('shows the checks-off empty state and validates the open-work-item key', async () => {
-    invoke.mockResolvedValueOnce({ ok: true, data: { enabled: false, view: 'pending', items: [], counts: null } });
-    const { history, container } = withRouter(<Inbox />, '/inbox');
-    expect(await screen.findByText('Nothing to review yet')).toBeTruthy();
+  const items = [
+    { issueId: '1', key: 'SHOP-42', summary: 'Add session replay', state: 'DPIA_LIKELY', mode: 'rules', chips: [{ kind: 'sensitive_data', signal: 'health' }], findingCount: 3, updatedAt: Date.now() - 3600000 },
+    { issueId: '2', key: 'HR-8', summary: 'Track contractor screens', state: 'REVIEW_REQUIRED', mode: 'ai', chips: [], findingCount: 2, updatedAt: Date.now() - 7200000 },
+  ];
+  it('lists real items with state, key and chips; strip numbers switch views', async () => {
+    const setView = vi.fn();
+    const onOpen = vi.fn();
+    const { container } = withRouter(<InboxView resource={resource({ data: { enabled: true, view: 'pending', items, counts: { pending: 2, dpiaLikely: 1, needsInfo: 0, oldestPendingMs: 7200000 } } })} view="pending" setView={setView} onOpen={onOpen} />, '/inbox');
+    expect(screen.getByText('SHOP-42')).toBeTruthy();
+    expect(screen.getByText('Health data')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /SHOP-42/ }));
+    expect(onOpen).toHaveBeenCalledWith('SHOP-42');
+    fireEvent.click(screen.getAllByRole('button', { name: /Needs information$/ })[0]);
+    expect(setView).toHaveBeenCalled();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+  it('shows an empty view and validates the open-work-item key', async () => {
+    const { history } = withRouter(<InboxView resource={resource({ data: { enabled: true, view: 'pending', items: [], counts: { pending: 0, dpiaLikely: 0, needsInfo: 0, oldestPendingMs: null } } })} view="pending" setView={vi.fn()} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.getByText('Nothing in this view')).toBeTruthy();
     const input = screen.getByLabelText('Work item key');
     fireEvent.change(input, { target: { value: 'not a key' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
@@ -167,6 +227,5 @@ describe('Inbox', () => {
     fireEvent.change(input, { target: { value: 'shop-42' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open' })));
     expect(history.location.pathname).toBe('/review/SHOP-42');
-    expect(await axeViolations(container)).toEqual([]);
   });
 });

@@ -5,6 +5,22 @@ import Lozenge from '@atlaskit/lozenge';
 import { locateMarks, segment } from '../margin.js';
 
 const markId = (prefix, id) => `${prefix}-mark-${id}`;
+
+/** Server ranges use blockIndex -1 for the summary and 0..n for description blocks. */
+function rangesToMap(ranges, all) {
+  const map = new Map();
+  for (const r of ranges) {
+    const b = r.blockIndex + 1;
+    const text = all[b]?.text ?? '';
+    if (!(r.start >= 0 && r.end <= text.length && r.start < r.end)) continue; // defensive: never render out-of-range marks
+    const list = map.get(b) ?? [];
+    if (list.some((x) => r.start < x.end && r.end > x.start)) continue;
+    list.push({ start: r.start, end: r.end, id: r.id });
+    list.sort((x, y) => x.start - y.start);
+    map.set(b, list);
+  }
+  return map;
+}
 const noteId = (prefix, id) => `${prefix}-note-${id}`;
 
 /**
@@ -15,10 +31,13 @@ const noteId = (prefix, id) => `${prefix}-note-${id}`;
  * @param {{id:string,index:number,quote:string,tone:'sensitive'|'vendor'|'default'}[]} props.marks
  * @param {string|null} props.activeId
  */
-export function EvidenceDocument({ idPrefix, summary, blocks, marks = [], activeId = null, labels }) {
+export function EvidenceDocument({ idPrefix, summary, blocks, marks = [], ranges = null, activeId = null, labels }) {
   const all = useMemo(() => [{ kind: 'summary', text: summary ?? '' }, ...blocks], [summary, blocks]);
-  const located = useMemo(() => locateMarks(all, marks), [all, marks]);
+  // Prefer server-verified ranges (offsets into the exact screened text); fall back to quote search
+  // only for static illustrative content.
+  const located = useMemo(() => (ranges ? rangesToMap(ranges, all) : locateMarks(all, marks)), [ranges, all, marks]);
   const byId = useMemo(() => Object.fromEntries(marks.map((m) => [m.id, m])), [marks]);
+  const total = marks.length;
 
   const renderText = (text, b) =>
     segment(text, located.get(b)).map((seg, i) => {
@@ -35,7 +54,7 @@ export function EvidenceDocument({ idPrefix, summary, blocks, marks = [], active
           <sup className="a25-mark__index" aria-hidden="true">
             {m.index}
           </sup>
-          <span className="a25-visually-hidden">{` (evidence ${m.index} of ${marks.length})`}</span>
+          <span className="a25-visually-hidden">{` (evidence ${m.index} of ${total})`}</span>
         </mark>
       );
     });
@@ -89,8 +108,14 @@ export function MarginNotes({ idPrefix, notes, activeId, onActivate, newLabel = 
                 </span>
                 {n.isNew ? <Lozenge appearance="moved">{newLabel}</Lozenge> : null}
               </span>
-              <q className="a25-note__quote">{n.quote}</q>
-              {n.provenance ? <span className="a25-note__provenance a25-small">{n.provenance}</span> : null}
+              {n.explanation ? <span className="a25-note__explanation a25-small">{n.explanation}</span> : null}
+              {n.quote ? <q className="a25-note__quote">{n.quote}</q> : null}
+              {n.certainty || n.provenance ? (
+                <span className="a25-note__meta a25-small">
+                  {n.certainty ? <span className={`a25-note__certainty a25-note__certainty--${n.severity ?? 'info'}`}>{n.certainty}</span> : null}
+                  {n.provenance ? <span className="a25-note__provenance">{n.provenance}</span> : null}
+                </span>
+              ) : null}
             </span>
           </button>
         </li>

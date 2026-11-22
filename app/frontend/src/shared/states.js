@@ -17,6 +17,7 @@ const APPEARANCE = {
   CHANGES_REQUESTED: 'moved',
   REJECTED: 'removed',
   STALE: 'removed',
+  RESCREEN_REQUIRED: 'moved',
 };
 
 export function stateDisplay(state) {
