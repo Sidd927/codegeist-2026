@@ -59,3 +59,10 @@ export function clientMetrics(payload) {
   }
   return { surface, metrics };
 }
+
+/** Name search for the reviewer picker: 2–50 characters of plain text. */
+export function personQuery(value) {
+  const v = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (v.length < 2 || v.length > 50 || /[<>]/.test(v) || [...v].some((c) => c.charCodeAt(0) < 32)) throw new AppError(ErrorCode.INVALID_INPUT, 'Type at least two characters of a name.');
+  return v;
+}

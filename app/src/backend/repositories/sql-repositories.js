@@ -251,7 +251,7 @@ export const chain = {
   all: async (limit = 5000) => (await many(`SELECT record FROM chain ORDER BY seq ASC LIMIT ${Number(limit) | 0}`)).map((r) => JSON.parse(r.record)),
 };
 
-/** Inbox candidates with their latest decision and assignment (two correlated subqueries, one statement). */
+/** Inbox candidates with their latest decision and assignment (grouped derived tables, one statement). */
 export async function inboxCandidates({ projectKey = null, outcome = null, limit = 300 }) {
   const where = ["(w.outcome IN ('NEEDS_INFO', 'REVIEW_REQUIRED', 'DPIA_LIKELY') OR d.decision IS NOT NULL OR w.state IN ('QUEUED', 'SCREENING', 'SCREENING_FAILED'))"];
   const params = [];
@@ -268,8 +268,10 @@ export async function inboxCandidates({ projectKey = null, outcome = null, limit
             d.decision AS d_decision, d.fp AS d_fp, d.seq AS d_seq, d.decided_at AS d_at, d.detail AS d_detail,
             a.assignee AS a_assignee, a.seq AS a_seq
      FROM work_items w
-     LEFT JOIN decisions d ON d.issue_id = w.issue_id AND d.seq = (SELECT MAX(d2.seq) FROM decisions d2 WHERE d2.issue_id = w.issue_id)
-     LEFT JOIN assignments a ON a.issue_id = w.issue_id AND a.seq = (SELECT MAX(a2.seq) FROM assignments a2 WHERE a2.issue_id = w.issue_id)
+     LEFT JOIN (SELECT issue_id, MAX(seq) AS max_seq FROM decisions GROUP BY issue_id) dm ON dm.issue_id = w.issue_id
+     LEFT JOIN decisions d ON d.issue_id = dm.issue_id AND d.seq = dm.max_seq
+     LEFT JOIN (SELECT issue_id, MAX(seq) AS max_seq FROM assignments GROUP BY issue_id) am ON am.issue_id = w.issue_id
+     LEFT JOIN assignments a ON a.issue_id = am.issue_id AND a.seq = am.max_seq
      WHERE ${where.join(' AND ')}
      ORDER BY w.updated_at ASC LIMIT ${Number(limit) | 0}`,
     ...params,

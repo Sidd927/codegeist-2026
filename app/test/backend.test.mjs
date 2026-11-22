@@ -27,7 +27,7 @@ const ADF = {
 function fakeJira({ admin = false, deny = false, adminThrows = false, visible = null, reviewers = [] } = {}) {
   return {
     groupsOf: async (id) => (reviewers.includes(id) ? ['article25-reviewers'] : []),
-    groupMembers: async () => reviewers.map((accountId) => ({ accountId, displayName: `Reviewer ${accountId}`, active: true })),
+    searchUsers: async () => reviewers.map((accountId) => ({ accountId, displayName: `Reviewer ${accountId}`, active: true })),
     usersBulk: async (ids) => new Map(ids.map((id) => [id, { displayName: `User ${id}`, active: true }])),
     async getIssueDocument(key) {
       if (deny) throw new AppError(ErrorCode.NOT_FOUND);
@@ -181,4 +181,12 @@ test('version-aware: a stored result from an older pipeline version is shown as 
   const old = { ...SCREENING, pipelineVersion: 't1.r0.9.0.f1.noai' };
   assert.deepEqual([presentScreening(row, old, 'a').state, presentScreening(row, old, 'a').reason], ['RESCREEN_REQUIRED', 'pipeline_changed']);
   assert.equal(presentScreening(row, SCREENING, 'a').state, 'REVIEW_REQUIRED');
+});
+
+test('error facts for logs keep only class, code, errno and letters-only message kind (no identifiers or values)', async () => {
+  const { errorFacts } = await import('../src/backend/lib/logger.js');
+  const e = Object.assign(new Error("Error 1054 (42S22): Unknown column 'secret_col' in 'field list' for value 'diabetes'"), { name: 'ForgeSQLError', code: 'SQL_EXECUTION_ERROR' });
+  const f = sanitise({ evt: 'x', ...errorFacts(e) });
+  assert.deepEqual(f, { evt: 'x', errName: 'ForgeSQLError', errCode: 'SQL_EXECUTION_ERROR', errno: 1054, errKind: 'Error_S_Unknown_column' });
+  assert.equal(JSON.stringify(f).includes('diabetes') || JSON.stringify(f).includes('secret'), false);
 });

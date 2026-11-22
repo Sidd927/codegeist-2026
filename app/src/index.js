@@ -6,7 +6,7 @@ import { createDeskServices } from './backend/services/desk.js';
 import * as repos from './backend/repositories/sql-repositories.js';
 import { buildScreening, buildReview, requestMigration } from './backend/handlers/events.js';
 import { configFor, settingsFromEnv } from './backend/lib/config.js';
-import { log } from './backend/lib/logger.js';
+import { log, errorFacts } from './backend/lib/logger.js';
 import { ok, toEnvelope, AppError, ErrorCode } from './backend/lib/errors.js';
 import * as validate from './backend/lib/validate.js';
 
@@ -34,7 +34,7 @@ function define(key, fn) {
       return ok(data);
     } catch (e) {
       const envelope = toEnvelope(e);
-      log[envelope.error.code === 'INTERNAL' ? 'error' : 'warn']({ evt: 'resolver.failed', resolver: key, code: envelope.error.code, status: e?.status, ms: Date.now() - t0, env: deps.config.name });
+      log[envelope.error.code === 'INTERNAL' ? 'error' : 'warn']({ evt: 'resolver.failed', resolver: key, code: envelope.error.code, status: e?.status, ...(envelope.error.code === 'INTERNAL' ? errorFacts(e) : {}), ms: Date.now() - t0, env: deps.config.name });
       return envelope;
     }
   });
@@ -47,7 +47,7 @@ define('getPanelState', ({ services, context }) => services.panelState(context?.
 define('getWorkspace', ({ services, payload, context }) => services.workspace(payload.issueKey, actor(context)));
 define('getInbox', ({ services, payload, context }) => services.inbox(payload, actor(context)));
 define('getSettingsOverview', ({ services, context }) => services.settingsOverview(actor(context)));
-define('getReviewers', ({ services, context }) => services.reviewers(actor(context)));
+define('getReviewers', ({ services, payload, context }) => services.reviewers(payload.query, actor(context)));
 define('assignReview', ({ services, payload, context }) => services.assign(payload, actor(context)));
 define('recordDecision', ({ services, payload, context }) => services.decide(payload, actor(context)));
 define('verifyRecord', ({ services, payload, context }) => services.verifyRecord(payload.issueKey, actor(context)));

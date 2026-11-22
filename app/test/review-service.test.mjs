@@ -55,7 +55,8 @@ function world({ signingKey = KEY, sod = 'on' } = {}) {
       groupCalls.n++;
       return members.some((m) => m.accountId === id) ? ['article25-reviewers', 'jira-software-users'] : ['jira-software-users'];
     },
-    groupMembers: async () => members.map((m) => ({ ...m })),
+    // Name search returns reviewers AND non-reviewers; the service must filter to the group.
+    searchUsers: async (q) => [...members, { accountId: OUTSIDER, displayName: 'Outside Person', active: true }].filter((m) => m.displayName.toLowerCase().includes(q.toLowerCase())).map((m) => ({ ...m })),
     usersBulk: async (ids) => new Map(ids.map((id) => [id, members.find((m) => m.accountId === id) ?? { displayName: `User ${id.slice(-3)}`, active: true }])),
     isJiraAdmin: async () => false,
   });
@@ -143,7 +144,7 @@ test('non-reviewers cannot decide, assign or list reviewers; the frontend flag i
   const binding = (await w.desk(REV1).workspace('SHOP-1', REV1)).review.binding;
   await assert.rejects(w.desk(OUTSIDER).decide({ issueKey: 'SHOP-1', input: APPROVE, ...binding, expectedSeq: 0, requestId: nextRid() }, OUTSIDER), codeOf('NOT_AUTHORISED'));
   await assert.rejects(w.desk(OUTSIDER).assign({ issueKey: 'SHOP-1', assigneeId: OUTSIDER, expectedSeq: 0, requestId: nextRid() }, OUTSIDER), codeOf('NOT_AUTHORISED'));
-  await assert.rejects(w.desk(OUTSIDER).reviewers(OUTSIDER), codeOf('NOT_AUTHORISED'));
+  await assert.rejects(w.desk(OUTSIDER).reviewers('rev', OUTSIDER), codeOf('NOT_AUTHORISED'));
   await assert.rejects(w.desk(OUTSIDER).verifyRecord('SHOP-1', OUTSIDER), codeOf('NOT_AUTHORISED'));
   // No actor (missing context) is treated as unauthorised, never as a reviewer.
   await assert.rejects(w.desk(null).decide({ issueKey: 'SHOP-1', input: APPROVE, ...binding, expectedSeq: 0, requestId: nextRid() }, null), codeOf('NOT_AUTHORISED'));
@@ -219,6 +220,13 @@ test('assignment: only active reviewers can be assigned; reassignment and unassi
   assert.equal((await d.inbox({ view: 'attention', assignee: 'me' }, REV1)).total, 1);
   assert.equal((await d.inbox({ view: 'attention', assignee: 'unassigned' }, REV1)).total, 0);
   assert.equal((await w.desk(REV2).inbox({ view: 'attention', assignee: 'me' }, REV2)).total, 0);
+});
+
+test('reviewer search returns only active members of the reviewer group; queries are validated', async () => {
+  const w = await world();
+  const r = await w.desk(REV1).reviewers('re', REV1); // matches Reviewer One/Two, Former Reviewer, Outside Person
+  assert.deepEqual(r.reviewers.map((x) => x.displayName).sort(), ['Reviewer One', 'Reviewer Two']);
+  for (const bad of ['', 'a', 'x'.repeat(51), '<script>', undefined]) await assert.rejects(w.desk(REV1).reviewers(bad, REV1), codeOf('INVALID_INPUT'));
 });
 
 test('an inactive (former) reviewer still shows in history and no longer has rights', async () => {
@@ -333,6 +341,7 @@ test('material change after approval → approval invalidated automatically and 
   const sys = ws.review.decisions[0];
   assert.deepEqual([sys.kind, sys.decision, sys.decidedBy], ['system', 'APPROVAL_INVALIDATED', null]);
   assert.ok(Object.keys(sys.detail.added).length > 0 || sys.detail.escalated);
+  assert.deepEqual(sys.detail.added.recipients, ['Twilio']); // shown with the text's own casing
   // It is back in the attention queue, and a new decision binds to the new content.
   assert.equal((await w.desk(REV1).inbox({ view: 'changed' }, REV1)).items[0].reviewStatus, 'APPROVAL_STALE');
   assert.equal((await decision(w, REV1, 'SHOP-1', { decision: 'REJECTED', rationale: 'Sharing contact data with Twilio is not covered by the approval.' })).status, 'recorded');

@@ -27,7 +27,10 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
         jira
           .groupsOf(accountId)
           .then((g) => g.includes(settings.reviewerGroup))
-          .catch(() => false), // fail closed
+          .catch((e) => {
+            log.warn({ evt: 'reviewer.check.failed', code: e?.code ?? 'INTERNAL', status: e?.status });
+            return false; // fail closed
+          }),
       );
     }
     return groupCache.get(accountId);
@@ -84,9 +87,11 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
   }
 
   // ---- assignment ---------------------------------------------------------------------------
-  async function reviewers() {
-    const members = await jira.groupMembers(settings.reviewerGroup);
-    return members.map((m) => ({ accountId: m.accountId, displayName: m.displayName, active: m.active }));
+  /** Active reviewer-group members matching a name search (at most 20 candidates are checked). */
+  async function reviewers(query) {
+    const found = await jira.searchUsers(query);
+    const checked = await Promise.all(found.filter((u) => u.active && ACCOUNT_ID.test(u.accountId)).map(async (u) => ((await isReviewer(u.accountId)) ? u : null)));
+    return checked.filter(Boolean).map((u) => ({ accountId: u.accountId, displayName: u.displayName, active: true }));
   }
 
   async function assign({ actorId, issueKey, assigneeId, expectedSeq, requestId }) {
@@ -178,6 +183,10 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     if (!latest || !isApprovingDecision(latest.decision) || latest.fp === screening.fp) return { status: 'no_change' };
     const current = signalSetOf({ ...screening.result, outcome: screening.outcome });
     const m = materialChange(latest.signal_set, current);
+    // Signal sets compare lower-cased values; show recipients/transfers with the text's own casing.
+    const original = (kinds, v) => (screening.result?.findings ?? []).find((f) => kinds.includes(f.kind) && String(f.signal ?? '').toLowerCase() === v)?.signal ?? v;
+    if (m.added.recipients) m.added.recipients = m.added.recipients.map((v) => original(['external_sharing'], v));
+    if (m.added.transfers) m.added.transfers = m.added.transfers.map((v) => original(['international_transfer'], v));
     const carried = latest.decision === 'APPROVAL_RECONFIRMED' ? latest.detail?.carried ?? 'APPROVED' : latest.decision;
     const row = {
       issueId, seq: latest.seq + 1, requestId: `sys:${issueId}:${latest.seq}:${screening.screeningId}`.slice(0, 100), kind: 'system',

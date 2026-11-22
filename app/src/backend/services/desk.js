@@ -45,7 +45,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   async function peopleMap(ids) {
     try {
       return await jira.usersBulk(ids.filter(Boolean));
-    } catch {
+    } catch (e) {
+      log.warn({ evt: 'people.lookup.failed', code: e?.code ?? 'INTERNAL', status: e?.status });
       return new Map(); // names are cosmetic; never block on them
     }
   }
@@ -182,10 +183,11 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return { filters: f, items, total, page, pages, pageSize: PAGE_SIZE, counts, projects, ai: aiActive() ? 'on' : 'off', isReviewer };
     },
 
-    /** Reviewer list for assignment (reviewers only). */
-    async reviewers(actorId) {
+    /** Reviewer search for assignment (reviewers only): active group members matching a name. */
+    async reviewers(rawQuery, actorId) {
       if (!(await review.isReviewer(actorId))) throw new AppError(ErrorCode.NOT_AUTHORISED);
-      return { group: settings.reviewerGroup, reviewers: await review.reviewers() };
+      const query = validate.personQuery(rawQuery);
+      return { group: settings.reviewerGroup, reviewers: await review.reviewers(query) };
     },
 
     assign: async (payload, actorId) => review.assign({ actorId, issueKey: validate.issueKey(payload?.issueKey), assigneeId: payload?.assigneeId === 'me' ? actorId : payload?.assigneeId ?? null, expectedSeq: payload?.expectedSeq, requestId: payload?.requestId }),
@@ -213,18 +215,15 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Settings are available to Jira administrators.');
       const counts = Object.fromEntries((await repos.workItems.countByState()).map((r) => [r.state, Number(r.n)]));
       const usage = await repos.usage.get(new Date().toISOString().slice(0, 10));
-      let members = [];
-      try {
-        members = await review.reviewers();
-      } catch {
-        members = [];
-      }
+      // Group membership is checked per person (read:jira-user); listing all members would need an
+      // admin-level scope, so the overview reports whether the caller is a reviewer instead of a count.
+      const youAreReviewer = await review.isReviewer(actorId);
       return {
         environment: { name: config.name, label: config.label },
         version: APP_VERSION,
         sections: [
           { key: 'scope', status: settings.scopeProjects.length ? 'configured' : 'all-projects' },
-          { key: 'people', status: members.some((m) => m.active) ? 'configured' : 'not-configured' },
+          { key: 'people', status: youAreReviewer ? 'configured' : 'not-verified' },
           { key: 'inventory', status: 'not-configured' },
           { key: 'ai', status: aiActive() ? 'on' : 'off' },
           { key: 'register', status: 'not-connected' },
@@ -240,8 +239,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         },
         review: {
           reviewerGroup: settings.reviewerGroup,
-          activeReviewers: members.filter((m) => m.active).length,
-          youAreReviewer: await review.isReviewer(actorId),
+          youAreReviewer,
           separationOfDuties: settings.separationOfDuties,
           recordSigning: settings.signingKey ? 'configured' : 'missing',
         },

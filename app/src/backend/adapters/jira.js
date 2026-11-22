@@ -74,10 +74,14 @@ export function createJiraAdapter({ timeoutMs }) {
       const j = await getJson(route`/rest/api/3/user/groups?accountId=${accountId}`, { asApp: true });
       return (Array.isArray(j) ? j : []).map((g) => g.name);
     },
-    /** Active members of a group (as the app). */
-    async groupMembers(groupName) {
-      const j = await getJson(route`/rest/api/3/group/member?groupname=${groupName}&includeInactiveUsers=true&maxResults=50`, { asApp: true });
-      return (j.values ?? []).filter((u) => u.accountType === 'atlassian').map((u) => ({ accountId: u.accountId, displayName: u.displayName ?? '', active: u.active === true }));
+    /**
+     * Find people by name (as the app; read:jira-user). Listing a group's members would need the
+     * admin-level manage:jira-configuration scope, so reviewers are found by search and then
+     * filtered by group membership on the server.
+     */
+    async searchUsers(query) {
+      const j = await getJson(route`/rest/api/3/user/search?query=${query}&maxResults=20`, { asApp: true });
+      return (Array.isArray(j) ? j : []).filter((u) => u.accountType === 'atlassian').map((u) => ({ accountId: u.accountId, displayName: u.displayName ?? '', active: u.active === true }));
     },
     /** Display names for a set of account ids (as the app). */
     async usersBulk(accountIds) {
