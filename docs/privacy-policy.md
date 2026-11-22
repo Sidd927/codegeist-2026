@@ -1,4 +1,4 @@
-<!-- DRAFT v2 — NOT PUBLISHED. Revised after docs/privacy-policy-review.md. Items marked [REVIEW] need legal/privacy-professional review before publication. -->
+> **⚠️ DRAFT — NOT PUBLISHED AND NOT LEGALLY REVIEWED.** This is a working draft for the Article25 hackathon build. It is not the app's live privacy policy. Items marked [REVIEW] need review by a lawyer or privacy professional before publication. See `docs/privacy-policy-review.md`.
 
 # Article25 — Privacy Policy (hackathon build)
 

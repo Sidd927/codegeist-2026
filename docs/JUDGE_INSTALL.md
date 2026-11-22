@@ -1,4 +1,4 @@
-<!-- DRAFT — NOT REHEARSED. Steps marked (unverified) must be confirmed in the C1 rehearsal on a clean site before submission. -->
+> **⚠️ DRAFT — NOT YET REHEARSED.** Steps marked (unverified) must be confirmed in the C1 install rehearsal on a clean site. The app is not yet available through a sharing link.
 
 # Installing Article25 (judges)
 
