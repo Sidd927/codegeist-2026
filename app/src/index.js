@@ -4,7 +4,7 @@ import Resolver from '@forge/resolver';
 import { createJiraAdapter } from './backend/adapters/jira.js';
 import { createDeskServices } from './backend/services/desk.js';
 import * as repos from './backend/repositories/sql-repositories.js';
-import { buildScreening, requestMigration } from './backend/handlers/events.js';
+import { buildScreening, buildReview, requestMigration } from './backend/handlers/events.js';
 import { configFor, settingsFromEnv } from './backend/lib/config.js';
 import { log } from './backend/lib/logger.js';
 import { ok, toEnvelope, AppError, ErrorCode } from './backend/lib/errors.js';
@@ -18,8 +18,10 @@ function servicesFor(context) {
   const config = configFor(context?.environmentType);
   const jira = createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs });
   const settings = settingsFromEnv();
-  const screening = buildScreening(context?.environmentType);
-  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings }) };
+  const siteId = context?.cloudId ? String(context.cloudId) : null;
+  const screening = buildScreening(context?.environmentType, siteId);
+  const review = buildReview(context?.environmentType, siteId);
+  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings: { ...settings, signingKey: siteId ? settings.signingKey : null }, review }) };
 }
 
 function define(key, fn) {
@@ -38,11 +40,17 @@ function define(key, fn) {
   });
 }
 
-define('getAppContext', ({ services }) => services.appContext());
-define('getPanelState', ({ services, context }) => services.panelState(context?.extension?.issue));
-define('getWorkspace', ({ services, payload }) => services.workspace(payload.issueKey));
-define('getInbox', ({ services, payload }) => services.inbox(payload.view));
-define('getSettingsOverview', ({ services }) => services.settingsOverview());
+// The acting user ALWAYS comes from the Forge context, never from the payload.
+const actor = (context) => (context?.accountId ? String(context.accountId) : null);
+define('getAppContext', ({ services, context }) => services.appContext(actor(context)));
+define('getPanelState', ({ services, context }) => services.panelState(context?.extension?.issue, actor(context)));
+define('getWorkspace', ({ services, payload, context }) => services.workspace(payload.issueKey, actor(context)));
+define('getInbox', ({ services, payload, context }) => services.inbox(payload, actor(context)));
+define('getSettingsOverview', ({ services, context }) => services.settingsOverview(actor(context)));
+define('getReviewers', ({ services, context }) => services.reviewers(actor(context)));
+define('assignReview', ({ services, payload, context }) => services.assign(payload, actor(context)));
+define('recordDecision', ({ services, payload, context }) => services.decide(payload, actor(context)));
+define('verifyRecord', ({ services, payload, context }) => services.verifyRecord(payload.issueKey, actor(context)));
 // Panel: the issue comes from the Forge context. Desk: a validated key; access is checked as the user.
 define('requestRescreen', ({ services, context, payload }) => services.requestRescreen({ extensionIssue: context?.extension?.issue, issueKey: payload.issueKey }));
 
