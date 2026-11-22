@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@forge/api": "8.5.0",
-    "@forge/resolver": "2.0.2"
+    "@forge/events": "^3.0.10",
+    "@forge/resolver": "2.0.2",
+    "@forge/sql": "^4.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

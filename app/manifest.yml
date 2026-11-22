@@ -15,9 +15,50 @@ modules:
         function: resolver
       title: Article25
       icon: resource:desk;icon.svg
+  # M2 DETECT: screening pipeline (trigger → queue → consumer), schema, reconciler.
+  trigger:
+    - key: issue-events
+      function: issue-events-fn
+      events:
+        - avi:jira:created:issue
+        - avi:jira:updated:issue
+        - avi:jira:deleted:issue
+      filter:
+        ignoreSelf: true
+    - key: lifecycle
+      function: lifecycle-fn
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+  consumer:
+    - key: screening-consumer
+      queue: a25-screening
+      function: screening-consumer-fn
+    - key: maintenance-consumer
+      queue: a25-maintenance
+      function: maintenance-consumer-fn
+  scheduledTrigger:
+    - key: reconcile
+      function: reconcile-fn
+      interval: fiveMinute
+  sql:
+    - key: main
+      engine: mysql
   function:
     - key: resolver
       handler: index.handler
+    - key: issue-events-fn
+      handler: index.onIssueEvent
+    - key: lifecycle-fn
+      handler: index.onLifecycle
+    - key: screening-consumer-fn
+      handler: index.screeningConsumer
+      timeoutSeconds: 120
+    - key: maintenance-consumer-fn
+      handler: index.maintenanceConsumer
+      timeoutSeconds: 300
+    - key: reconcile-fn
+      handler: index.reconcileSchedule
 resources:
   - key: panel
     path: frontend/dist/panel

@@ -15,6 +15,10 @@ const ALLOWED_FIELDS = new Set([
   'value', // numeric metric value
   'issueId', // numeric Jira issue id (not personal data, not content)
   'count',
+  'outcome', // screening outcome code
+  'mode', // 'ai' | 'rules'
+  'reason', // job reason code
+  'shape', // structural key names only (e.g. changelog item keys), never values
 ]);
 
 const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count']);
