@@ -65,8 +65,8 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
     // Settle to the actual cost when usage is reported; otherwise keep the (worst-case) reservation.
     const actual = Number.isFinite(r.usage?.tokensIn) ? await pricing.costMicros(llm.model, r.usage.tokensIn, r.usage.tokensOut ?? 0) : reserved;
     await spend.adjust({ deltaMicros: actual - reserved });
-    if (r.status !== AI_STATUS.OK) return { mode: 'rules', aiStatus: r.status, usage: r.usage, modelMs: r.ms, costMicros: actual };
-    return { mode: 'ai', aiStatus: AI_STATUS.OK, raw: r.raw, usage: r.usage, modelMs: r.ms, costMicros: actual };
+    if (r.status !== AI_STATUS.OK) return { mode: 'rules', aiStatus: r.status, usage: r.usage, modelMs: r.ms, costMicros: actual, finish: r.finish };
+    return { mode: 'ai', aiStatus: AI_STATUS.OK, raw: r.raw, usage: r.usage, modelMs: r.ms, costMicros: actual, finish: r.finish };
   }
 
   /**
@@ -141,7 +141,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
         evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, aiStatus, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined,
         dbMs: timing.dbMs, jiraMs: timing.jiraMs, modelMs: ex.modelMs, count: analysis.result.findings.length,
         rejected: analysis.quality.rejected, dropped: analysis.quality.dropped, sensitive: analysis.result.findings.some((f) => f.kind === 'sensitive_data') ? 1 : 0,
-        tokensIn: ex.usage?.tokensIn ?? undefined, tokensOut: ex.usage?.tokensOut ?? undefined, costMicros: ex.costMicros,
+        tokensIn: ex.usage?.tokensIn ?? undefined, tokensOut: ex.usage?.tokensOut ?? undefined, costMicros: ex.costMicros, finish: ex.finish,
       });
       return { status: ok ? 'screened' : 'lease_lost', screeningId, outcome: analysis.result.outcome, mode, aiStatus };
     } catch (e) {

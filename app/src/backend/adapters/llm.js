@@ -16,7 +16,7 @@ const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeo
 /**
  * @param {{ chat: Function|null, model: string, timeoutMs: number, maxTokens?: number }} opts
  */
-export function createLlmAdapter({ chat, model, timeoutMs, maxTokens = 900 }) {
+export function createLlmAdapter({ chat, model, timeoutMs, maxTokens = 2000 }) {
   return {
     available: typeof chat === 'function',
     model,
@@ -44,8 +44,9 @@ export function createLlmAdapter({ chat, model, timeoutMs, maxTokens = 900 }) {
         return { status: AI_STATUS.UNAVAILABLE, ms: Date.now() - t0 };
       }
       const raw = toolArgumentsFrom(res);
+      const finish = String(res?.choices?.[0]?.finish_reason ?? res?.choices?.[0]?.stop_reason ?? 'unknown').slice(0, 32);
       const usage = { tokensIn: res?.usage?.prompt_tokens ?? res?.usage?.input_tokens ?? null, tokensOut: res?.usage?.completion_tokens ?? res?.usage?.output_tokens ?? null };
-      return raw ? { status: AI_STATUS.OK, raw, usage, ms: Date.now() - t0 } : { status: AI_STATUS.MALFORMED, usage, ms: Date.now() - t0 };
+      return raw ? { status: AI_STATUS.OK, raw, usage, finish, ms: Date.now() - t0 } : { status: AI_STATUS.MALFORMED, usage, finish, ms: Date.now() - t0 };
     },
   };
 }

@@ -30,6 +30,7 @@ const ALLOWED_FIELDS = new Set([
   'tokensOut',
   'costMicros', // AI cost of this call in micro-USD
   'aiStatus', // ok | not_enabled | over_budget | unavailable | malformed_output
+  'finish', // model finish reason enum (e.g. tool_calls, length)
 ]);
 
 const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count', 'dbMs', 'jiraMs', 'modelMs', 'queueMs', 'rejected', 'dropped', 'sensitive', 'tokensIn', 'tokensOut', 'costMicros']);
