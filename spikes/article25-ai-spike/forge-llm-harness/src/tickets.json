@@ -1,0 +1,137 @@
+{
+  "_note": "SYNTHETIC data only. Written and labelled BEFORE the baseline rules were written (2026-11-22). Labels by a single author (assistant) -> optimistic bias; needs independent labelling before any claim. Outcome scale: CLEAR < INVENTORY_UPDATE < NEEDS_INFO < REVIEW_REQUIRED < DPIA_LIKELY.",
+  "tickets": [
+    {
+      "id": "T01", "group": "no_personal_data",
+      "summary": "Upgrade build pipeline to Node 24",
+      "description": "Bump the CI image to Node 24 LTS, update lockfiles and fix deprecation warnings in the webpack config. No functional changes.",
+      "gold": { "categories": [], "sensitive": false, "vendors": [], "outcome": "CLEAR" }
+    },
+    {
+      "id": "T02", "group": "no_personal_data",
+      "summary": "Dark mode for the settings page",
+      "description": "Add a dark theme toggle to the settings page using design tokens. Store the preference in the browser's local storage.",
+      "gold": { "categories": [], "sensitive": false, "vendors": [], "outcome": "CLEAR", "_comment": "Arguably a device-stored preference; labelled CLEAR as no personal data is processed server-side." }
+    },
+    {
+      "id": "T03", "group": "ordinary_personal_data",
+      "summary": "Add phone number to the signup form",
+      "description": "Collect the customer's mobile phone number at signup so we can send order updates by SMS. Phone number is optional and stored on the customer profile.",
+      "gold": { "categories": ["contact"], "sensitive": false, "vendors": [], "outcome": "REVIEW_REQUIRED", "_comment": "New category for system; SMS implies a sending provider not named -> review." }
+    },
+    {
+      "id": "T04", "group": "ordinary_personal_data",
+      "summary": "Show customer's full name and email on invoices",
+      "description": "Invoices PDF should include the billing name, email address and postal address already held on the account.",
+      "gold": { "categories": ["identity", "contact"], "sensitive": false, "vendors": [], "outcome": "INVENTORY_UPDATE", "_comment": "Existing data, existing purpose (billing) -> inventory confirmation only." }
+    },
+    {
+      "id": "T05", "group": "sensitive_personal_data",
+      "summary": "Prescription upload for pharmacy orders",
+      "description": "Allow customers to upload a photo of their prescription when ordering prescription-only medicines. Pharmacists review the image and the medication history before approving the order.",
+      "gold": { "categories": ["health"], "sensitive": true, "vendors": [], "outcome": "DPIA_LIKELY" }
+    },
+    {
+      "id": "T06", "group": "sensitive_personal_data",
+      "summary": "Face ID login for the mobile app",
+      "description": "Let users log in with facial recognition. We will create a face template from the selfie and store it on our servers so it works across devices.",
+      "gold": { "categories": ["biometric"], "sensitive": true, "vendors": [], "outcome": "DPIA_LIKELY" }
+    },
+    {
+      "id": "T07", "group": "location_tracking",
+      "summary": "Implement a customer analytics dashboard",
+      "description": "Implement a customer analytics dashboard that collects customer location, purchase history and behavioural information.",
+      "gold": { "categories": ["location", "financial", "behavioural"], "sensitive": false, "vendors": [], "outcome": "REVIEW_REQUIRED", "_comment": "The brief's scenario. Monitoring + combination of datasets -> at least review; DPIA plausible if large scale (unknown)." }
+    },
+    {
+      "id": "T08", "group": "location_tracking",
+      "summary": "Live courier tracking",
+      "description": "Track the courier's GPS position every 10 seconds during deliveries and show it to the customer on a map. Keep the route history for 12 months for dispute handling.",
+      "gold": { "categories": ["location"], "sensitive": false, "vendors": [], "outcome": "DPIA_LIKELY", "_comment": "Systematic monitoring of workers + retention; WP248 criteria 3 and 7 (employees = vulnerable)." }
+    },
+    {
+      "id": "T09", "group": "behavioural_profiling",
+      "summary": "Personalised offers from browsing history",
+      "description": "Build a model that scores each shopper's likelihood to buy based on their browsing and clickstream events, and segment users to target personalised discount offers.",
+      "gold": { "categories": ["behavioural"], "sensitive": false, "vendors": [], "outcome": "DPIA_LIKELY", "_comment": "Profiling/scoring + systematic monitoring of behaviour -> 2 criteria." }
+    },
+    {
+      "id": "T10", "group": "behavioural_profiling",
+      "summary": "Session replay on checkout",
+      "description": "Add session replay using ReplayCloud on the checkout funnel to understand drop-off. Recordings capture clicks, scrolls and form interactions.",
+      "gold": { "categories": ["behavioural"], "sensitive": false, "vendors": ["ReplayCloud"], "outcome": "REVIEW_REQUIRED", "_comment": "New vendor + monitoring; form inputs may capture personal data -> review (DPIA arguable)." }
+    },
+    {
+      "id": "T11", "group": "third_party_sharing",
+      "summary": "Send order data to Segment",
+      "description": "Forward order completed events including customer email and order value to Segment so marketing can build audiences in our ad platforms.",
+      "gold": { "categories": ["contact", "financial"], "sensitive": false, "vendors": ["Segment"], "outcome": "REVIEW_REQUIRED" }
+    },
+    {
+      "id": "T12", "group": "third_party_sharing",
+      "summary": "Share fraud signals with a partner bank",
+      "description": "Share customers' IP address, device fingerprint and transaction history with PartnerBank to automatically decline high-risk payments.",
+      "gold": { "categories": ["identifiers", "financial"], "sensitive": false, "vendors": ["PartnerBank"], "outcome": "DPIA_LIKELY", "_comment": "Automated decision with significant effect + combining datasets." }
+    },
+    {
+      "id": "T13", "group": "employee_information",
+      "summary": "Productivity dashboard for support agents",
+      "description": "Show managers each support agent's average handle time, idle time and keystroke activity per hour to identify low performers.",
+      "gold": { "categories": ["employee", "behavioural"], "sensitive": false, "vendors": [], "outcome": "DPIA_LIKELY", "_comment": "Systematic monitoring of employees (vulnerable) + evaluation." }
+    },
+    {
+      "id": "T14", "group": "employee_information",
+      "summary": "Import new hires from Workday",
+      "description": "Sync new hire name, work email, department and start date from Workday into Jira so onboarding tasks are created automatically.",
+      "gold": { "categories": ["employee", "identity", "contact"], "sensitive": false, "vendors": ["Workday"], "outcome": "REVIEW_REQUIRED", "_comment": "New flow from HR system; vendor may already be approved for HR but new system/purpose." }
+    },
+    {
+      "id": "T15", "group": "ambiguous",
+      "summary": "Improve search relevance",
+      "description": "Use user signals to improve search ranking. Details TBD with the data team.",
+      "gold": { "categories": ["behavioural"], "sensitive": false, "vendors": [], "outcome": "NEEDS_INFO" }
+    },
+    {
+      "id": "T16", "group": "ambiguous",
+      "summary": "Store more context on support tickets",
+      "description": "Agents want to keep extra notes about the customer's situation on each ticket so the next agent has context.",
+      "gold": { "categories": ["identity"], "sensitive": false, "vendors": [], "outcome": "NEEDS_INFO", "_comment": "Free-text notes about customers can contain anything incl. sensitive data." }
+    },
+    {
+      "id": "T17", "group": "existing_approved",
+      "summary": "Fix bug in password reset email",
+      "description": "The password reset email shows the wrong link for EU users. Fix the template; the email address is already used for account recovery.",
+      "gold": { "categories": ["contact"], "sensitive": false, "vendors": [], "outcome": "CLEAR", "_comment": "Existing processing, bug fix, no change." }
+    },
+    {
+      "id": "T18", "group": "existing_approved",
+      "summary": "Rotate Stripe API keys",
+      "description": "Rotate the Stripe secret keys and move them into the secrets manager. Payment processing logic is unchanged.",
+      "gold": { "categories": [], "sensitive": false, "vendors": ["Stripe"], "outcome": "CLEAR", "_comment": "Vendor already approved; no change in processing." }
+    },
+    {
+      "id": "T19", "group": "high_risk",
+      "summary": "Kids accounts for the learning app",
+      "description": "Allow parents to create accounts for children under 13. We will track lesson progress and recommend content based on each child's learning behaviour.",
+      "gold": { "categories": ["children", "behavioural"], "sensitive": false, "vendors": [], "outcome": "DPIA_LIKELY" }
+    },
+    {
+      "id": "T20", "group": "high_risk",
+      "summary": "Automatic loan eligibility decisions",
+      "description": "Automatically approve or reject instant credit applications using income, employment status and credit bureau data from CreditCheckCo. No human review for amounts under 500 EUR.",
+      "gold": { "categories": ["financial", "employee"], "sensitive": false, "vendors": ["CreditCheckCo"], "outcome": "DPIA_LIKELY", "_comment": "Automated decision with legal/similar effect; 'employee' here means employment status (financial profile) - label kept to test category confusion." }
+    },
+    {
+      "id": "T21", "group": "no_personal_data",
+      "summary": "Aggregate weekly sales report",
+      "description": "Generate a weekly report of total sales per product category. Only aggregated, anonymised totals; no customer-level data.",
+      "gold": { "categories": [], "sensitive": false, "vendors": [], "outcome": "CLEAR", "_comment": "Tricky negative: mentions customers/sales but aggregated." }
+    },
+    {
+      "id": "T22", "group": "sensitive_personal_data",
+      "summary": "Wellbeing check-in survey",
+      "description": "Add an optional weekly mood check-in where employees rate stress levels and can mention mental health concerns to HR.",
+      "gold": { "categories": ["health", "employee"], "sensitive": true, "vendors": [], "outcome": "DPIA_LIKELY", "_comment": "Hard case: 'mental health' and 'mood' (health) without the word 'medical'." }
+    }
+  ]
+}

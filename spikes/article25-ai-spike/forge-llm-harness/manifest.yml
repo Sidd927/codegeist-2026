@@ -1,0 +1,34 @@
+# Article25 Spike D: Forge LLM harness. Synthetic data only.
+# Billable calls guarded by env var A25_LLM_APPROVED=true (forge variables set) and an in-app $4 spend cap.
+modules:
+  llm:
+    - key: a25-llm
+      model:
+        - claude
+  jira:globalPage:
+    - key: a25-llm-page
+      resource: page
+      resolver:
+        function: resolver
+      render: native
+      title: Article25 LLM spike
+  consumer:
+    - key: eval-consumer
+      queue: eval-queue
+      function: evalfn
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: evalfn
+      handler: index.runEval
+      timeoutSeconds: 900
+resources:
+  - key: page
+    path: src/frontend/page.jsx
+permissions:
+  scopes:
+    - storage:app
+app:
+  runtime:
+    name: nodejs24.x
+  id: ari:cloud:ecosystem::app/49315148-f001-4040-bfc9-b53476bf231d
