@@ -64,6 +64,7 @@ F0 → M1 foundation → core (policy, rules) → M2 screening → M6 gate → C
 ## 5. Actions required from the user (with dates)
 | Action | Needed by | Why |
 |---|---|---|
+| **Approve the Forge `llm` module (dev major version) and a capped AI validation spend** (estimate ≈ $0.41, suggested cap $2) | **Tue 24 Nov** | M2 evidence: the deterministic floor alone has held-out escalation recall 0.00 (`product/M2_DETECT_RESULTS.md` §9–§10). M2 cannot complete without live AI validation. |
 | Create a second, clean Atlassian Cloud site (Jira + Confluence) | **Sat 28 Nov** | C1 rehearsal |
 | Approve the production deploy of the new `article25` app (skeleton) and **Distribution → Sharing** | Mon 30 Nov | C1 needs a production deployment and a sharing link **[DOCS]** |
 | Decide the privacy-policy host and provide a private contact email | Mon 30 Nov | Sharing requires a privacy policy URL |
