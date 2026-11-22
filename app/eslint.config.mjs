@@ -8,7 +8,7 @@ export default [
   { ignores: ['frontend/dist/**', '**/node_modules/**'] },
   js.configs.recommended,
   {
-    files: ['src/**/*.js', 'test/**/*.mjs', 'scripts/**/*.mjs'],
+    files: ['src/**/*.js', 'test/**/*.mjs', 'scripts/**/*.mjs', 'eval/**/*.mjs'],
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: { ...globals.node } },
     rules: {
       // Only the content-free logger may write to the console (NFR-3).
