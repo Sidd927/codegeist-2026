@@ -7,6 +7,7 @@ import { createPricing } from '../adapters/pricing.js';
 import { createJiraAdapter } from '../adapters/jira.js';
 import { createLlmAdapter } from '../adapters/llm.js';
 import { createScreeningService } from '../services/screening.js';
+import { createReviewService } from '../services/review.js';
 import * as repos from '../repositories/sql-repositories.js';
 import { applyMigrations } from '../db/schema.js';
 import { configFor, settingsFromEnv } from '../lib/config.js';
@@ -21,10 +22,25 @@ const maintenanceQueue = new Queue({ key: MAINTENANCE_QUEUE });
 // Calls still require A25_AI_ENABLED=true, a daily call budget and a hard spend cap (settingsFromEnv).
 const pricing = createPricing(list);
 
-export function buildScreening(environmentType) {
+/** Site (cloud) id for signing, from whichever invocation context carries it. */
+export function siteIdOf(context, event) {
+  if (context?.cloudId) return String(context.cloudId);
+  if (event?.context?.cloudId) return String(event.context.cloudId);
+  const m = /site\/([0-9a-f-]{36})/i.exec(String(context?.installContext ?? event?.context?.installContext ?? ''));
+  return m ? m[1] : null;
+}
+
+export function buildReview(environmentType, siteId) {
+  const config = configFor(environmentType);
+  return createReviewService({ repos, jira: createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs }), log, settings: { ...settingsFromEnv(), signingKey: siteId ? settingsFromEnv().signingKey : null }, siteId });
+}
+
+export function buildScreening(environmentType, siteId = null) {
   const config = configFor(environmentType);
   const settings = settingsFromEnv();
+  const review = buildReview(environmentType, siteId);
   return createScreeningService({
+    onCompleted: (args) => review.onScreeningCompleted(args),
     repos,
     jira: createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs }),
     llm: createLlmAdapter({ chat, model: settings.aiModel, timeoutMs: 25_000 }),
@@ -50,7 +66,7 @@ const isSchemaMissing = (e) => /doesn'?t exist|no such table|unknown table/i.tes
 export async function onIssueEvent(event, context) {
   const issueId = String(event?.issue?.id ?? '');
   if (!/^\d{1,18}$/.test(issueId)) return;
-  const svc = buildScreening(context?.environmentType);
+  const svc = buildScreening(context?.environmentType, siteIdOf(context, event));
   try {
     if (event.eventType === 'avi:jira:deleted:issue') {
       await svc.onIssueDeleted({ issueId });
@@ -80,7 +96,7 @@ export async function onLifecycle(_event, _context) {
 export async function screeningConsumer(event, context) {
   const job = event?.body ?? {};
   const retryCount = event?.retryContext?.retryCount ?? 0;
-  const svc = buildScreening(context?.environmentType);
+  const svc = buildScreening(context?.environmentType, siteIdOf(context, event));
   try {
     const r = await svc.processJob(job, { retryCount });
     log.info({ evt: 'consumer.done', issueId: String(job.issueId ?? ''), reason: r.status, outcome: r.outcome, mode: r.mode, count: retryCount });
@@ -108,10 +124,15 @@ export async function maintenanceConsumer(event) {
   }
 }
 
-export async function reconcileSchedule(_event, context) {
+export async function reconcileSchedule(event, context) {
   try {
-    const r = await buildScreening(context?.environmentType).reconcile();
+    const siteId = siteIdOf(context, event);
+    const r = await buildScreening(context?.environmentType, siteId).reconcile();
     if (r.requeued || r.failed) log.info({ evt: 'reconcile', count: r.requeued, value: r.failed });
+    if (siteId) {
+      const repaired = await buildReview(context?.environmentType, siteId).repairChain();
+      if (repaired) log.info({ evt: 'reconcile.chain', count: repaired });
+    }
   } catch (e) {
     log.error({ evt: 'reconcile.failed', code: e?.code ?? 'INTERNAL' });
   }

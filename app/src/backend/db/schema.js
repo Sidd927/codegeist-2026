@@ -69,6 +69,57 @@ export const MIGRATIONS = [
       calls INT NOT NULL DEFAULT 0
     )`,
   ],
+  // M3 REVIEW: append-only decision history (one row per decision; never updated or deleted),
+  // assignment history, and the signed hash chain anchoring every decision (chain-core, Stage 1.5).
+  [
+    'v005_decisions',
+    `CREATE TABLE IF NOT EXISTS decisions (
+      issue_id VARCHAR(20) NOT NULL,
+      seq INT NOT NULL,
+      decision_id CHAR(64) NOT NULL,
+      request_id VARCHAR(100) NOT NULL,
+      kind VARCHAR(8) NOT NULL,
+      decision VARCHAR(32) NOT NULL,
+      rationale TEXT NULL,
+      conditions MEDIUMTEXT NOT NULL,
+      questions MEDIUMTEXT NOT NULL,
+      decided_by VARCHAR(128) NULL,
+      decided_at BIGINT NOT NULL,
+      screening_id CHAR(64) NOT NULL,
+      fp CHAR(64) NOT NULL,
+      pipeline_version VARCHAR(60) NOT NULL,
+      outcome VARCHAR(24) NULL,
+      signal_set MEDIUMTEXT NOT NULL,
+      detail MEDIUMTEXT NULL,
+      PRIMARY KEY (issue_id, seq),
+      UNIQUE KEY uq_decisions_id (decision_id),
+      UNIQUE KEY uq_decisions_request (request_id)
+    )`,
+  ],
+  [
+    'v006_assignments',
+    `CREATE TABLE IF NOT EXISTS assignments (
+      issue_id VARCHAR(20) NOT NULL,
+      seq INT NOT NULL,
+      assignee VARCHAR(128) NULL,
+      assigned_by VARCHAR(128) NOT NULL,
+      assigned_at BIGINT NOT NULL,
+      request_id VARCHAR(100) NOT NULL,
+      PRIMARY KEY (issue_id, seq),
+      UNIQUE KEY uq_assignments_request (request_id)
+    )`,
+  ],
+  [
+    'v007_chain',
+    `CREATE TABLE IF NOT EXISTS chain (
+      seq INT PRIMARY KEY,
+      decision_id CHAR(64) NOT NULL,
+      record MEDIUMTEXT NOT NULL,
+      record_hash CHAR(64) NOT NULL,
+      created_at BIGINT NOT NULL,
+      UNIQUE KEY uq_chain_decision (decision_id)
+    )`,
+  ],
 ];
 
 /** Apply pending migrations. Called only from the migration queue consumer (never per request). */

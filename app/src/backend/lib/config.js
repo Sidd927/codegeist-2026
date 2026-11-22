@@ -11,7 +11,7 @@ const ENVIRONMENTS = {
 // acceptance criteria pass. The frontend reads these flags but never decides anything with them.
 export const FEATURES = Object.freeze({
   screening: true, // M2: automatic privacy checks (AI extraction only when approved; see settingsFromEnv)
-  decisions: false, // Milestone 3: reviewer decisions and ledger
+  decisions: true, // M3: reviewer assignment, decisions and decision history
   gate: false, // workflow validator
   register: false, // Confluence decision register
 });
@@ -42,5 +42,9 @@ export function settingsFromEnv(env = process.env) {
     manualRescreenIntervalMs: 60_000,
     scopeProjects: scope,
     isProjectInScope: (projectKey) => scope.length === 0 || scope.includes(String(projectKey ?? '').toUpperCase()),
+    // M3 REVIEW
+    reviewerGroup: (env.A25_REVIEWER_GROUP || 'article25-reviewers').trim(),
+    separationOfDuties: env.A25_SEPARATION_OF_DUTIES !== 'off', // on unless explicitly switched off
+    signingKey: env.A25_SIGNING_KEY || null, // encrypted Forge variable; never logged or returned
   };
 }

@@ -1,0 +1,229 @@
+// Review service (M3): reviewer authorisation, assignment, human decisions, evidence-locked approval
+// and the decision record. Every rule is enforced here, server-side; the frontend only reflects it.
+//
+// Concurrency and partial failure (Forge SQL: single-statement atomicity only):
+//  - decisions/assignments are single INSERT IGNORE rows at (issue_id, expectedSeq + 1) with a unique
+//    request_id → duplicates are idempotent, races resolve to exactly one winner;
+//  - review status is DERIVED from the latest decision (core/review.js), so no second write can be
+//    left half-applied;
+//  - anchoring in the signed chain is idempotent; unanchored decisions are repaired by the reconciler.
+import { AppError, ErrorCode } from '../lib/errors.js';
+import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, isApprovingDecision, deriveReviewStatus } from '../../core/review.js';
+import { buildRecord, genesis, verifyHistory } from '../../core/chain-core.js';
+import { buildScreeningText } from '../../core/screening-text.js';
+
+const REQUEST_ID = /^[A-Za-z0-9:_-]{8,100}$/;
+const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
+
+export function createReviewService({ repos, jira, log, clock = () => Date.now(), settings, siteId }) {
+  const { decisions, assignments, chain, workItems } = repos;
+  const groupCache = new Map();
+
+  async function isReviewer(accountId) {
+    if (!accountId || !ACCOUNT_ID.test(accountId)) return false;
+    if (!groupCache.has(accountId)) {
+      groupCache.set(
+        accountId,
+        jira
+          .groupsOf(accountId)
+          .then((g) => g.includes(settings.reviewerGroup))
+          .catch(() => false), // fail closed
+      );
+    }
+    return groupCache.get(accountId);
+  }
+
+  async function requireReviewer(accountId) {
+    if (!(await isReviewer(accountId))) throw new AppError(ErrorCode.NOT_AUTHORISED, `Only members of ${settings.reviewerGroup} can do this.`);
+  }
+
+  const requestIdOf = (raw) => {
+    const v = String(raw ?? '');
+    if (!REQUEST_ID.test(v)) throw new AppError(ErrorCode.INVALID_INPUT);
+    return v;
+  };
+  const expectedSeqOf = (raw) => {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 1_000_000) throw new AppError(ErrorCode.INVALID_INPUT);
+    return n;
+  };
+
+  // ---- signed record ------------------------------------------------------------------------
+  /** Append one decision to the signed hash chain. Idempotent (unique decision_id); retries seq races. */
+  async function anchor(d) {
+    if (!settings.signingKey) return { anchored: false, reason: 'no_signing_key' };
+    const existing = await chain.byDecision(d.decision_id);
+    if (existing) return { anchored: true, seq: existing.seq };
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const head = await chain.head();
+      const seq = head ? Number(head.seq) + 1 : 1;
+      const record = buildRecord(settings.signingKey, {
+        siteId,
+        seq,
+        prevHash: head ? head.record_hash : genesis(siteId),
+        decisionId: d.decision_id,
+        issueKey: d.issue_id, // the stable numeric issue id (keys change when issues move)
+        state: d.decision,
+        conditions: d.decision === 'NEEDS_MORE_INFORMATION' ? d.questions : d.conditions,
+        decidedBy: d.decided_by ?? 'system',
+        decidedAt: new Date(d.decided_at).toISOString(),
+      });
+      if (await chain.insert({ seq, decisionId: d.decision_id, record, recordHash: record.hash, createdAt: clock() })) return { anchored: true, seq };
+      if (await chain.byDecision(d.decision_id)) return { anchored: true, seq: (await chain.byDecision(d.decision_id)).seq };
+    }
+    return { anchored: false, reason: 'contention' };
+  }
+
+  async function insertDecision(row) {
+    const decisionId = decisionIdOf({
+      issueId: row.issueId, seq: row.seq, kind: row.kind, decision: row.decision, rationale: row.rationale, conditions: row.conditions, questions: row.questions,
+      decidedBy: row.decidedBy, decidedAt: row.decidedAt, screeningId: row.screeningId, fp: row.fp, pipelineVersion: row.pipelineVersion, outcome: row.outcome,
+    });
+    const inserted = await decisions.insert({ ...row, decisionId });
+    return { inserted, decisionId };
+  }
+
+  // ---- assignment ---------------------------------------------------------------------------
+  async function reviewers() {
+    const members = await jira.groupMembers(settings.reviewerGroup);
+    return members.map((m) => ({ accountId: m.accountId, displayName: m.displayName, active: m.active }));
+  }
+
+  async function assign({ actorId, issueKey, assigneeId, expectedSeq, requestId }) {
+    await requireReviewer(actorId);
+    const rid = requestIdOf(requestId);
+    const exp = expectedSeqOf(expectedSeq);
+    const doc = await jira.getIssueDocument(issueKey); // as-user: the actor must be able to see the issue
+    const target = assigneeId === null || assigneeId === undefined || assigneeId === '' ? null : String(assigneeId);
+    if (target !== null) {
+      if (!ACCOUNT_ID.test(target)) throw new AppError(ErrorCode.INVALID_INPUT);
+      if (!(await isReviewer(target))) throw new AppError(ErrorCode.INVALID_INPUT, 'That person is not in the reviewer group.');
+      const users = await jira.usersBulk([target]);
+      if (users.get(target)?.active !== true) throw new AppError(ErrorCode.INVALID_INPUT, 'That reviewer account is inactive.');
+    }
+    const prior = await assignments.byRequest(rid);
+    if (prior) return { status: 'unchanged', assignment: prior };
+    const latest = await assignments.latest(doc.id);
+    if ((latest?.seq ?? 0) !== exp) throw new AppError(ErrorCode.CONFLICT);
+    if ((latest?.assignee ?? null) === target) return { status: 'unchanged', assignment: latest };
+    const row = { issueId: doc.id, seq: exp + 1, assignee: target, assignedBy: actorId, assignedAt: clock(), requestId: rid };
+    if (!(await assignments.insert(row))) {
+      const dup = await assignments.byRequest(rid);
+      if (dup) return { status: 'unchanged', assignment: dup };
+      throw new AppError(ErrorCode.CONFLICT);
+    }
+    log.info({ evt: 'review.assigned', issueId: doc.id, count: row.seq });
+    return { status: 'assigned', assignment: { ...row, issue_id: row.issueId, assigned_by: actorId, assigned_at: row.assignedAt } };
+  }
+
+  // ---- decision -----------------------------------------------------------------------------
+  /**
+   * Record a human decision bound to the exact screened content the reviewer saw.
+   * Order of checks: input → reviewer → as-user read → separation of duties → evidence binding →
+   * idempotency → optimistic sequence → single INSERT → anchor.
+   */
+  async function decide({ actorId, issueKey, input, screeningId, fp, expectedSeq, requestId }) {
+    const v = validateDecisionInput(input);
+    if (!v.ok) throw Object.assign(new AppError(ErrorCode.INVALID_INPUT, 'Some fields need attention.'), { fields: v.errors });
+    const rid = requestIdOf(requestId);
+    const exp = expectedSeqOf(expectedSeq);
+    await requireReviewer(actorId);
+    if (!settings.signingKey) throw new AppError(ErrorCode.NOT_CONFIGURED); // fail closed: no unsigned decisions
+
+    const doc = await jira.getIssueDocument(issueKey); // as-user browse check
+    if (settings.separationOfDuties && (doc.reporterId === actorId || doc.assigneeId === actorId)) throw new AppError(ErrorCode.SOD_BLOCKED);
+
+    const prior = await decisions.byRequest(rid); // duplicate submission (double click, retry)
+    if (prior) {
+      if (prior.issue_id !== doc.id || prior.decided_by !== actorId) throw new AppError(ErrorCode.INVALID_INPUT);
+      return { status: 'unchanged', decision: prior };
+    }
+
+    const view = await workItems.getView(doc.id);
+    const item = view.row;
+    const screening = view.screening;
+    const currentFp = buildScreeningText(doc).fingerprint;
+    if (!item || !screening || item.state !== 'SCREENED') throw new AppError(ErrorCode.STALE_EVIDENCE, 'This work item is being checked. Decide once the check has finished.');
+    if (screening.screening_id !== screeningId || item.screened_fp !== fp || currentFp !== item.screened_fp) throw new AppError(ErrorCode.STALE_EVIDENCE);
+
+    const latest = await decisions.latest(doc.id);
+    if ((latest?.seq ?? 0) !== exp) throw new AppError(ErrorCode.CONFLICT);
+
+    const row = {
+      issueId: doc.id, seq: exp + 1, requestId: rid, kind: 'human', decision: v.value.decision, rationale: v.value.rationale, conditions: v.value.conditions, questions: v.value.questions,
+      decidedBy: actorId, decidedAt: clock(), screeningId: screening.screening_id, fp: item.screened_fp, pipelineVersion: screening.pipeline_version, outcome: screening.outcome,
+      signalSet: signalSetOf({ ...screening.result, outcome: screening.outcome }), detail: null,
+    };
+    const { inserted, decisionId } = await insertDecision(row);
+    if (!inserted) {
+      const dup = await decisions.byRequest(rid);
+      if (dup) return { status: 'unchanged', decision: dup };
+      throw new AppError(ErrorCode.CONFLICT);
+    }
+    const stored = await decisions.latest(doc.id);
+    const a = await anchor(stored).catch(() => ({ anchored: false, reason: 'error' }));
+    log.info({ evt: 'review.decided', issueId: doc.id, outcome: row.decision, count: row.seq, reason: a.anchored ? 'anchored' : a.reason });
+    return { status: 'recorded', decision: stored, decisionId, anchored: a.anchored };
+  }
+
+  // ---- evidence-locked approval -------------------------------------------------------------
+  /**
+   * Called by the screening pipeline after a screening completes. If the latest decision approved
+   * different content, append a SYSTEM record: APPROVAL_INVALIDATED (material change: re-review
+   * required) or APPROVAL_RECONFIRMED (no new privacy signals: approval carried to the new content).
+   * Idempotent (request id derives from the approval and the new screening).
+   */
+  async function onScreeningCompleted({ issueId, screening }) {
+    const latest = await decisions.latest(issueId);
+    if (!latest || !isApprovingDecision(latest.decision) || latest.fp === screening.fp) return { status: 'no_change' };
+    const current = signalSetOf({ ...screening.result, outcome: screening.outcome });
+    const m = materialChange(latest.signal_set, current);
+    const carried = latest.decision === 'APPROVAL_RECONFIRMED' ? latest.detail?.carried ?? 'APPROVED' : latest.decision;
+    const row = {
+      issueId, seq: latest.seq + 1, requestId: `sys:${issueId}:${latest.seq}:${screening.screeningId}`.slice(0, 100), kind: 'system',
+      decision: m.material ? 'APPROVAL_INVALIDATED' : 'APPROVAL_RECONFIRMED', rationale: null, conditions: m.material ? [] : latest.conditions, questions: [],
+      decidedBy: null, decidedAt: clock(), screeningId: screening.screeningId, fp: screening.fp, pipelineVersion: screening.pipelineVersion, outcome: screening.outcome,
+      signalSet: m.material ? current : latest.signal_set, detail: { basedOnSeq: latest.seq, carried, added: m.added, escalated: m.escalated, from: m.from, to: m.to },
+    };
+    const { inserted } = await insertDecision(row);
+    if (!inserted) return { status: 'skipped' }; // already recorded, or a human decided concurrently
+    await anchor(await decisions.latest(issueId)).catch(() => undefined);
+    log.info({ evt: 'review.system', issueId, outcome: row.decision, count: row.seq });
+    return { status: row.decision };
+  }
+
+  // ---- record integrity ---------------------------------------------------------------------
+  /** Repair partial failures: anchor decisions that were inserted but not chained. */
+  async function repairChain(limit = 25) {
+    let repaired = 0;
+    for (const d of await decisions.unanchored(limit)) if ((await anchor(d)).anchored) repaired++;
+    return repaired;
+  }
+
+  /** Verify the signed chain and that each of this issue's rows still matches its chain record. */
+  async function verify(issueId) {
+    if (!settings.signingKey) return { status: 'not_configured' };
+    const records = await chain.all();
+    const v = verifyHistory(settings.signingKey, siteId, records, {});
+    const rows = issueId ? await decisions.list(issueId) : [];
+    const problems = [];
+    for (const r of rows) {
+      const recomputed = decisionIdOf({ issueId: r.issue_id, seq: r.seq, kind: r.kind, decision: r.decision, rationale: r.rationale, conditions: r.conditions, questions: r.questions, decidedBy: r.decided_by, decidedAt: r.decided_at, screeningId: r.screening_id, fp: r.fp, pipelineVersion: r.pipeline_version, outcome: r.outcome });
+      if (recomputed !== r.decision_id) problems.push({ seq: r.seq, problem: 'row_changed' });
+      const rec = records.find((x) => x.decisionId === r.decision_id);
+      if (!rec) problems.push({ seq: r.seq, problem: 'not_anchored' });
+      else if (rec.state !== r.decision || rec.issueKey !== r.issue_id) problems.push({ seq: r.seq, problem: 'record_mismatch' });
+    }
+    return { status: v.valid && problems.filter((p) => p.problem !== 'not_anchored').length === 0 ? (problems.length ? 'pending_anchor' : 'verified') : 'problem', chainLength: records.length, head: v.head?.seq ?? 0, errors: v.errors.slice(0, 5), problems };
+  }
+
+  /** Everything the workspace needs about the review of one issue (decisions, assignment, status). */
+  async function reviewOf(issueId, { item, currentFp }) {
+    const [list, assigns] = await Promise.all([decisions.list(issueId), assignments.list(issueId)]);
+    const latest = list.at(-1) ?? null;
+    const status = deriveReviewStatus(item, latest ? { ...latest, carried: latest.detail?.carried } : null, currentFp);
+    return { status, decisions: list, assignments: assigns, latestSeq: latest?.seq ?? 0, assignmentSeq: assigns.at(-1)?.seq ?? 0, assignee: assigns.at(-1)?.assignee ?? null };
+  }
+
+  return { isReviewer, reviewers, assign, decide, onScreeningCompleted, repairChain, verify, reviewOf };
+}

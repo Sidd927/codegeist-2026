@@ -22,7 +22,7 @@ const dayOf = (now) => new Date(now).toISOString().slice(0, 10);
 /**
  * @param {object} deps { repos: {workItems, screenings, usage}, jira, llm, queue, log, clock, settings }
  */
-export function createScreeningService({ repos, jira, llm, queue, log, clock = () => Date.now(), settings, pricing }) {
+export function createScreeningService({ repos, jira, llm, queue, log, clock = () => Date.now(), settings, pricing, onCompleted = null }) {
   const { workItems, screenings, usage, spend } = repos;
   const versionFor = (mode) => pipelineVersion(mode, mode === 'ai' ? llm.model : null);
 
@@ -109,6 +109,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
         const existing = await timed('dbMs', () => screenings.get(existingId));
         if (existing && (mode === 'ai' || !settings.aiEnabled || !llm.available)) {
           const ok = await workItems.finalize({ issueId, token, screeningId: existingId, fp: st.fingerprint, outcome: existing.outcome, seqAtClaim, now: clock() });
+          if (ok) await notifyCompleted(issueId, { screeningId: existingId, fp: st.fingerprint, outcome: existing.outcome, result: existing.result, pipelineVersion: existing.pipelineVersion ?? existing.pipeline_version });
           await followUpIfNeeded(issueId, seqAtClaim);
           log.info({ evt: 'screening.reused', issueId, outcome: existing.outcome, mode, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined, dbMs: timing.dbMs, jiraMs: timing.jiraMs });
           return { status: ok ? 'reused' : 'lease_lost', screeningId: existingId, outcome: existing.outcome };
@@ -136,6 +137,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       }));
       await timed('dbMs', () => usage.record({ day: dayOf(now), fallback: mode !== 'ai', tokensIn: ex.usage?.tokensIn ?? 0, tokensOut: ex.usage?.tokensOut ?? 0 }));
       const ok = await timed('dbMs', () => workItems.finalize({ issueId, token, screeningId, fp: st.fingerprint, outcome: analysis.result.outcome, seqAtClaim, now }));
+      if (ok) await notifyCompleted(issueId, { screeningId, fp: st.fingerprint, outcome: analysis.result.outcome, result: analysis.result, pipelineVersion: version });
       await followUpIfNeeded(issueId, seqAtClaim);
       log.info({
         evt: 'screening.done', issueId, outcome: analysis.result.outcome, mode, aiStatus, ms: clock() - t0, queueMs: job.enqueuedAt ? t0 - job.enqueuedAt : undefined,
@@ -151,6 +153,16 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
       log.warn({ evt: 'screening.failed', issueId, code: String(code), count: retryCount + 1, status: terminal ? 1 : 0 });
       if (terminal) return { status: 'failed', code };
       throw Object.assign(new Error('retryable screening failure'), { retryable: true, retryAfter: RETRY_BASE_SECONDS * 2 ** retryCount });
+    }
+  }
+
+  /** Evidence-locked approval hook (M3). A failure leaves the derived status at PENDING_RECHECK (safe). */
+  async function notifyCompleted(issueId, screening) {
+    if (!onCompleted) return;
+    try {
+      await onCompleted({ issueId, screening });
+    } catch (e) {
+      log.warn({ evt: 'review.hook.failed', issueId, code: e?.code ?? 'INTERNAL' });
     }
   }
 
