@@ -2,6 +2,20 @@
 
 **Stage 2** · 2026-11-22 · Scope: [MVP_SCOPE.md](MVP_SCOPE.md) · Deadline: **Tue 22 Dec 2026, 12:00 PT** (submission). The app must keep working through judging, until **3 Feb 2027**.
 
+## 0. Progress (updated 23 Nov 2026)
+| Milestone | Status | Branch / PR (drafts, stacked) | Results |
+|---|---|---|---|
+| Stage 1/1.5 research + spikes | ✅ Done | `stage1-research-and-spikes` (#1) | `research/` |
+| Stage 2 blueprint | ✅ Done | `stage2-product-blueprint` (#2) | this folder |
+| M1 Foundation | ✅ Done | `stage3-product-foundation` (#3) | [STAGE3_FOUNDATION_RESULTS.md](STAGE3_FOUNDATION_RESULTS.md) |
+| M2 Detect (screening, AI validated at $0.40) | ✅ Done | `milestone-m2-detect` (#4) | [M2_DETECT_RESULTS.md](M2_DETECT_RESULTS.md) |
+| **M3 Review** (inbox, Margin workspace, assignment, four decisions, evidence-locked approval, signed record) | ✅ **Done (development)** | `milestone-m3-review` (#5) | [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md) |
+| M4 Enforce (Jira workflow gate) | ⏭ Next, **not started** | — | requirements: M3 results §11 |
+| Ledger publishing (Confluence register), onboarding, recovery, release | Planned | — | phases 7–12 below |
+
+**Ahead of plan:** phase 5 (review and approval) shipped before phase 6 (gate). The gate can now enforce `approvedForContent` from day one.
+**Scope change in M3:** `read:jira-user`, development major version. `manage:jira-configuration` was rejected on least-privilege grounds (see M3 results §3).
+
 ## 1. Calendar and principles
 - **Planned internal deadline: submit on Mon 21 Dec**, keeping Tue 22 Dec morning as buffer only.
 - **Code freeze: Thu 17 Dec** (end of day). After that, only fixes for defects found in rehearsal.

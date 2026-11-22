@@ -108,8 +108,13 @@ States are defined in [DATA_AND_SECURITY_MODEL.md §2](DATA_AND_SECURITY_MODEL.m
 | PENDING_REVIEW (DPIA_LIKELY) | DPIA likely | removed (bold) | block |
 | APPROVED | Approved | success | allow |
 | APPROVED_WITH_CONDITIONS | Approved with conditions | success + condition count | allow |
-| CHANGES_REQUESTED | Changes requested | moved | block |
+| NEEDS_MORE_INFORMATION (was CHANGES_REQUESTED) | More information requested | moved | block |
 | REJECTED | Rejected | removed | block |
-| STALE | Changed since approval | removed | block |
+| STALE → APPROVAL_STALE | Approval invalidated | removed (bold) | block |
+| PENDING_RECHECK (M3) | Changed · re-checking | inprogress | block |
+| CHANGED_SINCE_DECISION (M3) | Changed since decision | moved | block |
+| AWAITING_REVIEW (M3, = PENDING_REVIEW) | Awaiting review | moved | block |
+
+> M3 amendment: review statuses are derived on the server (`core/review.js`). The gate column is the M4 design; no gate is active yet.
 
 Monitor mode overrides every "block" to "allow + logged", with a banner.

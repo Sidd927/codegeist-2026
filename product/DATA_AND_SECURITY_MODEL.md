@@ -19,11 +19,28 @@ Migrations run only from install/upgrade triggers and an admin action **[VERIFIE
 | `usage` | `day` PK, `screenings`, `llm_calls`, `fallbacks`, `tokens_in/out` | Atomic budget counter **[VERIFIED pattern]** | No |
 | `audit` | `id` PK auto, `at`, `actor`, `action`, `target`, `result`, `detail` JSON | Admin and security actions **[VERIFIED]** | Actor account ID |
 
-KVS is used only for the recovery nonce (TTL semantics) **[VERIFIED]**. App-environment secret: `A25_SIGNING_KEY` (encrypted Forge variable; separate per environment; never logged) **[VERIFIED]**.
+KVS is used only for the recovery nonce (TTL semantics) **[VERIFIED]**. App-environment secret: `A25_SIGNING_KEY` (encrypted Forge variable; separate per environment; never logged) **[VERIFIED]**. M3: created in **development only** (generated locally, never printed). Production has no key, and decisions fail closed (`NOT_CONFIGURED`) without one.
+
+**M3 tables (implemented, migrations v005–v007):**
+- `decisions`: append-only, PK `(issue_id, seq)`, unique `decision_id` and `request_id`. Binds `screening_id`, `fp`, `pipeline_version`, `outcome` and `signal_set`; `decided_by` is the account ID or NULL for system records.
+- `assignments`: append-only, PK `(issue_id, seq)`, unique `request_id`.
+- `chain`: the signed hash chain, PK `seq`, unique `decision_id`.
+
+Every write is a single `INSERT IGNORE` at `expectedSeq + 1`. Duplicates are idempotent, and concurrent writers get exactly one winner.
+
+**M3 scope change:** `read:jira-user` was added, used for reviewer-group membership (`/user/groups`), reviewer names (`/user/bulk`) and reviewer search (`/user/search`). Listing group members (`/group/member`) would need the admin-level `manage:jira-configuration`, so that scope was **not** requested.
 
 ## 2. Decision model and state machine
 **Machine outcome** (per screening): `CLEAR`, `INVENTORY_UPDATE`, `NEEDS_INFO`, `REVIEW_REQUIRED`, `DPIA_LIKELY` (+ `SCREENING_FAILED`).
-**Human decisions:** `APPROVED`, `APPROVED_WITH_CONDITIONS`, `CHANGES_REQUESTED`, `REJECTED`. The system record `RECONFIRMED` (non-material change) and the recovery record `RESTORED` (audit only) are system-attributed.
+**Human decisions:** `APPROVED`, `APPROVED_WITH_CONDITIONS`, `NEEDS_MORE_INFORMATION`, `REJECTED`. The system records `APPROVAL_RECONFIRMED` (non-material change) and `APPROVAL_INVALIDATED` (material change), and the recovery record `RESTORED` (audit only), are system-attributed.
+
+> **M3 amendment (2026-11-22, implemented).**
+> - `CHANGES_REQUESTED` became `NEEDS_MORE_INFORMATION`: the reviewer must ask at least one specific question. It covers both "change the plan" and "tell me more", without implying the reviewer has rejected the work.
+> - `RECONFIRMED` and `STALE` are stored as the system decisions `APPROVAL_RECONFIRMED` and `APPROVAL_INVALIDATED`.
+> - The **review status is derived** from the latest decision plus the current content fingerprint (`core/review.js`), not stored separately. That avoids a second write that could be half-applied (Forge SQL has single-statement atomicity only).
+> - Derived statuses: `NOT_SCREENED`, `AWAITING_SCREENING`, `SCREENING_FAILED`, `AWAITING_REVIEW`, `NOT_REQUIRED`, `APPROVED`, `APPROVED_WITH_CONDITIONS`, `NEEDS_MORE_INFORMATION`, `REJECTED`, `APPROVAL_STALE`, `PENDING_RECHECK` (text edited, re-check not finished: the approval does **not** cover it) and `CHANGED_SINCE_DECISION`.
+> - The gate column below is still the M4 design; **no gate is active in M3**.
+> - Evidence: [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md).
 
 **Work-item states and gate effect** (default policy):
 | State | Entered when | Gate | Leaves when |
@@ -36,7 +53,7 @@ KVS is used only for the recovery nonce (TTL semantics) **[VERIFIED]**. App-envi
 | `NEEDS_INFO` | outcome NEEDS_INFO | **block** (policy toggle; default block) | edit → re-screen, or "send anyway" → `PENDING_REVIEW` |
 | `PENDING_REVIEW` | outcome ≥ REVIEW_REQUIRED (policy) | **block** | decision |
 | `APPROVED` / `APPROVED_WITH_CONDITIONS` | decision | **allow** | material re-screen → `STALE` |
-| `CHANGES_REQUESTED` | decision | **block** | edit → re-screen → `PENDING_REVIEW` (keeps history) |
+| `NEEDS_MORE_INFORMATION` (was `CHANGES_REQUESTED`) | decision | **block** | edit → re-screen → `CHANGED_SINCE_DECISION` → new decision (keeps history) |
 | `REJECTED` | decision | **block** | new decision by a reviewer (edit + re-screen → `PENDING_REVIEW`) |
 | `STALE` | material change after approval | **block** | decision |
 | (any) + monitor mode | admin switch | **allow**, logged `would_block` | switch off |
