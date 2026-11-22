@@ -14,10 +14,15 @@ const APPEARANCE = {
   DPIA_LIKELY: 'removed',
   APPROVED: 'success',
   APPROVED_WITH_CONDITIONS: 'success',
-  CHANGES_REQUESTED: 'moved',
   REJECTED: 'removed',
-  STALE: 'removed',
   RESCREEN_REQUIRED: 'moved',
+  AWAITING_SCREENING: 'inprogress',
+  AWAITING_REVIEW: 'moved',
+  NOT_REQUIRED: 'default',
+  NEEDS_MORE_INFORMATION: 'moved',
+  APPROVAL_STALE: 'removed',
+  PENDING_RECHECK: 'inprogress',
+  CHANGED_SINCE_DECISION: 'moved',
 };
 
 export function stateDisplay(state) {
@@ -25,6 +30,6 @@ export function stateDisplay(state) {
   return {
     label: known ? copy.states[state] : copy.states.NOT_SCREENED,
     appearance: known ? APPEARANCE[state] : 'default',
-    bold: state === 'DPIA_LIKELY',
+    bold: state === 'DPIA_LIKELY' || state === 'APPROVAL_STALE',
   };
 }

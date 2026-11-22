@@ -6,3 +6,5 @@ html, body { background: transparent; }
 @media (max-width: 479px) {
   .a25-panel__actions > * { flex: 1 1 100%; }
 }
+
+.a25-panel__review { display: flex; flex-direction: column; gap: var(--ds-space-025, 2px); padding: var(--ds-space-100, 8px) 0; border-top: 1px solid var(--ds-border, #0b120e24); border-bottom: 1px solid var(--ds-border, #0b120e24); }

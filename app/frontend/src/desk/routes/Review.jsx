@@ -1,6 +1,7 @@
 // Review workspace (UX_DESIGN_SPEC §3.4): Document · Margin · Decision.
 // Highlights come from server-verified offsets and are only drawn when the current text is exactly
-// the screened text. Decisions are not available in M2; the decision zone says so.
+// the screened text. The decision zone renders the server's review block: status, reviewer,
+// decision form (only when the server says this user may decide) and the append-only history.
 import { useMemo, useState } from 'react';
 import Button from '@atlaskit/button/new';
 import SectionMessage from '@atlaskit/section-message';
@@ -13,34 +14,36 @@ import { ModeNote, RuleTrace, DeltaChips, OpenQuestions, CheckedAt } from '../..
 import { toNote, toneOf, rangesFrom, whyLine } from '../../shared/findings.js';
 import { copy } from '../../shared/copy/en.js';
 import { useRouter } from '../router.jsx';
+import { ProcessingSummary } from '../review/ProcessingSummary.jsx';
+import { Assignment } from '../review/Assignment.jsx';
+import { DecisionForm } from '../review/DecisionForm.jsx';
+import { History } from '../review/History.jsx';
 
-const DECISIONS = ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'CHANGES_REQUESTED', 'REJECTED'];
 const S = copy.screening;
 const LABELS = { document: copy.review.documentLabel, summary: copy.review.summaryHeading, description: copy.review.descriptionHeading, noDescription: copy.review.noDescription };
 
-function DecisionZone({ decision }) {
-  const reasonId = 'a25-decision-reason';
-  const reason = copy.review.decisionUnavailable[decision.reason] ?? copy.review.decisionUnavailable.NOT_SCREENED;
+function DecisionZone({ issueKey, review, onChanged }) {
   return (
     <section className="a25-zone a25-zone--decision" aria-labelledby="a25-decision-title">
       <h2 id="a25-decision-title" className="a25-zone__title">
-        {copy.review.decisionLabel}
+        {copy.review.decision.title}
       </h2>
-      <fieldset className="a25-decision" disabled={!decision.available} aria-describedby={reasonId}>
-        <legend className="a25-visually-hidden">{copy.review.decisionLabel}</legend>
-        {DECISIONS.map((d) => (
-          <label key={d} className="a25-radio">
-            <input type="radio" name="a25-decision" value={d} disabled={!decision.available} />
-            <span>{copy.review.decisionOptions[d]}</span>
-          </label>
-        ))}
-      </fieldset>
-      <p id={reasonId} className="a25-decision__reason a25-small">
-        {reason}
-      </p>
-      <Button appearance="primary" isDisabled shouldFitContainer>
-        {copy.review.recordDecision}
-      </Button>
+      {!review ? (
+        <p className="a25-decision__reason a25-small">{copy.review.decision.unavailable.OUT_OF_SCOPE}</p>
+      ) : (
+        <>
+          <div className="a25-review-status">
+            <span className="a25-small a25-subtle">{copy.review.reviewStatusLabel}</span>
+            <StatusLozenge state={review.status} />
+          </div>
+          {review.approvedForContent ? <p className="a25-subtle a25-small">{copy.review.decision.currentApproval(copy.states[review.status])}</p> : null}
+          <Assignment issueKey={issueKey} review={review} onChanged={onChanged} />
+          <div className="a25-zone__divider" />
+          <DecisionForm issueKey={issueKey} review={review} onRecorded={onChanged} />
+          <div className="a25-zone__divider" />
+          <History issueKey={issueKey} review={review} />
+        </>
+      )}
     </section>
   );
 }
@@ -64,7 +67,9 @@ function MarginZone({ screening, activeId, onActivate, onRecheck }) {
       <ModeNote result={result} />
       <DeltaChips findings={result.findings} />
       {notes.length ? <MarginNotes idPrefix="a25-rv" notes={notes} activeId={activeId} onActivate={onActivate} newLabel={copy.findings.new} /> : <p className="a25-subtle">{S.noFindings}</p>}
+      {!screening.marksValid ? <p className="a25-subtle a25-small">{copy.review.marksHidden}</p> : null}
       <OpenQuestions findings={result.findings} />
+      <ProcessingSummary result={result} onActivate={onActivate} />
       {result.truncated ? <p className="a25-subtle a25-small">{S.truncated}</p> : null}
       <div className="a25-margin__meta">
         <CheckedAt result={result} />
@@ -124,7 +129,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
     );
   }
 
-  const { issue, document: doc, screening, decision } = data;
+  const { issue, document: doc, screening, review } = data;
   const displayState = screening.state;
   const recheck = onRecheck
     ? async () => {
@@ -150,6 +155,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
             {issue.summary}
           </h1>
           <StatusLozenge state={displayState} />
+          {review && review.status !== displayState ? <StatusLozenge state={review.status} /> : null}
           <span className="a25-review__open">
             {recheck && displayState !== 'SCREENING' && displayState !== 'OUT_OF_SCOPE' ? (
               <Button appearance="subtle" onClick={recheck}>
@@ -198,7 +204,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
           <MarginZone screening={screening} activeId={activeId} onActivate={setActiveId} onRecheck={recheck} />
         </section>
 
-        <DecisionZone decision={decision} />
+        <DecisionZone issueKey={issue.key} review={review} onChanged={refresh} />
       </div>
     </div>
   );

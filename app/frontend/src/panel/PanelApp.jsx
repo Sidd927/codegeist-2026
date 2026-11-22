@@ -8,10 +8,27 @@ import { useResource, usePolling } from '../shared/useResource.js';
 import { getContext, openDesk, reportFirstContent } from '../shared/platform.js';
 import { Skeleton, ErrorState, StatusHeader } from '../shared/components/States.jsx';
 import { ModeNote, RuleTrace, DeltaChips, FindingsList, OpenQuestions, CheckedAt } from '../shared/components/Screening.jsx';
-import { whyLine } from '../shared/findings.js';
+import { whyLine, relativeTime } from '../shared/findings.js';
+import { StatusLozenge } from '../shared/components/States.jsx';
 import { copy } from '../shared/copy/en.js';
 
 const S = copy.screening;
+
+/** Compact review summary: derived status, latest decision and reviewer (names only). */
+function ReviewSummary({ review }) {
+  if (!review || review.status === 'NOT_REQUIRED' || review.status === 'NOT_SCREENED' || review.status === 'AWAITING_SCREENING') return null;
+  const latest = review.latest;
+  return (
+    <div className="a25-panel__review" aria-label={copy.panel.reviewLabel} role="group">
+      <span className="a25-status__line">
+        <span className="a25-small a25-subtle">{copy.panel.reviewLabel}</span>
+        <StatusLozenge state={review.status} />
+      </span>
+      {latest ? <span className="a25-small a25-subtle">{copy.panel.latest(copy.states[latest.kind === 'system' ? (latest.decision === 'APPROVAL_INVALIDATED' ? 'APPROVAL_STALE' : latest.detail?.carried ?? 'APPROVED') : latest.decision], latest.decidedBy?.name, relativeTime(latest.decidedAt))}</span> : null}
+      {review.assignee ? <span className="a25-small a25-subtle">{copy.panel.reviewer(review.assignee.name)}</span> : null}
+    </div>
+  );
+}
 
 function RecheckButton({ onRecheck, label = S.recheck }) {
   const [busy, setBusy] = useState(false);
@@ -114,6 +131,7 @@ export function PanelView({ resource, onOpenDesk, onRecheck }) {
         {stale ? <p className="a25-subtle a25-small">{S.previousResult}: {copy.states[result.outcome]}</p> : null}
         <ModeNote result={result} />
       </StatusHeader>
+      <ReviewSummary review={data.review} />
       <DeltaChips findings={result.findings} />
       <FindingsList findings={result.findings} />
       <OpenQuestions findings={result.findings} />
