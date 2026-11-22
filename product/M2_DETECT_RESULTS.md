@@ -1,9 +1,7 @@
 # M2 — DETECT: Results
 
-**Date:** 2026-11-22 · **Branch:** `milestone-m2-detect` (from `stage3-product-foundation`) · **App:** `article25` v3.x (development only) · **Data:** synthetic only
-**Status:** ⚠️ **Functionally complete with a deterministic extractor. Not fully complete.**
-- **Live on real Jira events:** the event-driven pipeline, persistence, idempotency, the rules engine, evidence verification and the real UI states.
-- **Not live yet:** the **AI extractor**. It is implemented and tested against mocked model responses, but adding the Forge `llm` module and making billable calls both need your approval (§10). Per your definition of completion, **M2 is not marked complete** until that is done.
+**Date:** 2026-11-22 · **Branch:** `milestone-m2-detect` (from `stage3-product-foundation`) · **App:** `article25` v4.x (development only) · **Data:** synthetic only
+**Status:** ✅ **M2 complete (development).** The pipeline, persistence, rules, evidence verification and UI states are live on real Jira events, and **AI extraction is validated live**. The `llm` module and a $2 spend cap were approved on 22 Nov; **$0.40 was spent** across 70 calls (§10).
 
 ## 1. Definition-of-completion checklist
 | # | Criterion | Status | Evidence |
@@ -13,7 +11,7 @@
 | 3 | Results persist reliably | ✅ live | Forge SQL; Settings shows `SCREENED 4` after create, edit and delete runs; deterministic screening IDs |
 | 4 | Duplicate and concurrent events handled | ✅ live + unit | 3 parallel edits → 1 `screened`, 2 `busy`, 1 `reused`; final screening matches Jira's final text |
 | 5 | Deterministic rules engine works | ✅ unit + live | 14 ordered rules (`r1.0.0`) + fail-safe; trace and reasons shown in the UI |
-| 6 | AI extraction integrated **or** billable dependency documented | ⚠️ **implemented + mocked; billable dependency documented** | §6, §10 |
+| 6 | AI extraction integrated **or** billable dependency documented | ✅ **integrated and validated live** | 70 real Forge LLM calls through the product pipeline: 34 Haiku + 34 Sonnet eval issues, 2 smoke calls; 0 quotes rejected; §10 |
 | 7 | All accepted quotations verified against source | ✅ | Verifier on every signal (AI and fallback); 0 fallback quotes rejected over 34 tickets; hallucinated quotes rejected in tests |
 | 8 | Real states in panel and Margin desk | ✅ live | Not checked → Checking… → DPIA likely (no reload); Rescreening required (pipeline change); Margin highlights from server offsets |
 | 9 | Security and regression tests pass | ✅ | 60 backend + 25 frontend; ESLint (jsx-a11y strict), copy lint, `forge lint` |
@@ -86,7 +84,7 @@ reconciler (every 5 min): expired leases on QUEUED/SCREENING → re-queue; repea
 
 ## 6. AI extraction
 - **Adapter:** `createLlmAdapter({ chat, model })`.
-  - `chat` (the `@forge/llm` transport) is **injected and currently `null`**, so AI is reported as `not_enabled` and the labelled rule-based check runs.
+  - `chat` is `@forge/llm` (the `llm` module was approved for development on 22 Nov). Calls also require `A25_AI_ENABLED=true`, a daily call budget, and a **hard spend cap**: the worst-case cost is reserved atomically in `ai_spend` before each call and settled to the actual token cost after (`A25_AI_SPEND_CAP_USD`, default 0 = off).
   - Model default `claude-haiku-5-5` (research doc 15 §7.5), configurable via `A25_AI_MODEL`.
   - `tool_choice: 'auto'` (forced choice is rejected by the 5.5 models [VERIFIED Stage 1]); 25 s timeout.
 - **Schema:**
@@ -112,7 +110,7 @@ reconciler (every 5 min): expired leases on QUEUED/SCREENING → re-queue; repea
   - the deterministic floor is merged in;
   - a "no personal data" statement only clears when no category is found by either source.
 - **Mocked tests (no billable calls):** valid tool call, hallucinated quote, malformed text reply, schema-invalid arguments, transport error/timeout, over-budget, benign AI CLEAR, prompt injection.
-- **Not yet verified live:** real model behaviour with this schema, quote-verification rate, latency, cost, and quality on the eval set (§10).
+- **Verified live (§10):** real model behaviour with this schema, quote verification, latency, cost and eval quality.
 
 ## 7. Performance (measured live, development, 22 Nov 2026)
 | Metric | n | p50 | Range | Note |
@@ -123,7 +121,7 @@ reconciler (every 5 min): expired leases on QUEUED/SCREENING → re-queue; repea
 | SQL time per screening | 7 | 1,377 ms | 1,249–1,955 | ~7 statements at ~200 ms each: the largest cost |
 | Jira read per screening | 7 | 286 ms | 237–479 | — |
 | Processing (reused) | 2 | 1,357 ms | 1,345–1,369 | SQL 553–603 ms |
-| Model invocation | — | — | — | **Not measured** (AI not enabled). Stage 1: Haiku 5.5 median 3.5 s. |
+| Model invocation (Haiku 5.5, live) | 34 | 3,550 ms | 1,925–5,676 | AI processing end to end p50 5.8 s (Sonnet: model 3.8 s) |
 | `getPanelState` server | — | 534 ms → **~280 ms** | — | After JOIN + parallel read |
 | **Panel first content (warm)** | 6 | 2,069 ms → **1,378 ms** | 1,129–1,925 | Budget ≤ 1,500 ms ✅. Cold start after deploy: 6.9 s. |
 | Desk first content (warm) | 3 | 1,839 ms | 1,582–5,005 | Small sample |
@@ -159,17 +157,57 @@ The M2 prompt and schema are larger than Stage 1's: an **estimated** ~1,350 inpu
 - This is the measured reason the AI extractor is required.
 - Same caveats as Stage 1: n=34, a single author, synthetic, directional only.
 
-## 10. Remaining billable dependency (needs your decision)
-1. **Add the `llm` module** (`model: [claude]`) to the manifest. That is a **major version upgrade**.
-   - **Development:** I would deploy with `--approve MAJOR_VERSION_RULE` and upgrade the dev installation (`forge install --upgrade`, re-consent by the installing admin, i.e. you on the demo site).
-   - **Production:** untouched; the module will be part of the frozen manifest before sharing (roadmap scope freeze, 4 Dec).
-   - **Judges:** they will see the AI usage disclosure at install.
-2. **Billable calls:**
-   - inject `@forge/llm` `chat`;
-   - set `A25_AI_ENABLED=true` in **development only**;
-   - run the eval harness on Haiku and Sonnet, plus live dev screenings;
-   - estimated ≈ $0.41 under a **hard cap you set** (suggested $2, enforced by the atomic daily budget plus a run-level guard).
-3. **Then record:** model latency, verified-quote rate, malformed rate, held-out recall vs. the floor, and cost per screening, and only after that mark M2 complete.
+## 10. Live AI validation (approved 22 Nov 2026; cap $2; spent $0.40)
+**What was done:**
+- **Manifest:** `llm` module added (major version 4 in development; the dev installation was upgraded and re-consented).
+- **Development-only variables:** AI on, cap $2, 150 calls/day, model Haiku 5.5. Production has no Article25 variables and no deployment.
+- **Method:** the eval ran through the **real product path**. The 34 synthetic tickets were created as `[A25-EVAL …]` Jira issues, and the live trigger → queue → AI → verify → rules → SQL pipeline screened them. Results were scored from **content-free logs** (outcome codes, counts, timings, cost). All 68 eval issues were then deleted: 68/68 purge events, no errors.
+
+**Finding 1: output truncation (fixed).**
+- The first smoke call used exactly the 900-token output limit (`tokensOut: 900`), and the truncated tool call failed validation.
+- The fail-safe worked: the result was labelled rule-based, "The AI response was invalid and was discarded", and was not clean.
+- Fix:
+  - output budget raised to 2,000 tokens;
+  - prompt asks for minimal quotes and no prose outside the tool call;
+  - extractor version `x2`;
+  - finish reason now logged (as an enum).
+- The re-check then succeeded with `finish: tool_use` and 896 output tokens: the answer genuinely needed about 900.
+
+**Quality (product pipeline, synthetic set, single-author labels: directional only):**
+| Set | Configuration | Esc. precision | Esc. recall | Flag recall | Exact outcome | Sensitive misses |
+|---|---|---|---|---|---|---|
+| Dev (n=22) | Rule-based floor only | 1.00 | 0.93 | 1.00 | 0.59 | 0 |
+| Dev (n=22) | **Haiku 5.5 + floor** | **1.00** | **0.93** | 1.00 | **0.73** | 0 |
+| Dev (n=22) | Sonnet 5.5 + floor | 1.00 | 0.86 | 1.00 | 0.73 | 0 |
+| Held-out (n=12) | Rule-based floor only | n/a | **0.00** | 1.00 | 0.00 | **4** |
+| Held-out (n=12) | **Haiku 5.5 + floor** | **1.00** | **0.89** | 1.00 | **0.83** | **0** |
+| Held-out (n=12) | Sonnet 5.5 + floor | 1.00 | 0.89 | 1.00 | 0.75 | 0 |
+
+**Mismatches (Haiku):**
+- **H09** churn prediction → NEEDS_INFO, gold DPIA_LIKELY. This is the only held-out escalation miss.
+- **T05** → REVIEW_REQUIRED, gold DPIA.
+- **T03** → NEEDS_INFO, gold REVIEW: rule R-OQ asks who the SMS provider is.
+- **T17** → NEEDS_INFO, gold CLEAR: conservative.
+- **T04** → NEEDS_INFO, gold INVENTORY_UPDATE.
+- **T07, T11, H02** → DPIA, gold REVIEW: more conservative than the labels.
+
+| Integrity and cost | Haiku 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Calls / tool-call completions | 34 / 34 (`tool_use`) | 34 / 34 |
+| Quotes rejected by verifier | **0** | **0** |
+| Items dropped by schema validation | 1 | 2 |
+| Tokens in / out (p50) | 1,828 / 654 | 1,828 / 562 |
+| Model latency p50 (range) | 3.5 s (1.9–5.7) | 3.8 s (1.7–5.2) |
+| Processing p50 (queue p50) | 5.8 s (1.1 s) | 5.9 s (0.7 s) |
+| **Cost per screening (p50)** | **$0.0026** | $0.0093 |
+| Run total | $0.084 | $0.311 |
+
+**Decision:** keep **`claude-haiku-5-5`** as the default. It matches or beats Sonnet 5.5 on this set at about 28% of the cost, consistent with Stage 1. **Total spend** (smoke tests + both runs): **70 calls, $0.4017**, from content-free `costMicros` logs, with the atomic cap of $2.00 never approached.
+
+**Caveats:**
+- n=34, synthetic, labels by a single author;
+- these are product-pipeline results (AI merged with the deterministic floor), not model-only results;
+- an independent, larger labelled set is still needed before any public accuracy claim.
 
 ## 11. Security and privacy
 - **Logging:** no ticket content in logs. An allow-listed logger, verified on live logs (§5).
@@ -188,7 +226,7 @@ The M2 prompt and schema are larger than Stage 1's: an **estimated** ~1,350 inpu
 - **Secrets:** none in source. The `A25_*` settings are non-secret environment variables.
 
 ## 12. Known limitations
-1. **AI not live** (§10). Real-model behaviour is unverified.
+1. **AI quality** is measured only on 34 synthetic, single-author tickets (§10). No public accuracy claim yet.
 2. **The rule-based floor has low precision as well as low recall.** Live example: "health profile" also matched profiling (c1). The AI is expected to disambiguate this; not yet measured.
 3. **Transfers, retention and purposes come only from the AI.** The floor cannot detect them (live AS-6 missed "in the Philippines").
 4. **SQL latency** dominates processing (~200 ms per statement). Statement batching (e.g. a single upsert for usage) is a hardening item.
@@ -206,11 +244,13 @@ The M2 prompt and schema are larger than Stage 1's: an **estimated** ~1,350 inpu
 | Display issue property written after screening | **Not written** | Your M2 rule (no authoritative state in user-editable properties). It would also need `write:jira-work`. |
 | `outbox`, `gate_events`, `decisions`, `chain`, `audit` tables | Not created | Later milestones (M3+) |
 | Retention purge of superseded screenings (90 days) | Not yet | Hardening milestone |
+| AI cost control: daily budget | Daily budget **plus a hard cumulative dollar cap** with atomic reservation | Approval condition for live AI (new) |
 | Outcome vocabulary | Unchanged (CLEAR, INVENTORY_UPDATE, NEEDS_INFO, REVIEW_REQUIRED, DPIA_LIKELY + SCREENING_FAILED); display adds `RESCREEN_REQUIRED` | Display-only state |
 | AI path | AI **plus** a merged deterministic floor | Prompt-injection and model-miss defence (new) |
 
 ## 14. Dependencies for the next milestone (M3: review, decide, ledger)
-- **M2 AI validation** (§10) should land first, or at least in parallel, so reviewers see AI-quality findings.
+- **AI is live in development** (Haiku 5.5, $2 cap). Before production: set a production cap and budget deliberately, and freeze the `llm` module with the other scopes.
+- **Not re-verified:** the desk's Re-check button refreshing in place after an AI screening. The panel's in-place refresh was verified earlier in M2; a screenshot of the desk after Re-check was stale until reload. Re-test in M3.
 - **M3 needs:**
   - `read:jira-user` (reviewer group check);
   - possibly `write:jira-work` (receipts);
