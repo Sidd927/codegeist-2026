@@ -162,7 +162,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const page = Math.min(f.page, pages);
       const slice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
       const isReviewer = await review.isReviewer(actorId);
-      const people = await peopleMap(slice.map((x) => x.r.assignee));
+      const [people, scr] = await Promise.all([peopleMap(slice.map((x) => x.r.assignee)), slice.length ? repos.screenings.getMany(slice.map((x) => x.r.screening_id).filter(Boolean)) : []]);
+      const byId = new Map(scr.map((s) => [s.screening_id, s]));
       const items = slice.map(({ r, status }) => ({
         issueId: String(r.issue_id),
         key: visible.get(String(r.issue_id)).key,
@@ -173,6 +174,10 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         reviewStatus: status,
         assignee: person(people, r.assignee, isReviewer),
         ageMs: now - r.updated_at,
+        // Why it is here: up to three of the most important verified signals (kind + label, no quotes).
+        chips: (byId.get(r.screening_id)?.result?.findings ?? []).filter((f) => f.severity === 'high' || f.isNew || f.kind === 'external_sharing').slice(0, 3).map((f) => ({ kind: f.kind, signal: f.signal })),
+        findingCount: byId.get(r.screening_id)?.result?.findings?.length ?? 0,
+        mode: byId.get(r.screening_id)?.mode ?? null,
       }));
       return { filters: f, items, total, page, pages, pageSize: PAGE_SIZE, counts, projects, ai: aiActive() ? 'on' : 'off', isReviewer };
     },
@@ -183,7 +188,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return { group: settings.reviewerGroup, reviewers: await review.reviewers() };
     },
 
-    assign: async (payload, actorId) => review.assign({ actorId, issueKey: validate.issueKey(payload?.issueKey), assigneeId: payload?.assigneeId ?? null, expectedSeq: payload?.expectedSeq, requestId: payload?.requestId }),
+    assign: async (payload, actorId) => review.assign({ actorId, issueKey: validate.issueKey(payload?.issueKey), assigneeId: payload?.assigneeId === 'me' ? actorId : payload?.assigneeId ?? null, expectedSeq: payload?.expectedSeq, requestId: payload?.requestId }),
 
     decide: async (payload, actorId) =>
       review.decide({ actorId, issueKey: validate.issueKey(payload?.issueKey), input: payload?.input, screeningId: validate.hex64(payload?.screeningId), fp: validate.hex64(payload?.fp), expectedSeq: payload?.expectedSeq, requestId: payload?.requestId }),
