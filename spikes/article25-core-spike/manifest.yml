@@ -1,6 +1,9 @@
 # Article25 Stage 1 core spike (Spikes B, C, F). NOT the product.
 # app.id is filled in by `forge register`.
 modules:
+  sql:
+    - key: main
+      engine: mysql
   jira:issuePanel:
     - key: a25-spike-panel
       resource: panel
@@ -52,6 +55,11 @@ modules:
         - team-managed
 
   trigger:
+    - key: a25-installed
+      function: migrate
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
     - key: a25-issue-created
       function: onIssueCreated
       events:
@@ -60,6 +68,8 @@ modules:
         ignoreSelf: true
 
   function:
+    - key: migrate
+      handler: index.onInstalled
     - key: resolver
       handler: index.handler
     - key: validator

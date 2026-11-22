@@ -1,4 +1,4 @@
-// Spike C2: lambda workflow validator reading app-only KVS state.
+// Spike C2 (Stage 1.5): lambda workflow validator reading app-only Forge SQL state (db.js).
 // Payload (per docs): { issue: { key }, configuration, transition: { from, to, modifiedFields } }
 // Must return { result: boolean, errorMessage?: string }.
 import { kvs } from '@forge/kvs';
@@ -15,7 +15,7 @@ export const run = async (payload) => {
 
     const review = await getReview(issueKey);
     const ms = Date.now() - t0;
-    console.log(JSON.stringify({ spike: 'C2', issueKey, from: payload?.transition?.from?.id, to: payload?.transition?.to?.id, state: review?.state ?? null, kvsMs: ms }));
+    console.log(JSON.stringify({ spike: 'C2', issueKey, from: payload?.transition?.from?.id, to: payload?.transition?.to?.id, state: review?.state ?? null, storeMs: ms, store: 'sql' }));
     if (!review) {
       return { result: false, errorMessage: `Article25: no privacy review recorded for ${issueKey}. Request a review before starting development.` };
     }
