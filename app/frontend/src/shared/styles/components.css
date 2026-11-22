@@ -62,7 +62,9 @@
 .a25-note.is-active .a25-note__button { border-left-color: var(--a25-mark-underline-default); background: var(--ds-background-neutral-subtle-hovered, #0515240f); }
 .a25-note__index { color: var(--a25-index-fg); flex: none; padding-top: 1px; }
 .a25-note__body { display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); min-width: 0; }
-.a25-note__head { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-100, 8px); }
+.a25-note__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ds-space-100, 8px); }
+.a25-note__head > :last-child:not(.a25-note__label) { flex: none; }
+.a25-note__label { min-width: 0; }
 .a25-note__label { font-weight: var(--ds-font-weight-semibold, 600); }
 .a25-note__quote { font: var(--ds-font-body-small, 400 12px/16px ui-sans-serif, sans-serif); font-style: italic; color: var(--ds-text-subtle, #505258); overflow-wrap: anywhere; }
 .a25-note__provenance { color: var(--a25-ai-fg); }

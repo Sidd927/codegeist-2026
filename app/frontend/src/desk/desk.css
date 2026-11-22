@@ -51,7 +51,9 @@
 .a25-home__side { display: flex; flex-direction: column; gap: var(--ds-space-200, 16px); }
 
 .a25-loop-section { display: flex; flex-direction: column; gap: var(--ds-space-150, 12px); }
-.a25-loop { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-top: 1px solid var(--ds-border, #0b120e24); }
+.a25-loop { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); column-gap: var(--ds-space-200, 16px); border-top: 1px solid var(--ds-border, #0b120e24); }
+@media (min-width: 560px) { .a25-loop { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 760px) { .a25-loop { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .a25-loop__step { display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); padding: var(--ds-space-150, 12px) var(--ds-space-150, 12px) var(--ds-space-150, 12px) 0; border-bottom: 1px solid var(--ds-border, #0b120e24); }
 .a25-loop__num { color: var(--ds-text-subtlest, #6b6e76); }
 .a25-loop__title { font-weight: var(--ds-font-weight-semibold, 600); }
@@ -109,7 +111,8 @@
 
 /* ---------- Review workspace: Document · Margin · Decision ---------- */
 .a25-review { gap: var(--ds-space-200, 16px); }
-.a25-review__head { display: flex; flex-direction: column; gap: var(--ds-space-075, 6px); }
+.a25-review__head { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ds-space-075, 6px); }
+.a25-review__titleline { align-self: stretch; }
 .a25-review__titleline { display: flex; align-items: center; gap: var(--ds-space-100, 8px); flex-wrap: wrap; }
 .a25-review__key { color: var(--ds-text-subtle, #505258); }
 .a25-review__title { font: var(--ds-font-heading-medium, 600 20px/24px ui-sans-serif, sans-serif); }
