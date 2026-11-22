@@ -24,7 +24,11 @@ function ReviewSummary({ review }) {
         <span className="a25-small a25-subtle">{copy.panel.reviewLabel}</span>
         <StatusLozenge state={review.status} />
       </span>
-      {latest ? <span className="a25-small a25-subtle">{copy.panel.latest(copy.states[latest.kind === 'system' ? (latest.decision === 'APPROVAL_INVALIDATED' ? 'APPROVAL_STALE' : latest.detail?.carried ?? 'APPROVED') : latest.decision], latest.decidedBy?.name, relativeTime(latest.decidedAt))}</span> : null}
+      {latest ? (
+        <span className="a25-small a25-subtle">
+          {latest.decision === 'APPROVAL_RECONFIRMED' ? copy.panel.carried(relativeTime(latest.decidedAt)) : latest.decision === 'APPROVAL_INVALIDATED' ? copy.panel.invalidated(relativeTime(latest.decidedAt)) : copy.panel.latest(copy.states[latest.decision], latest.decidedBy?.name, relativeTime(latest.decidedAt))}
+        </span>
+      ) : null}
       {review.assignee ? <span className="a25-small a25-subtle">{copy.panel.reviewer(review.assignee.name)}</span> : null}
     </div>
   );

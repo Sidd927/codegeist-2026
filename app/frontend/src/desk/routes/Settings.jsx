@@ -75,10 +75,6 @@ function ReviewStatus({ r }) {
           <dd className="a25-mono">{r.reviewerGroup}</dd>
         </div>
         <div>
-          <dt>{T.activeReviewersLabel}</dt>
-          <dd>{r.activeReviewers}</dd>
-        </div>
-        <div>
           <dt>{T.youLabel}</dt>
           <dd>{r.youAreReviewer ? T.youReviewer : T.youNotReviewer}</dd>
         </div>

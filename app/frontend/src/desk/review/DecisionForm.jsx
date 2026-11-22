@@ -155,8 +155,8 @@ export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
         ) : null}
       </fieldset>
 
-      {decision === 'APPROVED_WITH_CONDITIONS' ? <ListEditor id="a25-cond" label={D.conditions} kind={D.conditions} items={conditions} setItems={setConditions} error={errors.conditions} addLabel={D.addCondition} /> : null}
-      {decision === 'NEEDS_MORE_INFORMATION' ? <ListEditor id="a25-q" label={D.questions} kind={D.questions} items={questions} setItems={setQuestions} error={errors.questions} addLabel={D.addQuestion} /> : null}
+      {decision === 'APPROVED_WITH_CONDITIONS' ? <ListEditor id="a25-cond" label={D.conditions} kind={D.conditions} items={conditions} setItems={(v) => { setConditions(v); if (errors.conditions) setErrors(({ conditions: _c, ...rest }) => rest); }} error={errors.conditions} addLabel={D.addCondition} /> : null}
+      {decision === 'NEEDS_MORE_INFORMATION' ? <ListEditor id="a25-q" label={D.questions} kind={D.questions} items={questions} setItems={(v) => { setQuestions(v); if (errors.questions) setErrors(({ questions: _q, ...rest }) => rest); }} error={errors.questions} addLabel={D.addQuestion} /> : null}
 
       <div className="a25-field">
         <label htmlFor="a25-rationale" className="a25-field__label">
@@ -168,7 +168,10 @@ export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
           rows={4}
           maxLength={2000}
           value={rationale}
-          onChange={(e) => setRationale(e.target.value)}
+          onChange={(e) => {
+            setRationale(e.target.value);
+            if (errors.rationale) setErrors(({ rationale: _r, ...rest }) => rest);
+          }}
           aria-invalid={errors.rationale ? 'true' : undefined}
           aria-describedby={errors.rationale ? 'a25-rationale-err' : 'a25-rationale-hint'}
         />
@@ -205,13 +208,12 @@ export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
         </Button>
       )}
       {result ? (
-        <div role={result.tone === 'error' ? 'alert' : 'status'} className={result.tone === 'error' ? 'a25-field-error' : 'a25-subtle a25-small'}>
-          {result.text}
-          {result.reload ? ' ' : null}
+        <div role={result.tone === 'error' ? 'alert' : 'status'} className={result.tone === 'error' ? 'a25-decision__result a25-field-error' : 'a25-subtle a25-small'}>
+          <span>{result.text}</span>
           {result.reload ? (
-            <button type="button" className="a25-linkbutton" onClick={() => onRecorded?.()}>
-              {copy.common.retry}
-            </button>
+            <Button appearance="default" onClick={() => onRecorded?.()}>
+              {D.reload}
+            </Button>
           ) : null}
         </div>
       ) : null}

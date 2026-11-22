@@ -274,3 +274,16 @@ describe('Inbox', () => {
     expect(history.location.pathname).toBe('/review/SHOP-42');
   });
 });
+
+describe('Issue panel review summary', () => {
+  const RESULT2 = { screeningId: 's1', outcome: 'REVIEW_REQUIRED', mode: 'rules', aiStatus: 'not_enabled', checkedAt: Date.now(), rulesVersion: 'r1.0.0', reasons: [], trace: [], criteria: [], truncated: false, quality: { rejected: 0, dropped: 0 }, findings: [] };
+  const panel = (latest) => ({ access: 'granted', issue: { id: '1', key: 'AS-79', projectKey: 'AS' }, screening: { state: 'REVIEW_REQUIRED', result: RESULT2 }, review: { status: 'APPROVED', assignee: null, latest } });
+  it('says an approval was carried over by the system, not decided again by a person', () => {
+    render(<PanelView resource={resource({ data: panel({ kind: 'system', decision: 'APPROVAL_RECONFIRMED', decidedBy: null, decidedAt: Date.now(), detail: { carried: 'APPROVED' } }) })} />);
+    expect(screen.getByText(/Approval carried over to the edited text/)).toBeTruthy();
+  });
+  it('names the reviewer for human decisions', () => {
+    render(<PanelView resource={resource({ data: panel({ kind: 'human', decision: 'APPROVED', decidedBy: { name: 'Reviewer One' }, decidedAt: Date.now() }) })} />);
+    expect(screen.getByText(/Approved by Reviewer One/)).toBeTruthy();
+  });
+});

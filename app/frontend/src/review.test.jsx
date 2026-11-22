@@ -44,6 +44,10 @@ describe('Decision form', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record decision' })));
     expect(screen.getByText('Choose an outcome.')).toBeTruthy();
     pick('Request more information');
+    type('Rationale', 'x');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record decision' })));
+    type('Rationale', 'xy'); // editing clears that field's error until the next submit
+    expect(screen.queryByText('Write at least 10 characters.')).toBeNull();
     type('Rationale', 'short');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record decision' })));
     expect(screen.getByText('Write at least 10 characters.')).toBeTruthy();
@@ -85,7 +89,7 @@ describe('Decision form', () => {
     type('Rationale', 'Proportionate as described in the ticket.');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record decision' })));
     expect(screen.getByRole('alert').textContent).toContain('changed since');
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload the latest state' }));
     expect(onRecorded).toHaveBeenCalled();
   });
 
@@ -112,16 +116,28 @@ describe('Assignment', () => {
     expect(client.assign.mock.calls[0][0]).toMatchObject({ issueKey: 'SHOP-42', assigneeId: 'me', expectedSeq: 1 });
     expect(onChanged).toHaveBeenCalled();
   });
-  it('offers only active reviewers when picking someone', async () => {
-    const client = { reviewers: vi.fn().mockResolvedValue({ reviewers: [{ accountId: 'a1', displayName: 'Reviewer One', active: true }, { accountId: 'a2', displayName: 'Former Reviewer', active: false }] }), assign: vi.fn().mockResolvedValue({ status: 'assigned' }) };
+  it('finds reviewers by name search and assigns the chosen one', async () => {
+    const client = { reviewers: vi.fn().mockResolvedValue({ reviewers: [{ accountId: 'a1', displayName: 'Reviewer One', active: true }, { accountId: 'a3', displayName: 'Reviewer Three', active: true }] }), assign: vi.fn().mockResolvedValue({ status: 'assigned' }) };
     const { container } = render(<Assignment issueKey="SHOP-42" review={review({ assignee: null })} client={client} />);
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Assign to' })));
-    const select = screen.getByLabelText('Choose a reviewer');
-    expect([...select.options].map((o) => o.textContent)).toEqual(['Choose a reviewer', 'Reviewer One']);
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to…' }));
+    expect(screen.getByRole('button', { name: 'Search' }).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Find a reviewer by name'), { target: { value: 'Rev' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Search' })));
+    expect(client.reviewers).toHaveBeenCalledWith('Rev');
+    const select = screen.getByLabelText('Matching reviewers');
+    expect([...select.options].map((o) => o.textContent)).toEqual(['—', 'Reviewer One', 'Reviewer Three']);
     fireEvent.change(select, { target: { value: 'a1' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Assign' })));
     expect(client.assign.mock.calls[0][0].assigneeId).toBe('a1');
     expect(await axeViolations(container)).toEqual([]);
+  });
+  it('says so when no reviewer matches', async () => {
+    const client = { reviewers: vi.fn().mockResolvedValue({ reviewers: [] }) };
+    render(<Assignment issueKey="SHOP-42" review={review({ assignee: null })} client={client} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to…' }));
+    fireEvent.change(screen.getByLabelText('Find a reviewer by name'), { target: { value: 'Nobody' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Search' })));
+    expect(screen.getByRole('status').textContent).toMatch(/No active members of the reviewer group/);
   });
   it('shows an inactive assignee and no controls for non-reviewers', () => {
     render(<Assignment issueKey="SHOP-42" review={review({ assignee: { name: 'Former Reviewer', active: false }, permissions: { isReviewer: false, canDecide: false, decideReason: 'NOT_REVIEWER', canAssign: false } })} />);
@@ -132,7 +148,7 @@ describe('Assignment', () => {
 
 describe('History', () => {
   const decisions = [
-    { seq: 2, kind: 'system', decision: 'APPROVAL_INVALIDATED', rationale: null, conditions: [], questions: [], decidedBy: null, decidedAt: Date.now() - 60000, outcome: 'DPIA_LIKELY', contentRef: '9f8e7d6c', detail: { carried: 'APPROVED', added: { categories: ['health'], recipients: ['twilio'] }, escalated: true, from: 'REVIEW_REQUIRED', to: 'DPIA_LIKELY' } },
+    { seq: 2, kind: 'system', decision: 'APPROVAL_INVALIDATED', rationale: null, conditions: [], questions: [], decidedBy: null, decidedAt: Date.now() - 60000, outcome: 'DPIA_LIKELY', contentRef: '9f8e7d6c', detail: { carried: 'APPROVED', added: { categories: ['health'], recipients: ['Twilio'] }, escalated: true, from: 'REVIEW_REQUIRED', to: 'DPIA_LIKELY' } },
     { seq: 1, kind: 'human', decision: 'APPROVED', rationale: 'Proportionate with masking.', conditions: [], questions: [], decidedBy: { name: 'Reviewer One', active: true }, decidedAt: Date.now() - 3600000, outcome: 'REVIEW_REQUIRED', contentRef: 'ab12cd34', detail: null },
   ];
   const assignments = [{ seq: 1, assignee: { name: 'Reviewer One' }, assignedBy: { name: 'Reviewer Two' }, assignedAt: Date.now() - 7200000 }];
@@ -142,7 +158,7 @@ describe('History', () => {
     expect(items.map((li) => li.textContent.slice(0, 40))).toHaveLength(3);
     expect(items[0].textContent).toContain('Approval invalidated');
     expect(items[0].textContent).toContain('Health data');
-    expect(items[0].textContent).toContain('Shared with twilio');
+    expect(items[0].textContent).toContain('Shared with Twilio');
     expect(items[0].textContent).toContain('from Review required to DPIA likely');
     expect(items[1].textContent).toContain('by Reviewer One');
     expect(items[1].textContent).toContain('Proportionate with masking.');
