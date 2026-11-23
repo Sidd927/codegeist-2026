@@ -151,7 +151,7 @@ s.chip("Health data", s.at("Health data"), 120, 520, "#FFF5DB", "#7A4A00")
 s.chip("Systematic monitoring", s.at("Systematic monitoring"), 330, 520, "#FFF5DB", "#7A4A00")
 s.chip("DPIA likely", s.at("A data protection"), 120, 600, RED)
 s.cap('Every finding quotes <em>the exact words</em> it is based on.', s.at("Every finding"), x=120, y=720, w=800)
-s.add('<div class="note" style="left:120px;top:900px;width:780px">This build runs rule-based checks (limited recall) — and says so.</div>', s.at("This build"))
+s.add('<div class="note" style="left:120px;top:900px;width:780px">Each result names its mode: AI-assisted or rule-based. This one: rule-based.</div>', s.at("Each result says"))
 
 # 6 · Review: the margin, then the decision.
 s = Scene("review", "s06-review", eyebrow=("02 · 03", "Review and decide")); S.append(s)

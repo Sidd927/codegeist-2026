@@ -89,7 +89,7 @@ Article 25 of the GDPR asks for data protection *by design and by default*. In p
 1. **Detect.** Every created or edited work item in scope is checked in the background.
    - A versioned rules engine sets the outcome: *Review required*, *DPIA likely* and others.
    - Every finding quotes the exact words it is based on, so a reviewer never has to trust an unexplained flag.
-   - Optional AI extraction (Atlassian's Forge LLM) must also quote verbatim, or its finding is discarded.
+   - AI-assisted extraction (Atlassian's Forge LLM, on in the judging build, within a hard spend cap) must also quote verbatim, or its finding is discarded. If AI is unavailable, checks fall back to rules only.
    - Each result says whether it is rule-based or AI-assisted.
 2. **Review.** Reviewers get an Inbox and a margin-style workspace: the text on the left, the evidence in the margin, the "what's new" chips, and assignment to a reviewer.
 3. **Decide.** Approve, approve with conditions, request more information, or reject.
@@ -196,7 +196,7 @@ Atlassian Forge (Custom UI, Jira issue panel, global page, workflow validator, t
   - `read:jira-work`: read work-item text to screen it and to check the gate;
   - `read:jira-user`: reviewer-group membership and names;
   - `read:workflow:jira`: show which transitions carry the gate;
-  - plus Forge LLM (only used if AI is switched on).
+  - plus Forge LLM: AI-assisted checks, within a hard spend cap.
 
 ## Repository
 [GitHub URL, public or shared with judges, your choice] · README explains setup, architecture, operation and verification.

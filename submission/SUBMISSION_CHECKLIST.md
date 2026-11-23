@@ -13,7 +13,7 @@
 | 5 | Text description: features and functionality | → Full description | ✅ Ready |
 | 6 | "How the project meets the main technology requirement" | → Main technology requirement | ✅ Ready |
 | 7 | Built with | → Built with | ✅ Ready |
-| 8 | Demo video **under 5 min**, shows the project working, **public on YouTube** | `submission/video/build/article25-demo-final.mp4` (3:57) | ⛔ **[YOU]** approve the music decision and the voice; upload to your YouTube channel as Public |
+| 8 | Demo video **under 5 min**, shows the project working, **public on YouTube** | `submission/video/build/article25-demo-final.mp4` (3:59) | ⛔ **[YOU]** approve the music decision and the voice; upload to your YouTube channel as Public |
 | 9 | Video has no third-party trademarks or copyrighted music without permission | Synthetic names; Pixabay effects; no music yet | ✅ (re-check if music is added) |
 | 10 | Installation link for judges | Production deploy + Distribution → Sharing | ⛔ **[YOU]** approve the production deploy and the Sharing setup (runbook §1–3) |
 | 11 | Detailed setup instructions | `docs/JUDGE_INSTALL.md` | ✅ Draft; re-run on a clean site after the deploy |

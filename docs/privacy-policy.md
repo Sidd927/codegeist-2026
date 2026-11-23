@@ -56,10 +56,10 @@ Please don't put unnecessary personal data in rationales, conditions or question
 - Article25 writes only an allow-listed set of fields: event names, error codes, durations, numeric work-item IDs, outcome codes and counts.
 - **It never logs work-item text, rationales or account IDs.**
 
-## AI processing (optional) [CONFIRM: on or off in the published build]
-**Default:** AI is **off** by default, and screening then uses deterministic rules only.
+## AI processing
+**In the published build, AI-assisted checks are on, within a spending cap set by the developer.** If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so. [CONFIRM the cap before publication]
 
-**If AI is switched on** by whoever operates the app:
+**When AI-assisted checks run:**
 - work-item text is sent to **Atlassian's Forge LLM service**, which runs within Atlassian's platform, to extract possible privacy signals;
 - every signal must quote the text verbatim, or it is discarded;
 - a rules engine, not the AI, sets the outcome;

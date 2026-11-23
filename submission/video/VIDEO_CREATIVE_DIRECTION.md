@@ -1,6 +1,6 @@
 # Article25 demo film: creative direction
 
-**Deliverable:** `build/article25-demo-final.mp4`, 3:56.7, 1920×1080, 30 fps, H.264 + AAC, −15.0 LUFS integrated, −1.3 dBTP. Captions: `article25-demo.en.srt`.
+**Deliverable:** `build/article25-demo-final.mp4`, 3:59.3, 1920×1080, 30 fps, H.264 + AAC, −15.0 LUFS integrated, −1.3 dBTP. Captions: `article25-demo.en.srt`.
 
 ## 1. What the film must do for judges
 The 2026 rules judge five criteria equally. Presentation explicitly asks for:
@@ -28,14 +28,14 @@ The film is built around one sentence a judge should remember: **"Privacy review
 | Product framing | Captures in a rounded window with a soft shadow; slow push-ins (2–6%) | Keeps stills alive without faking interaction |
 | Mark | The app's own icon (`desk/public/icon.svg`) | Real brand asset |
 
-## 4. Structure (3:57)
+## 4. Structure (3:59)
 | Act | Scenes | Purpose |
 |---|---|---|
 | Problem (0:00–0:30) | hook, tension | Everyday Jira work changes how personal data is handled; reviews are informal and approvals go stale |
 | Promise (0:30–0:59) | reveal, setup | Article25 and its loop; honest setup: installing protects nothing until a transition carries the gate |
 | Proof (0:59–2:43) | detect, review, separation of duties, gate, modes, invalidation | One work item, end to end, in real UI |
 | Trust (2:43–3:43) | record, recover, under the hood | Signed history, offline verification, recovery, the architecture on Forge |
-| Close (3:43–3:57) | close | Name, promise, platform |
+| Close (3:43–3:59) | close | Name, promise, platform |
 
 ## 5. Sound
 - **Narration:** a synthetic voice (Kokoro-82M, voice `af_heart`, generated locally; Apache-2.0 model). **It is not a human recording**, and the notes say so.
@@ -45,5 +45,5 @@ The film is built around one sentence a judge should remember: **"Privacy review
 ## 6. Honesty rules for the film
 - Every product frame is captured from Article25's own code. States come from the real services on synthetic data; one live Jira capture is used.
 - Captions on the screen describe what the UI shows; none adds a capability.
-- Mode is stated: "This build runs rule-based checks, and the panel says so."
+- The mode is stated: "Each result says whether it came from AI-assisted or rule-based checks. This one is rule based." This holds for the AI-assisted judging build too.
 - No third-party trademarks. Vendors (Fernwick, Tidepost) and people (Maya Okafor, Daniel Reyes, Sam Whitlock) are invented. Atlassian and Jira are named only to describe the platform the app runs on, as the rules require footage of it running there.

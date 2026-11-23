@@ -3,7 +3,7 @@
 ## 1. Status
 | Item | State |
 |---|---|
-| Picture | ✅ Final cut rendered: `build/article25-demo-final.mp4` (3:56.7; 1920×1080; 30 fps; H.264 CRF 18; 51 MB). `build/` is git-ignored; rebuild with §2 |
+| Picture | ✅ Final cut rendered: `build/article25-demo-final.mp4` (3:59.3; 1920×1080; 30 fps; H.264 CRF 18; 51 MB). `build/` is git-ignored; rebuild with §2 |
 | Narration | ✅ Synthetic voice (Kokoro `af_heart`, local). **Swap for a human recording if you prefer (§4).** |
 | Effects | ✅ Pixabay-licensed (whooshes, pops, riser, impact) |
 | Music | ⛔ **Missing asset: needs your approval** (§5) |

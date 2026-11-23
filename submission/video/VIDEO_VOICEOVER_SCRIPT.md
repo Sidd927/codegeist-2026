@@ -17,7 +17,7 @@
 | 0:18 | s02-tension | And when a review does happen, it is an email thread and a thumbs up. Weeks later, the work changes. New data, a new vendor. And the old approval still says yes. | 9.7 |
 | 0:30 | s03-reveal | Article25 is privacy review that lives inside Jira, and actually enforces the decision. Detect. Review. Decide. Enforce. Record. | 10.1 |
 | 0:43 | s04-setup | An administrator installs it, and Get started shows exactly what is left to do, checked live. Installing protects nothing by itself, so Article25 says so, until a workflow transition carries the Article25 gate. | 14.8 |
-| 1:00 | s05-detect | A developer files a work item: add session replay to checkout, with a vendor called Fernwick. Article25 reads the text and flags it. Health data. Systematic monitoring. A data protection impact assessment is likely. Every finding quotes the exact words it is based on. This build runs rule based checks, and the panel says so. | 21.8 |
+| 1:00 | s05-detect | A developer files a work item: add session replay to checkout, with a vendor called Fernwick. Article25 reads the text and flags it. Health data. Systematic monitoring. A data protection impact assessment is likely. Every finding quotes the exact words it is based on. Each result says whether it came from AI assisted or rule based checks. This one is rule based. | 21.8 |
 | 1:24 | s06-review | The privacy reviewer opens it in the review desk. The text is on the left, the evidence in the margin. Select a finding, and its words light up. She approves with conditions: mask every form input, and keep prescription pages out. The decision is bound to this exact text, and signed. | 17.9 |
 | 1:44 | s07-sod | The developer who reported it cannot approve their own work. Article25 explains why, and what to do instead. | 7.2 |
 | 1:54 | s08-gate | Jira's workflow now asks Article25 before work can start. Without an approval, the transition is refused, and the developer is told what to do next. | 10.0 |
@@ -32,6 +32,7 @@
 
 | Line | Claim | Evidence |
 |---|---|---|
+| s05 | Mode labelling: every result names AI-assisted or rule-based |
 | s05 | Rules-mode result | `film-data.mjs` output: DPIA likely; health; systematic monitoring |
 | s05 | Quotes | Evidence verifier; excerpts of 120 characters or fewer |
 | s06 | Bound and signed | `decisionIdOf` covers the fingerprint; Ed25519 record |

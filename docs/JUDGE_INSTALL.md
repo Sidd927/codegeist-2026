@@ -25,7 +25,9 @@ Confluence is not needed.
    | View user profiles (`read:jira-user`) | Check membership of the reviewer group and show reviewers' names |
    | View workflows (`read:workflow:jira`) | Read-only: show which workflow transitions carry the Article25 gate |
 
-   Article25 **writes nothing to Jira** and sends nothing outside Atlassian. AI extraction runs on Atlassian's Forge LLM and is **off** unless the operator switches it on. Without it, screening uses the rule-based extractor and the result says so.
+   Article25 **writes nothing to Jira** and sends nothing outside Atlassian.
+
+   AI-assisted checks run on Atlassian's Forge LLM, within a spending cap. Every AI finding must quote the text it relies on, and a rules engine sets the outcome. If AI is unavailable or over its cap, checks fall back to rules only, and the panel says which mode produced each result.
 
 ## 2. Set up (site admin, about 5 minutes)
 1. **Reviewer group.** In *Admin → Groups*, create the group **`article25-reviewers`** and add yourself.

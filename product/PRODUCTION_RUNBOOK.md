@@ -32,7 +32,7 @@ Do **not** set `A25_SIGNING_KEY` (legacy HMAC) in production: there are no legac
 
 **1.2 Pin the fingerprint [YOU].** After the first install, open *Settings → Decision record and recovery*. Copy the key fingerprint into your password manager or audit file. This is what auditors pin with `verify-archive.mjs --fingerprint`.
 
-**1.3 AI.** Use the option you approve (memo §6). Rules-only:
+**1.3 AI.** **Decided: hybrid with a hard cap** (memo §6, option A). Use the commands under "Hybrid" below, with the cap you name. The rules-only commands are kept for reference. Rules-only:
 
 ```bash
 forge variables set -e production A25_AI_ENABLED false

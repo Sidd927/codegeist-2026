@@ -10,12 +10,12 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 | Forge environments | Development: installed (v6), AI **off**, gate **Monitoring**. `recovery`: empty, no install. Staging: unused. **Production: deployed 22 Nov, no install, no variables** | `forge environments/variables/install list` | Production setup needs you |
 | Scopes | `read:jira-work`, `read:jira-user`, `read:workflow:jira` + `llm` module; no egress | `manifest.yml` | Freeze by **4 Dec** (you) |
 | Signing keys | Development: Ed25519 + legacy HMAC. Production: **none** | variables list | **Yes:** production key (you generate) |
-| AI decision | Memo ready: hybrid with a cap recommended | `AI_PRODUCTION_DECISION.md` | Your decision |
+| AI decision | ✅ **Decided: hybrid with a hard cap** (owner, 23 Nov). The dollar cap is still to be named | `AI_PRODUCTION_DECISION.md` | The cap figure (you) |
 | Sharing link | Not created | — | **Yes** (you) |
 | Privacy policy | Rewritten from the code; not published; contact and legal review open | `docs/privacy-policy.md` | **Yes** (you) |
 | Clean-site rehearsal | Isolated first-run and recovery done live; a real clean site needs you | `docs/CLEAN_SITE_REHEARSAL.md` | Strongly recommended |
 | Judge guide | Accurate; matches Get started | `docs/JUDGE_INSTALL.md` | No |
-| Demo film | ✅ Rendered, 3:57, real product footage. Synthetic voice; no music yet | `submission/video/` | Music and voice approvals; YouTube upload (you) |
+| Demo film | ✅ Rendered, 3:59, real product footage. Synthetic voice; no music yet | `submission/video/` | Music and voice approvals; YouTube upload (you) |
 | Devpost package | ✅ Copy-ready; field-by-field checklist | `submission/` | Submission (you) |
 | Runbook | ✅ Exact commands | `PRODUCTION_RUNBOOK.md` | — |
 
@@ -47,8 +47,8 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 ## 4. Decisions and actions that need you (in order)
 | # | Decision or action | Why it's yours | By |
 |---|---|---|---|
-| 1 | **AI in production:** hybrid with a cap (recommended; state the $ cap) or rules-only | Billable | 1 Dec |
-| 2 | **Freeze scopes** as listed (keep or remove the `llm` module, following #1) | Re-consent after judges install | **4 Dec** |
+| 1 | ~~AI in production~~ **Hybrid decided.** Still needed: **the $ cap per installation** (recommended $10) | Billable | 1 Dec |
+| 2 | **Freeze scopes** as listed, **keeping the `llm` module** (follows #1) | Re-consent after judges install | **4 Dec** |
 | 3 | **Generate the production signing key** (runbook §1.1) and pin its fingerprint | Production key | Before #5 |
 | 4 | **Privacy policy:** add a contact email, get legal review of the [REVIEW] items, publish to a public URL | Publishing | Before #5 |
 | 5 | **Approve the production deploy + Distribution → Sharing** (I can run the deploy once approved; you complete Sharing in the developer console) | Production + public link | ~7 Dec |

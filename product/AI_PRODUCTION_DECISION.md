@@ -1,6 +1,12 @@
 # AI in production: decision memo
 
-**Date:** 23 Nov 2026 · **Decision owner:** you (billable) · **Status:** AI is **off** everywhere today. Development has `A25_AI_ENABLED=false`; production has no variables at all.
+**Date:** 23 Nov 2026 · **Decision owner:** you (billable)
+
+> **DECISION (23 Nov 2026): Option A, hybrid with a hard spend cap, approved by the owner.**
+> - The per-installation dollar cap is **still to be named** (recommended $10, about 3,800 checks; $5 is about 1,900).
+> - Nothing is configured yet. Production still has no variables, and development keeps AI **off**.
+> - The variables are set together with the production deploy (runbook §1.3), after the deploy is approved.
+> - The `llm` module stays in the manifest for the scope freeze.
 
 **Recommendation:** ship the **hybrid** (AI-assisted extraction plus the deterministic rules floor) in production for the judging period, behind a hard spend cap. Use a **$10 cap** and **300 screenings a day**. If you don't approve a spend, ship **rules-only**, and make the demo and judge guide use texts the rules floor catches (already done). Either way, the panel tells the user honestly which mode produced each result.
 
