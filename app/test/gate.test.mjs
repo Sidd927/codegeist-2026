@@ -1,6 +1,7 @@
 // M4 ENFORCE tests: the gate policy (pure) and the validator path through the REAL screening,
 // review, desk and gate services over in-memory repositories. Synthetic data only. Run: npm test
 import { test } from 'node:test';
+import { environmentIdOf } from '../src/backend/services/gate.js';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { evaluateGate, verifyDecisionRecord, applyMode, analyseCoverage, REASONS, jiraMessage, GATE_POLICY_VERSION } from '../src/core/gate.js';
@@ -408,6 +409,14 @@ test('health: never claims protection without verified coverage and working depe
   const otherModule = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/a25-validator-lambda` } };
   w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [otherApp, otherModule, { ruleKey: 'article25-gate' }])])], statuses: ST };
   assert.equal((await w.gateFor(ADMIN, { appId: APP }).health()).coverage.status, 'none');
+  // Final audit: a rule that calls ANOTHER environment of this app (e.g. development, while this is a
+  // staging or recovery-test installation on the same site) is not this installation's coverage.
+  w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [GATE_RULE])])], statuses: ST };
+  assert.equal((await w.gateFor(ADMIN, { appId: APP, environmentId: ENV }).health()).coverage.status, 'complete');
+  assert.equal((await w.gateFor(ADMIN, { appId: APP, environmentId: '00000000-0000-4000-8000-000000000002' }).health()).coverage.status, 'none');
+  assert.equal(environmentIdOf({ environmentId: ENV }), ENV);
+  assert.equal(environmentIdOf({ localId: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/desk` }), ENV);
+  assert.equal(environmentIdOf({}), null);
   w.workflowFixture.current = Object.assign(new AppError(ErrorCode.NOT_AUTHORISED), { status: 403 });
   h = (await d.gateOverview(ADMIN)).health;
   assert.deepEqual([h.overall, h.coverage.status, h.coverage.error], ['unknown', 'unknown', 'not_permitted']);

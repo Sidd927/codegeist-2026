@@ -19,10 +19,19 @@ const ISSUE_KEY = /^[A-Z][A-Z0-9_]{0,99}-[1-9]\d{0,9}$/;
 const STATUS_ID = /^\d{1,20}$/;
 export const GATE_MODULE_KEY = 'article25-gate';
 
+/** This installation's Forge environment id: from the context, or from the module's localId ARI. */
+export function environmentIdOf(context) {
+  const direct = String(context?.environmentId ?? '');
+  if (/^[0-9a-f-]{36}$/.test(direct)) return direct;
+  const m = /^ari:cloud:ecosystem::extension\/[0-9a-f-]{36}\/([0-9a-f-]{36})\//.exec(String(context?.localId ?? ''));
+  return m ? m[1] : null;
+}
+
+
 class Deadline extends Error {}
 const withDeadline = (p, ms) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Deadline()), ms))]);
 
-export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, ledger, deadlineMs = 9000, auditMs = 1500, appId = null }) {
+export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, ledger, deadlineMs = 9000, auditMs = 1500, appId = null, environmentId = null }) {
 
   /** Read and evaluate one issue. Throws on infrastructure failure (callers decide what that means). */
   async function evaluateIssue(issueKey) {
@@ -105,7 +114,9 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
   const EXTENSION = /^ari:cloud:ecosystem::extension\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/static\/([A-Za-z0-9_-]+)$/;
   const isGateRule = (rule) => {
     const m = EXTENSION.exec(String(rule?.parameters?.key ?? ''));
-    return Boolean(m) && m[3] === GATE_MODULE_KEY && (!appId || m[1] === appId);
+    // The environment matters: a workflow rule calls ONE environment's validator. Another environment of
+    // this app installed on the same site (staging, a recovery test) must not claim that coverage.
+    return Boolean(m) && m[3] === GATE_MODULE_KEY && (!appId || m[1] === appId) && (!environmentId || m[2] === environmentId);
   };
 
   async function health() {
