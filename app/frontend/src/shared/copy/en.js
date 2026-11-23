@@ -409,6 +409,7 @@ export const copy = {
     cancel: 'Cancel',
     noteLabel: 'Reason for the change (optional, kept in the history)',
     changed: 'Mode changed.',
+    changedTo: (mode) => `Mode changed to ${mode}.`,
     historyTitle: 'Change history',
     historyNone: 'No changes yet (default: monitoring).',
     changedBy: (who, when) => `${who} · ${when}`,

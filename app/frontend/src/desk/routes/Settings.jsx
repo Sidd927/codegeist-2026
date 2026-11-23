@@ -22,8 +22,8 @@ function SodControl({ setting, onChanged, client = api }) {
     setMsg(null);
     try {
       await client.setSeparationOfDuties({ value: target, expectedSeq: setting.seq, requestId: newRequestId() });
+      await onChanged(); // show the new state before closing the confirmation
       setConfirming(false);
-      onChanged();
     } catch (e) {
       setMsg(e?.message ?? copy.common.errorTitle);
       if (e?.code === 'CONFLICT') onChanged();

@@ -51,7 +51,9 @@ describe('Workflow gate settings', () => {
 
   it('switching to enforcement needs confirmation and sends the last seen version, a request id and the note', async () => {
     const client = { setGateMode: vi.fn().mockResolvedValue({ status: 'changed' }) };
-    const refresh = vi.fn();
+    // The refresh resolves later than the change: the confirmation must wait for it (live defect, M4).
+    let resolveRefresh;
+    const refresh = vi.fn(() => new Promise((r) => (resolveRefresh = r)));
     render(<GateSettingsView resource={resource({ data: OVERVIEW(), refresh })} client={client} />);
     fireEvent.click(screen.getByRole('button', { name: 'Start enforcing' }));
     expect(client.setGateMode).not.toHaveBeenCalled();
@@ -61,6 +63,9 @@ describe('Workflow gate settings', () => {
     expect(client.setGateMode.mock.calls[0][0]).toMatchObject({ mode: 'enforce', expectedSeq: 0, note: 'Pilot on test projects' });
     expect(client.setGateMode.mock.calls[0][0].requestId).toMatch(/^[A-Za-z0-9-]{16,}$/);
     expect(refresh).toHaveBeenCalled();
+    expect(screen.queryByText(/Mode changed/)).toBeNull(); // not before the refreshed state arrives
+    await act(async () => resolveRefresh());
+    expect(screen.getByText('Mode changed to Enforcing.')).toBeTruthy();
   });
 
   it('enforcing looks different from monitoring and offers switching back', () => {

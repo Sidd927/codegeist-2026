@@ -43,10 +43,11 @@ function ModeSwitch({ health, onChanged, client }) {
     setMsg(null);
     try {
       await client.setGateMode({ mode: target, expectedSeq: health.mode.seq, requestId: newRequestId(), note: note || undefined });
+      // Confirm only once the refreshed state is on screen, so the badge and the message never disagree.
+      await onChanged();
       setConfirming(false);
       setNote('');
-      setMsg({ tone: 'ok', text: G.changed });
-      onChanged();
+      setMsg({ tone: 'ok', text: G.changedTo(G.mode[target]) });
     } catch (e) {
       setMsg({ tone: 'error', text: e?.message ?? copy.common.errorTitle });
       if (e?.code === 'CONFLICT') onChanged();
