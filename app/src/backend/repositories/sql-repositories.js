@@ -456,6 +456,13 @@ async function insertIgnoreBatch(table, cols, rows, valuesOf) {
   const r = await run(`INSERT IGNORE INTO ${table} (${cols.join(', ')}) VALUES ${rows.map(() => tuple).join(', ')}`, ...rows.flatMap(valuesOf));
   return affected(r);
 }
+/** What an earlier (partial) restore round already wrote: decision keys and chain positions. */
+export const restoreReads = {
+  async present() {
+    const [d, c] = await Promise.all([many('SELECT issue_id, seq FROM decisions'), many('SELECT seq FROM chain')]);
+    return { decisions: new Set(d.map((r) => `${r.issue_id}#${Number(r.seq)}`)), chain: new Set(c.map((r) => Number(r.seq))) };
+  },
+};
 export const restoreWrites = {
   chainRecords: (records) => insertIgnoreBatch('chain', ['seq', 'decision_id', 'record', 'record_hash', 'created_at'], records, (r) => [r.seq, r.decisionId, JSON.stringify(r), r.hash, Date.parse(r.decidedAt) || 0]),
   decisions: (rows) =>

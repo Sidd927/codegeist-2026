@@ -171,6 +171,30 @@ test('restore writes are batched (one statement per table per 50 rows), not one 
   assert.ok(rows > statements);
 });
 
+test('a restore larger than one invocation completes in resumable rounds; each round skips what was already written', async () => {
+  const w = await world();
+  await history(w);
+  const text = await exportText(w);
+  w.fake.wipe();
+  w.fake.failures.onRestoreBatch = () => w.advance(19_000); // every SQL batch takes 19 s: the budget ends round 1 early
+  const up = await upload(w, text);
+  const b1 = await w.desk(ADMIN).beginRestore(up, ADMIN);
+  await assert.rejects(w.desk(ADMIN).confirmRestore({ ...up, token: b1.token }, ADMIN), (e) => e.code === 'CONFLICT' && /restored in steps/.test(e.message));
+  assert.equal(w.fake.lev.filter((e) => e.type === 'restore').at(-1).outcome, 'failed_partial');
+  await w.screen(10001);
+  assert.equal(await gateReason(w, 'SHOP-1'), 'RESTORE_INCOMPLETE');
+  const before = w.fake.restoreStatements.n;
+  const b2 = await w.desk(ADMIN).beginRestore(up, ADMIN);
+  assert.equal(b2.resume, true);
+  const r = await w.desk(ADMIN).confirmRestore({ ...up, token: b2.token }, ADMIN);
+  assert.equal(r.outcome, 'restored_verified');
+  assert.equal(r.counts.decisions, 0); // round 1 already wrote them: nothing is re-sent
+  assert.equal(w.fake.restoreStatements.n - before, 3); // chain + assignments + settings
+  w.fake.failures.onRestoreBatch = null;
+  await w.screen(10001);
+  assert.equal(await gateReason(w, 'SHOP-1'), 'ALLOW_APPROVED');
+});
+
 // ---------------------------------------------------------------- honest gate reasons
 test('a pre-M5 (HMAC) approval without its legacy key is reported as unverifiable, not as "signing not configured"', async () => {
   const w = await world({ recordKey: null });

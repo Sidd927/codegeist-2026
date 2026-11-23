@@ -126,7 +126,7 @@ export function createFakeRepos() {
   const dec = []; // stored as SQL would store them (JSON columns serialised)
   const asg = [];
   const chn = [];
-  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false, restoreChainAfter: null, restoreHang: false };
+  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false, restoreChainAfter: null, restoreHang: false, onRestoreBatch: null };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const parseD = (r) => r && { ...clone(r), conditions: JSON.parse(r.conditions), questions: JSON.parse(r.questions), signal_set: JSON.parse(r.signal_set), detail: r.detail ? JSON.parse(r.detail) : null };
   const decisions = {
@@ -318,12 +318,14 @@ export function createFakeRepos() {
   // counts calls; failures.restoreHang makes the chain phase never return (a killed invocation).
   const batch = (fn) => async (rows) => {
     restoreStatements.n++;
+    if (failures.onRestoreBatch) failures.onRestoreBatch();
     if (fn === one1.chain && failures.restoreHang) return new Promise(() => {});
     let n = 0;
     for (const r of rows) if (await fn(r)) n++;
     return n;
   };
   const restoreStatements = { n: 0 };
+  const restoreReads = { present: async () => ({ decisions: new Set(dec.map((r) => `${r.issue_id}#${Number(r.seq)}`)), chain: new Set(chn.map((c) => Number(c.seq))) }) };
   const restoreWrites = { chainRecords: batch(one1.chain), decisions: batch(one1.decision), assignments: batch(one1.assignment), settings: batch(one1.setting) };
   const transfers = {
     async put(x) {
@@ -365,7 +367,7 @@ export function createFakeRepos() {
     restoredChain = 0;
   }
   return {
-    repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable, recordKeys, keySuccessions, trustMaterial, checkpoints, ledgerEvents, recoverySessions, storeCounts, exportReads, restoreWrites, transfers, registerRows, purgeGateEvents },
+    repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable, recordKeys, keySuccessions, trustMaterial, checkpoints, ledgerEvents, recoverySessions, storeCounts, exportReads, restoreReads, restoreWrites, transfers, registerRows, purgeGateEvents },
     items, scr, use, counters, spendState, dec, asg, chn, sev, gev, keys, succ, cps, lev, sessions, xfer, failures, wipe, restoreStatements,
   };
 }

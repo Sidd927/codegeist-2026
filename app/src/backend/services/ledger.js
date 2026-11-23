@@ -27,6 +27,7 @@ const SESSION_MS = 10 * 60 * 1000;
 // A confirm runs inside one resolver invocation (Forge limit 25 s). An `in_progress` marker older than
 // this can only belong to an invocation that was killed; it may then be resumed.
 const STALE_RESTORE_MS = 60 * 1000;
+const RESTORE_BUDGET_MS = 18 * 1000; // stop a round cleanly before Forge's 25 s resolver limit; resume continues
 const RESTORE_BATCH = 50; // rows per multi-row INSERT IGNORE: ~200 statements for 5,000 decisions, each well under Forge SQL's request size
 /** Restore outcomes that leave the record incomplete: the gate stays closed and nothing new is signed. */
 export const RESTORE_INCOMPLETE_OUTCOMES = Object.freeze(['in_progress', 'failed_partial']);
@@ -223,10 +224,16 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     return false;
   }
 
-  /** Write rows in batches (multi-row INSERT IGNORE). Returns how many were newly inserted. */
-  async function writeBatches(write, rows) {
+  /**
+   * Write rows in batches (multi-row INSERT IGNORE). Stops with a TIME_BUDGET error when the round's
+   * budget is used up (the restore is then resumable and continues where it stopped).
+   */
+  async function writeBatches(write, rows, deadline) {
     let n = 0;
-    for (let i = 0; i < rows.length; i += RESTORE_BATCH) n += await write(rows.slice(i, i + RESTORE_BATCH));
+    for (let i = 0; i < rows.length; i += RESTORE_BATCH) {
+      if (clock() > deadline) throw Object.assign(new Error('time budget'), { code: 'TIME_BUDGET' });
+      n += await write(rows.slice(i, i + RESTORE_BATCH));
+    }
     return n;
   }
 
@@ -250,16 +257,25 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     // Gate-safe order: DECISIONS first (an approval without its record is blocked as pending), then the
     // CHAIN, then keys, checkpoints, assignments and settings. A failure part-way leaves the gate closed.
     const counts = { decisions: 0, records: 0, assignments: 0, settings: 0, keys: 0 };
+    const deadline = clock() + RESTORE_BUDGET_MS;
     try {
-      counts.decisions = await writeBatches(repos.restoreWrites.decisions, archive.decisions);
-      counts.records = await writeBatches(repos.restoreWrites.chainRecords, archive.records);
+      // A resumed restore skips what an earlier round already wrote, so every round makes progress.
+      const present = await repos.restoreReads.present();
+      const decisionsLeft = archive.decisions.filter((d) => !present.decisions.has(`${d.issue_id}#${d.seq}`));
+      const recordsLeft = archive.records.filter((r) => !present.chain.has(Number(r.seq)));
+      counts.decisions = await writeBatches(repos.restoreWrites.decisions, decisionsLeft, deadline);
+      counts.records = await writeBatches(repos.restoreWrites.chainRecords, recordsLeft, deadline);
       for (const k of archive.keys) if (await repos.recordKeys.insert(k)) counts.keys++;
       for (const s of archive.successions) await repos.keySuccessions.insert(s);
       for (const c of archive.checkpoints) await repos.checkpoints.insert(c);
-      counts.assignments = await writeBatches(repos.restoreWrites.assignments, archive.assignments);
-      counts.settings = await writeBatches(repos.restoreWrites.settings, archive.settings);
+      counts.assignments = await writeBatches(repos.restoreWrites.assignments, archive.assignments, Infinity);
+      counts.settings = await writeBatches(repos.restoreWrites.settings, archive.settings, Infinity);
     } catch (e) {
       await repos.ledgerEvents.insert({ at: clock(), type: 'restore', actor, outcome: 'failed_partial', headSeq: report.head.seq, digest: report.digest, summary: { ...counts, code: e?.code ?? 'INTERNAL' } });
+      if (e?.code === 'TIME_BUDGET') {
+        log.info({ evt: 'ledger.restore.partial', count: counts.decisions + counts.records });
+        throw new AppError(ErrorCode.CONFLICT, 'This archive is large, so it is restored in steps. Protected transitions stay blocked until it completes. Verify the same archive again to continue.');
+      }
       log.error({ evt: 'ledger.restore.failed', code: e?.code ?? 'INTERNAL' });
       throw new AppError(ErrorCode.UPSTREAM_UNAVAILABLE, 'The restore stopped part-way. Protected transitions stay blocked. Verify the same archive again to resume.');
     }
