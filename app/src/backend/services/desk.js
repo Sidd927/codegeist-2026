@@ -363,11 +363,11 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     },
 
     /** After a key LOSS: adopt a previous key as predecessor, bound to its typed fingerprint (admins). */
-    async adoptPreviousKey(payload) {
+    async adoptPreviousKey(payload, actorId) {
       await requireAdmin();
       const kid = String(payload?.kid ?? '');
       if (!/^k[0-9a-f]{16}$/.test(kid)) throw new AppError(ErrorCode.INVALID_INPUT);
-      return ledger.adoptPredecessor({ kid, fingerprint: payload?.fingerprint });
+      return ledger.adoptPredecessor({ kid, fingerprint: payload?.fingerprint, actor: actorId });
     },
 
     /** One decision's signed record, for independent verification (reviewers who can see the issue). */

@@ -258,9 +258,11 @@ test('key loss: old approvals are blocked until an admin adopts the previous key
   const d = w.desk(ADMIN, { settings });
   await assert.rejects(d.adoptPreviousKey({ kid: lost.kid, fingerprint: 'ab'.repeat(32) }), codeOf('INVALID_INPUT'));
   await assert.rejects(w.desk(REV1, { settings }).adoptPreviousKey({ kid: lost.kid, fingerprint: fingerprintOf(lost.publicKeyB64) }), codeOf('NOT_AUTHORISED'));
-  assert.equal((await d.adoptPreviousKey({ kid: lost.kid, fingerprint: fingerprintOf(lost.publicKeyB64) })).status, 'adopted');
+  assert.equal((await d.adoptPreviousKey({ kid: lost.kid, fingerprint: fingerprintOf(lost.publicKeyB64) }, ADMIN)).status, 'adopted');
   assert.equal(await gateReason(w, 'SHOP-1', { settings }), 'ALLOW_APPROVED');
   const st = await d.recordStatus(ADMIN);
+  const adopted = st.events.find((e) => e.type === 'key_adopted');
+  assert.ok(adopted && adopted.by !== 'Article25', 'the trust change is attributed to the administrator');
   assert.equal(st.keys.find((k) => k.kid === lost.kid).endorsedByPredecessor, false); // honest: not co-signed
 });
 

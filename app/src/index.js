@@ -71,7 +71,7 @@ define('getTransferChunk', ({ services, payload, context }) => services.transfer
 define('uploadArchiveChunk', ({ services, payload, context }) => services.uploadChunk(payload, actor(context)));
 define('beginRestore', ({ services, payload, context }) => services.beginRestore(payload, actor(context)));
 define('confirmRestore', ({ services, payload, context }) => services.confirmRestore(payload, actor(context)));
-define('adoptPreviousKey', ({ services, payload }) => services.adoptPreviousKey(payload));
+define('adoptPreviousKey', ({ services, payload, context }) => services.adoptPreviousKey(payload, actor(context)));
 define('getDecisionRecord', ({ services, payload, context }) => services.decisionRecord(payload, actor(context)));
 define('getRegister', ({ services, payload, context }) => services.register(payload, actor(context)));
 // Panel: the issue comes from the Forge context. Desk: a validated key; access is checked as the user.

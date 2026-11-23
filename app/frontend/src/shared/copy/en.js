@@ -533,7 +533,7 @@ export const copy = {
     externalTitle: 'Copies outside Jira',
     externalBody: 'Article25 keeps the record inside Jira and does not publish it to other products. To keep an independent copy, download a signed archive regularly and store it where your organisation keeps audit records.',
     eventsTitle: 'Recent record activity',
-    eventType: { export: 'Archive downloaded', verify: 'Record verified', restore: 'Restore', restore_check: 'Archive checked', restore_rejected: 'Restore refused' },
+    eventType: { export: 'Archive downloaded', verify: 'Record verified', restore: 'Restore', restore_check: 'Archive checked', restore_rejected: 'Restore refused', key_adopted: 'Previous key adopted' },
   },
 
   gate: {

@@ -89,7 +89,7 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
   }
 
   /** Admin: after a key LOSS, adopt a previously registered key as our predecessor (signed by us). */
-  async function adoptPredecessor({ kid, fingerprint }) {
+  async function adoptPredecessor({ kid, fingerprint, actor = null }) {
     if (!signer) throw new AppError(ErrorCode.NOT_CONFIGURED);
     const { registry, successions } = await repos.trustMaterial();
     const entry = registry.find((k) => k.kid === kid && keyEntryValid(k, siteId));
@@ -98,6 +98,8 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     if (String(fingerprint ?? '').replace(/\s+/g, '').toLowerCase() !== fingerprintOf(entry.publicKey).replace(/\s+/g, '')) throw new AppError(ErrorCode.INVALID_INPUT, 'The fingerprint does not match that key.');
     if (successions.some((s) => s.fromKid === kid && s.toKid === signer.kid)) return { status: 'unchanged' };
     await repos.keySuccessions.insert(succession(signer, entry, { siteId, at: iso(clock()), prevSigner: null }));
+    // A trust change: record who made it, next to exports, verifications and restores.
+    await repos.ledgerEvents.insert({ at: clock(), type: 'key_adopted', actor, outcome: 'adopted', summary: { kid } });
     log.info({ evt: 'ledger.key.adopted', reason: 'unendorsed' });
     return { status: 'adopted' };
   }
