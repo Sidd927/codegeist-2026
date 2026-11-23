@@ -22,7 +22,7 @@ const VIEW_FILTER = {
   all: () => true,
 };
 
-export function createDeskServices({ jira, config, log, repos, screening, settings, review }) {
+export function createDeskServices({ jira, config, log, repos, screening, settings, review, gate }) {
   async function safeIsAdmin() {
     try {
       return await jira.isJiraAdmin();
@@ -69,7 +69,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   }
 
   async function reviewBlock(doc, stored, view, actorId) {
-    const isReviewer = await review.isReviewer(actorId);
+    const [isReviewer, sodOn] = await Promise.all([review.isReviewer(actorId), review.separationOfDutiesOn()]);
     const currentFp = buildScreeningText(doc).fingerprint;
     const r = await review.reviewOf(doc.id, { item: stored.row, currentFp });
     const people = await peopleMap([...r.decisions.map((d) => d.decided_by), ...r.assignments.flatMap((a) => [a.assignee, a.assigned_by])]);
@@ -77,7 +77,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     let decideReason = null;
     if (!isReviewer) decideReason = 'NOT_REVIEWER';
     else if (!settings.signingKey) decideReason = 'NOT_CONFIGURED';
-    else if (settings.separationOfDuties && (doc.reporterId === actorId || doc.assigneeId === actorId)) decideReason = 'SOD';
+    else if (sodOn && (doc.reporterId === actorId || doc.assigneeId === actorId)) decideReason = 'SOD';
     else if (!sameContent) decideReason = view.state === 'SCREENING' ? 'CHECKING' : 'STALE_EVIDENCE';
     return {
       status: r.status.status,
@@ -90,6 +90,40 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       binding: sameContent ? { screeningId: stored.row.screening_id, fp: stored.row.screened_fp } : null,
       permissions: { isReviewer, canDecide: decideReason === null, decideReason, canAssign: isReviewer },
     };
+  }
+
+  /** Status id → name (as the user; read:jira-work). Names are cosmetic; failures fall back to null. */
+  async function statusNames(ids) {
+    const unique = [...new Set(ids.filter((x) => /^\d{1,20}$/.test(String(x ?? ''))))].slice(0, 20);
+    const pairs = await Promise.all(unique.map((id) => jira.statusName(id).then((n) => [id, n]).catch(() => [id, null])));
+    return new Map(pairs);
+  }
+
+  const presentGateEvent = (e, names) => ({
+    at: Number(e.at),
+    mode: e.mode,
+    verdict: e.verdict,
+    reason: e.reason,
+    to: e.to_status ? names.get(String(e.to_status)) ?? null : null,
+    from: e.from_status ? names.get(String(e.from_status)) ?? null : null,
+    policyVersion: e.policy_version,
+    contentRef: e.content_ref ? String(e.content_ref).slice(0, 8) : null,
+  });
+
+  /** The last gate checks for one issue (content-free events; caller already passed an as-user read). */
+  async function recentGateChecks(issueId) {
+    try {
+      const rows = await repos.gateEvents.forIssue(String(issueId), 5);
+      const names = await statusNames(rows.flatMap((e) => [e.to_status, e.from_status]));
+      return rows.map((e) => presentGateEvent(e, names));
+    } catch (e) {
+      log.warn({ evt: 'gate.events.read_failed', code: e?.code ?? 'INTERNAL' });
+      return [];
+    }
+  }
+
+  async function requireAdmin() {
+    if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Only Jira administrators can do this.');
   }
 
   return {
@@ -112,8 +146,9 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const issue = { id: doc.id, key: doc.key, projectKey: doc.projectKey };
       if (!settings.isProjectInScope(doc.projectKey)) return { access: 'granted', issue, screening: { state: 'OUT_OF_SCOPE', result: null }, features: FEATURES };
       const view = presentScreening(stored.row, stored.screening, buildScreeningText(doc).fingerprint);
-      const rb = await reviewBlock(doc, stored, view, actorId);
-      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null }, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
+      // The gate preview reads as the app, but only after the as-user read above succeeded.
+      const [rb, gatePreview] = await Promise.all([reviewBlock(doc, stored, view, actorId), gate.preview(doc.key)]);
+      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null }, gate: gatePreview, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
     },
 
     /** Review workspace (Margin): current text, latest screening, and the review. */
@@ -123,11 +158,18 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const { blocks, truncated } = adfToBlocks(doc.description);
       const view = settings.isProjectInScope(doc.projectKey) ? presentScreening(stored.row, stored.screening, buildScreeningText(doc).fingerprint) : { state: 'OUT_OF_SCOPE', result: null };
       const marksValid = view.result && !['SCREENING', 'SCREENING_FAILED'].includes(view.state) && view.reason !== 'content_changed';
+      const inScope = view.state !== 'OUT_OF_SCOPE';
+      const [reviewData, gatePreview, gateChecks] = await Promise.all([
+        inScope ? reviewBlock(doc, stored, view, actorId) : null,
+        inScope ? gate.preview(doc.key) : null,
+        inScope ? recentGateChecks(doc.id) : [],
+      ]);
       return {
         issue: { id: doc.id, key: doc.key, summary: doc.summary, status: doc.status, statusCategory: doc.statusCategory, projectKey: doc.projectKey, projectName: doc.projectName, issueType: doc.issueType },
         document: { summary: doc.summary, blocks, truncated },
         screening: { ...view, marksValid: Boolean(marksValid) },
-        review: view.state === 'OUT_OF_SCOPE' ? null : await reviewBlock(doc, stored, view, actorId),
+        review: reviewData,
+        gate: gatePreview ? { ...gatePreview, recent: gateChecks } : null,
         features: FEATURES,
         ai: aiActive() ? 'on' : 'off',
       };
@@ -210,6 +252,42 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return { status: r.status };
     },
 
+    /** Workflow gate overview (Jira admins only): health, coverage, mode, recent checks, settings history. */
+    async gateOverview() {
+      await requireAdmin();
+      const [health, events, modeHistory, sod, sodHistory] = await Promise.all([
+        gate.health(),
+        repos.gateEvents.recent(15).catch(() => null),
+        gate.modeHistory().catch(() => []),
+        review.separationOfDutiesSetting().catch(() => null),
+        review.separationOfDutiesHistory().catch(() => []),
+      ]);
+      // Issue keys only for work items this admin can see; others are shown without a key.
+      const ids = [...new Set((events ?? []).map((e) => e.issue_id).filter(Boolean))];
+      const [visible, names] = await Promise.all([ids.length ? jira.visibleIssues(ids).catch(() => new Map()) : new Map(), statusNames((events ?? []).flatMap((e) => [e.to_status, e.from_status]))]);
+      const people = await peopleMap([...modeHistory, ...sodHistory].map((h) => h.changedBy));
+      const changed = (h) => ({ seq: h.seq, value: h.value, at: h.changedAt, by: people.get(h.changedBy)?.displayName || 'Unknown user', note: h.note });
+      return {
+        health,
+        recent: events === null ? null : events.map((e) => ({ ...presentGateEvent(e, names), issueKey: visible.get(String(e.issue_id))?.key ?? null })),
+        modeHistory: modeHistory.map(changed),
+        separationOfDuties: sod ? { value: sod.value ?? 'on', seq: sod.seq, isDefault: sod.isDefault } : null,
+        separationOfDutiesHistory: sodHistory.map(changed),
+      };
+    },
+
+    /** Admin: switch the gate between monitor and enforce (audited, optimistic, idempotent). */
+    async setGateMode(payload, actorId) {
+      await requireAdmin();
+      return gate.setMode({ actorId, mode: payload?.mode, expectedSeq: payload?.expectedSeq, requestId: payload?.requestId, note: payload?.note });
+    },
+
+    /** Admin: switch separation of duties (audited, optimistic, idempotent). */
+    async setSeparationOfDuties(payload, actorId) {
+      await requireAdmin();
+      return review.setSeparationOfDuties({ actorId, value: payload?.value, expectedSeq: payload?.expectedSeq, requestId: payload?.requestId, note: payload?.note });
+    },
+
     /** Settings overview (Jira admins only, checked server-side). */
     async settingsOverview(actorId) {
       if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Settings are available to Jira administrators.');
@@ -227,7 +305,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
           { key: 'inventory', status: 'not-configured' },
           { key: 'ai', status: aiActive() ? 'on' : 'off' },
           { key: 'register', status: 'not-connected' },
-          { key: 'gate', status: 'not-added' },
+          { key: 'gate', status: await gate.currentMode().then((m) => m.mode).catch(() => 'unknown') },
         ],
         screening: {
           ai: aiActive() ? 'on' : 'off',
@@ -240,7 +318,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         review: {
           reviewerGroup: settings.reviewerGroup,
           youAreReviewer,
-          separationOfDuties: settings.separationOfDuties,
+          separationOfDuties: await review.separationOfDutiesOn(),
           recordSigning: settings.signingKey ? 'configured' : 'missing',
         },
       };

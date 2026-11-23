@@ -15,6 +15,18 @@ modules:
         function: resolver
       title: Article25
       icon: resource:desk;icon.svg
+  # M4 ENFORCE: the Article25 privacy gate. Admins add it to the transitions they want to protect
+  # (Jira's workflow editor → Validate details → Marketplace rules). It reads only Article25's own
+  # records (Forge SQL) and the work item's current text (as the app). Monitor mode by default.
+  jira:workflowValidator:
+    - key: article25-gate
+      name: Article25 privacy gate
+      description: Stops this transition unless an Article25 reviewer has approved the current text of the work item.
+      function: gate-fn
+      errorMessage: "Article25: the privacy decision for this work item could not be confirmed, so the transition was stopped."
+      projectTypes:
+        - company-managed
+        - team-managed
   # M2 DETECT: screening pipeline (trigger → queue → consumer), schema, reconciler.
   trigger:
     - key: issue-events
@@ -65,6 +77,8 @@ modules:
       timeoutSeconds: 300
     - key: reconcile-fn
       handler: index.reconcileSchedule
+    - key: gate-fn
+      handler: index.gateValidator
 resources:
   - key: panel
     path: frontend/dist/panel
@@ -74,6 +88,7 @@ permissions:
   scopes:
     - read:jira-work
     - read:jira-user # M3: reviewer-group membership, reviewer names, separation of duties
+    - read:workflow:jira # M4: read-only; admin health check finds which workflow transitions carry the Article25 gate (approved 23 Nov 2026)
 app:
   runtime:
     name: nodejs24.x
