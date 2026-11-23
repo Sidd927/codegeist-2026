@@ -52,9 +52,9 @@ function fakeJira({ admin = false, deny = false, adminThrows = false, visible = 
 }
 const svc = (opts = {}) => {
   const fake = opts.fake ?? createFakeRepos();
-  const screening = { aiAvailable: false, requestManual: async () => ({ status: 'queued' }) };
+  const screening = { aiAvailable: opts.aiAvailable ?? false, requestManual: async () => ({ status: 'queued' }) };
   const jira = fakeJira(opts);
-  const settings = settingsFromEnv({});
+  const settings = settingsFromEnv(opts.env ?? {});
   const ledger = createLedgerService({ repos: fake.repos, log: silentLog, settings, siteId: 'site-test' });
   const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
   const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
@@ -179,6 +179,17 @@ test('settings are refused for non-admins and when the admin check fails (fail c
   // Only sections that exist (the unbuilt "What is already approved" placeholder was removed at the final audit).
   assert.deepEqual(s.sections.map((x) => x.key), ['scope', 'people', 'ai', 'record', 'gate']);
   assert.equal(s.screening.ai, 'off');
+});
+test('AI shows as on only when switched on, available AND a spending limit is set; spend is reported', async () => {
+  const noCap = await svc({ admin: true, aiAvailable: true, env: { A25_AI_ENABLED: 'true' } }).settingsOverview();
+  assert.equal(noCap.screening.ai, 'off'); // no cap → no AI call is ever made, so the UI must not claim AI
+  assert.deepEqual(noCap.screening.aiSpend, { usedMicros: 0, capMicros: 0 });
+  const fake = createFakeRepos();
+  await fake.repos.spend.reserve({ micros: 1234, capMicros: 5_000_000 });
+  const on = await svc({ admin: true, aiAvailable: true, fake, env: { A25_AI_ENABLED: 'true', A25_AI_SPEND_CAP_USD: '5' } }).settingsOverview();
+  assert.equal(on.screening.ai, 'on');
+  assert.deepEqual(on.screening.aiSpend, { usedMicros: 1234, capMicros: 5_000_000 });
+  assert.equal(on.sections.find((x) => x.key === 'ai').status, 'on');
 });
 test('app context reports roles without personal identifiers', async () => {
   const c = await svc({ admin: true }).appContext('acc-admin');

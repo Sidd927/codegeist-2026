@@ -76,6 +76,12 @@ function ScreeningStatus({ s }) {
           <dt>{T.budgetLabel}</dt>
           <dd>{T.budgetValue(s.dailyAiBudget)}</dd>
         </div>
+        {s.aiSpend ? (
+          <div>
+            <dt>{T.spendLabel}</dt>
+            <dd>{T.spendValue(s.aiSpend.usedMicros, s.aiSpend.capMicros)}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>{T.scopeLabel}</dt>
           <dd>{s.scopeProjects.length ? s.scopeProjects.join(', ') : T.scopeAll}</dd>

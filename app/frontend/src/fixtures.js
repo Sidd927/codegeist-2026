@@ -70,7 +70,7 @@ export const SETTINGS = {
   sections: [
     { key: 'scope', status: 'all-projects' }, { key: 'people', status: 'configured' }, { key: 'ai', status: 'off' }, { key: 'record', status: 'configured' }, { key: 'gate', status: 'monitor' },
   ],
-  screening: { ai: 'off', aiModel: null, dailyAiBudget: 150, scopeProjects: [], countsByState: { SCREENED: 11 }, today: { screenings: 5, aiCalls: 0, ruleBased: 5 } },
+  screening: { ai: 'off', aiModel: null, dailyAiBudget: 150, aiSpend: { usedMicros: 0, capMicros: 0 }, scopeProjects: [], countsByState: { SCREENED: 11 }, today: { screenings: 5, aiCalls: 0, ruleBased: 5 } },
   review: { reviewerGroup: 'article25-reviewers', youAreReviewer: true, separationOfDuties: true, separationOfDutiesSetting: { value: 'on', seq: 2, isDefault: false }, recordSigning: 'configured' },
 };
 

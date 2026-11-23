@@ -37,7 +37,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return false; // fail closed
     }
   }
-  const aiActive = () => settings.aiEnabled && screening.aiAvailable === true;
+  // AI is only ever called with a spending limit configured (screening.extract), so without one it is off.
+  const aiActive = () => settings.aiEnabled && settings.aiSpendCapMicros > 0 && screening.aiAvailable === true;
 
   /** As-user read and the stored screening in parallel; SQL data is only used after the read succeeds. */
   async function readWithScreening(idOrKey, storedIssueId) {
@@ -472,7 +473,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     async settingsOverview(actorId) {
       if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Settings are available to Jira administrators.');
       const counts = Object.fromEntries((await repos.workItems.countByState()).map((r) => [r.state, Number(r.n)]));
-      const usage = await repos.usage.get(new Date().toISOString().slice(0, 10));
+      const [usage, spent] = await Promise.all([repos.usage.get(new Date().toISOString().slice(0, 10)), repos.spend ? repos.spend.get().catch(() => null) : null]);
       // Group membership is checked per person (read:jira-user); listing all members would need an
       // admin-level scope, so the overview reports whether the caller is a reviewer instead of a count.
       const youAreReviewer = await review.isReviewer(actorId);
@@ -490,6 +491,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
           ai: aiActive() ? 'on' : 'off',
           aiModel: aiActive() ? settings.aiModel : null,
           dailyAiBudget: settings.dailyAiBudget,
+          aiSpend: { usedMicros: Number(spent?.micros ?? 0), capMicros: settings.aiSpendCapMicros },
           scopeProjects: settings.scopeProjects,
           countsByState: counts,
           today: { screenings: Number(usage?.screenings ?? 0), aiCalls: Number(usage?.llm_calls ?? 0), ruleBased: Number(usage?.fallbacks ?? 0) },

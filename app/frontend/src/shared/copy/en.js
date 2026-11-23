@@ -72,6 +72,7 @@ export const copy = {
     aiStatus: {
       not_enabled: 'AI-assisted checks are not switched on.',
       over_budget: "Today's AI check budget is used up.",
+      spend_cap_reached: 'The AI spending limit for this installation is reached.',
       unavailable: 'The AI service was unavailable.',
       malformed_output: 'The AI response was invalid and was discarded.',
       ok: '',
@@ -655,6 +656,8 @@ export const copy = {
     aiOn: (model) => `On · ${model}`,
     budgetLabel: 'Daily AI budget',
     budgetValue: (n) => `${n} checks per day`,
+    spendLabel: 'AI spending limit',
+    spendValue: (used, cap) => (cap > 0 ? `$${(used / 1e6).toFixed(2)} of $${(cap / 1e6).toFixed(2)} used (this installation, all time)` : 'Not set, so no AI checks are made'),
     scopeLabel: 'Projects in scope',
     scopeAll: 'All projects',
     todayLabel: 'Today',

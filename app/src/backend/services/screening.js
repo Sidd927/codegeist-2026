@@ -60,7 +60,7 @@ export function createScreeningService({ repos, jira, llm, queue, log, clock = (
     const withinDaily = await usage.reserveAiCall({ day: dayOf(clock()), budget: settings.dailyAiBudget });
     if (!withinDaily) return { mode: 'rules', aiStatus: AI_STATUS.OVER_BUDGET };
     const reserved = await pricing.costMicros(llm.model, estimateInputTokens(text.length + 16), llm.maxTokens);
-    if (!(await spend.reserve({ micros: reserved, capMicros: settings.aiSpendCapMicros }))) return { mode: 'rules', aiStatus: AI_STATUS.OVER_BUDGET };
+    if (!(await spend.reserve({ micros: reserved, capMicros: settings.aiSpendCapMicros }))) return { mode: 'rules', aiStatus: AI_STATUS.SPEND_CAP };
     const r = await llm.extract(text);
     // Settle to the actual cost when usage is reported; otherwise keep the (worst-case) reservation.
     const actual = Number.isFinite(r.usage?.tokensIn) ? await pricing.costMicros(llm.model, r.usage.tokensIn, r.usage.tokensOut ?? 0) : reserved;

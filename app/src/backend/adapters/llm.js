@@ -6,7 +6,8 @@ import { SYSTEM_PROMPT, TOOL, toolArgumentsFrom } from '../../core/extraction/sc
 export const AI_STATUS = Object.freeze({
   OK: 'ok',
   NOT_ENABLED: 'not_enabled', // no approved LLM module / switch off
-  OVER_BUDGET: 'over_budget',
+  OVER_BUDGET: 'over_budget', // today's call budget is used up
+  SPEND_CAP: 'spend_cap_reached', // the installation's cumulative AI spending limit is reached
   UNAVAILABLE: 'unavailable', // transport error or timeout
   MALFORMED: 'malformed_output', // no valid tool call / schema violation
 });

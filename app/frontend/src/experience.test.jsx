@@ -181,6 +181,18 @@ describe('Settings deep links', () => {
   });
 });
 
+describe('Settings: AI spending limit', () => {
+  const base = { sections: [], environment: { label: 'Development' }, version: '0.5.0', review: null };
+  const scr = (aiSpend, ai = 'on') => ({ ai, aiModel: ai === 'on' ? 'claude-haiku-5-5' : null, dailyAiBudget: 300, aiSpend, scopeProjects: [], countsByState: {}, today: { screenings: 0, aiCalls: 0, ruleBased: 0 } });
+  it('shows spend against the cap, and says plainly when no cap is set', () => {
+    const { unmount } = render(<SettingsView resource={resource({ data: { ...base, screening: scr({ usedMicros: 1_234_567, capMicros: 5_000_000 }) } })} />);
+    expect(screen.getByText('$1.23 of $5.00 used (this installation, all time)')).toBeTruthy();
+    unmount();
+    render(<SettingsView resource={resource({ data: { ...base, screening: scr({ usedMicros: 0, capMicros: 0 }, 'off') } })} />);
+    expect(screen.getByText('Not set, so no AI checks are made')).toBeTruthy();
+  });
+});
+
 describe('Primitives keep native semantics', () => {
   it('Button is a native button (disabled works), Lozenge is text, SectionMessage has a heading and actions', async () => {
     const onClick = vi.fn();
