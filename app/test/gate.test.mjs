@@ -130,9 +130,12 @@ test('modes: monitor never blocks and records would_*; enforce blocks exactly wh
 
 // ================================================================= coverage analysis
 const ST = [{ statusReference: 's-todo', name: 'To Do' }, { statusReference: 's-ip', name: 'In Progress' }, { statusReference: 's-done', name: 'Done' }];
-const GATE_RULE = { ruleKey: 'forge:a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1:article25-gate', parameters: {} };
+// Real shape observed live (Jira stores Forge lambda validators under this ruleKey).
+const APP = 'a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1';
+const ENV = 'cbb17771-fe76-4c1d-be4a-e65eff0c94be';
+const GATE_RULE = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/article25-gate`, id: 'r1', config: '' } };
 const OTHER_RULE = { ruleKey: 'system:check-permission', parameters: {} };
-const isGate = (r) => String(r.ruleKey).includes('article25-gate');
+const isGate = (r) => String(r.parameters?.key ?? '').endsWith('/static/article25-gate');
 const wf = (transitions, scope = { type: 'GLOBAL' }) => ({ id: 'wf1', name: 'Software workflow', scope, transitions });
 
 test('coverage: covered transition, global bypass gap, initial transition ignored, other workflows ignored', () => {
@@ -396,9 +399,11 @@ test('health: never claims protection without verified coverage and working depe
   assert.equal((await d.gateOverview(ADMIN)).health.overall, 'monitoring');
   await setMode(w, 'enforce');
   assert.equal((await d.gateOverview(ADMIN)).health.overall, 'enforcing');
-  // Rules from another app with a similar name are not counted.
-  w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [{ ruleKey: 'forge:other-app:article25-gate' }])])], statuses: ST };
-  assert.equal((await w.gateFor(ADMIN, { appId: 'a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1' }).health()).coverage.status, 'none');
+  // Rules from another app (e.g. the Stage 1 spike) or another module are not counted.
+  const otherApp = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/a6a87625-08ce-466e-9322-016c9af89fa8/${ENV}/static/article25-gate` } };
+  const otherModule = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/a25-validator-lambda` } };
+  w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [otherApp, otherModule, { ruleKey: 'article25-gate' }])])], statuses: ST };
+  assert.equal((await w.gateFor(ADMIN, { appId: APP }).health()).coverage.status, 'none');
   w.workflowFixture.current = Object.assign(new AppError(ErrorCode.NOT_AUTHORISED), { status: 403 });
   h = (await d.gateOverview(ADMIN)).health;
   assert.deepEqual([h.overall, h.coverage.status, h.coverage.error], ['unknown', 'unknown', 'not_permitted']);

@@ -97,9 +97,13 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
   const modeHistory = () => settingsSvc.history('gate.mode');
 
   // ---- admin: health -----------------------------------------------------------------------------
+  // Jira stores Forge validators as ruleKey "forge:expression-validator" (also for lambdas) with
+  // parameters.key = "ari:cloud:ecosystem::extension/<appId>/<environmentId>/static/<moduleKey>"
+  // (observed live, 23 Nov 2026). Match the exact module of THIS app only.
+  const EXTENSION = /^ari:cloud:ecosystem::extension\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/static\/([A-Za-z0-9_-]+)$/;
   const isGateRule = (rule) => {
-    const blob = `${rule?.ruleKey ?? ''} ${JSON.stringify(rule?.parameters ?? {})}`;
-    return blob.includes(GATE_MODULE_KEY) && (!appId || blob.includes(appId));
+    const m = EXTENSION.exec(String(rule?.parameters?.key ?? ''));
+    return Boolean(m) && m[3] === GATE_MODULE_KEY && (!appId || m[1] === appId);
   };
 
   async function health() {

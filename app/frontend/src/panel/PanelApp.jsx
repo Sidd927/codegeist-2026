@@ -15,8 +15,21 @@ import { copy } from '../shared/copy/en.js';
 const S = copy.screening;
 
 /** Compact review summary: derived status, latest decision and reviewer (names only). */
-function ReviewSummary({ review }) {
-  if (!review || review.status === 'NOT_REQUIRED' || review.status === 'NOT_SCREENED' || review.status === 'AWAITING_SCREENING') return null;
+/** One line: what the Article25 gate would do now. Monitoring is labelled as not blocking. */
+function GateLine({ gate }) {
+  const G = copy.gate;
+  const state = gate.allow ? 'allow' : 'block';
+  const text = gate.mode === 'monitor' ? G.previewMonitor[state] : gate.mode === 'enforce' ? G.previewNow[state] : G.previewNow.block;
+  return (
+    <span className="a25-small">
+      {copy.panel.gate(text)}
+      {!gate.allow ? <span className="a25-block a25-subtle">{G.reasons[gate.reason] ?? gate.reason}</span> : null}
+    </span>
+  );
+}
+
+function ReviewSummary({ review, gate }) {
+  if (!review || ((review.status === 'NOT_SCREENED' || review.status === 'AWAITING_SCREENING') && !gate)) return null;
   const latest = review.latest;
   return (
     <div className="a25-panel__review" aria-label={copy.panel.reviewLabel} role="group">
@@ -30,6 +43,7 @@ function ReviewSummary({ review }) {
         </span>
       ) : null}
       {review.assignee ? <span className="a25-small a25-subtle">{copy.panel.reviewer(review.assignee.name)}</span> : null}
+      {gate ? <GateLine gate={gate} /> : null}
     </div>
   );
 }
@@ -135,7 +149,7 @@ export function PanelView({ resource, onOpenDesk, onRecheck }) {
         {stale ? <p className="a25-subtle a25-small">{S.previousResult}: {copy.states[result.outcome]}</p> : null}
         <ModeNote result={result} />
       </StatusHeader>
-      <ReviewSummary review={data.review} />
+      <ReviewSummary review={data.review} gate={data.gate} />
       <DeltaChips findings={result.findings} />
       <FindingsList findings={result.findings} />
       <OpenQuestions findings={result.findings} />

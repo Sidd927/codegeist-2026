@@ -128,8 +128,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
 
   return {
     async appContext(actorId) {
-      const [jiraAdmin, reviewer] = await Promise.all([safeIsAdmin(), review.isReviewer(actorId)]);
-      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer } };
+      const [jiraAdmin, reviewer, gateMode] = await Promise.all([safeIsAdmin(), review.isReviewer(actorId), gate.currentMode().then((m) => m.mode).catch(() => 'unknown')]);
+      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer }, reviewerGroup: settings.reviewerGroup, gate: { mode: gateMode } };
     },
 
     /** Issue panel: screening + a compact review summary, after an as-user read. */
@@ -319,6 +319,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
           reviewerGroup: settings.reviewerGroup,
           youAreReviewer,
           separationOfDuties: await review.separationOfDutiesOn(),
+          separationOfDutiesSetting: await review.separationOfDutiesSetting().then((x) => ({ value: x.value ?? 'on', seq: x.seq, isDefault: x.isDefault })).catch(() => null),
           recordSigning: settings.signingKey ? 'configured' : 'missing',
         },
       };

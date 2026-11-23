@@ -3,10 +3,61 @@
 import { useState } from 'react';
 import Lozenge from '@atlaskit/lozenge';
 import Button from '@atlaskit/button/new';
-import { api } from '../../shared/api.js';
+import SectionMessage from '@atlaskit/section-message';
+import { api, newRequestId } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
+import { GateSettings } from '../settings/GateSettings.jsx';
+
+/** Audited admin switch for separation of duties (server re-checks admin rights). */
+function SodControl({ setting, onChanged, client = api }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  if (!setting) return null;
+  const target = setting.value === 'off' ? 'on' : 'off';
+  const submit = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await client.setSeparationOfDuties({ value: target, expectedSeq: setting.seq, requestId: newRequestId() });
+      setConfirming(false);
+      onChanged();
+    } catch (e) {
+      setMsg(e?.message ?? copy.common.errorTitle);
+      if (e?.code === 'CONFLICT') onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="a25-gate__switch">
+      {!confirming ? (
+        <Button appearance="subtle" onClick={() => setConfirming(true)}>
+          {target === 'off' ? copy.sod.switchOff : copy.sod.switchOn}
+        </Button>
+      ) : (
+        <SectionMessage appearance={target === 'off' ? 'warning' : 'information'} title={copy.sod.title}>
+          <p>{target === 'off' ? copy.sod.confirmOff : copy.sod.confirmOn}</p>
+          <span className="a25-assign__row">
+            <Button appearance={target === 'off' ? 'danger' : 'primary'} isDisabled={busy} onClick={submit}>
+              {copy.gate.confirm}
+            </Button>
+            <Button appearance="subtle" onClick={() => setConfirming(false)}>
+              {copy.gate.cancel}
+            </Button>
+          </span>
+        </SectionMessage>
+      )}
+      {msg ? (
+        <p role="alert" className="a25-field-error">
+          {msg}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function ScreeningStatus({ s }) {
   const T = copy.settings;
@@ -62,7 +113,7 @@ function ScreeningStatus({ s }) {
   );
 }
 
-function ReviewStatus({ r }) {
+function ReviewStatus({ r, onChanged }) {
   const T = copy.settings;
   return (
     <section className="a25-card a25-settings__screening" aria-labelledby="a25-review-settings-title">
@@ -82,6 +133,9 @@ function ReviewStatus({ r }) {
           <dt>{T.sodLabel}</dt>
           <dd>{r.separationOfDuties ? T.sodOn : T.sodOff}</dd>
         </div>
+      </dl>
+      <SodControl setting={r.separationOfDutiesSetting} onChanged={onChanged} />
+      <dl className="a25-setup">
         <div>
           <dt>{T.signingLabel}</dt>
           <dd>{T.signing[r.recordSigning] ?? r.recordSigning}</dd>
@@ -91,8 +145,8 @@ function ReviewStatus({ r }) {
   );
 }
 
-export function SettingsView({ resource }) {
-  const { status, data, error, reload } = resource;
+export function SettingsView({ resource, gate = <GateSettings /> }) {
+  const { status, data, error, reload, refresh } = resource;
   return (
     <div className="a25-page a25-settings">
       <div className="a25-page__head">
@@ -121,7 +175,8 @@ export function SettingsView({ resource }) {
             ))}
           </ul>
           <p className="a25-subtle a25-small">{copy.settings.availableLater}</p>
-          {data.review ? <ReviewStatus r={data.review} /> : null}
+          {gate}
+          {data.review ? <ReviewStatus r={data.review} onChanged={refresh} /> : null}
           {data.screening ? <ScreeningStatus s={data.screening} /> : null}
           <dl className="a25-settings__meta a25-small">
             <div>

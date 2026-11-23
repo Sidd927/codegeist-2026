@@ -121,11 +121,17 @@ export function Home({ appContext }) {
               </div>
               <div>
                 <dt>{s.reviewers.label}</dt>
-                <dd>{s.reviewers.value}</dd>
+                <dd>
+                  <span className="a25-mono">{appContext?.reviewerGroup ?? '–'}</span>
+                  {appContext ? <span className="a25-block a25-subtle a25-small">{appContext.roles?.reviewer ? s.reviewers.member : s.reviewers.notMember}</span> : null}
+                </dd>
               </div>
               <div>
                 <dt>{s.gate.label}</dt>
-                <dd>{s.gate.value}</dd>
+                <dd>
+                  {s.gate[appContext?.gate?.mode] ?? s.gate.unknown}
+                  <span className="a25-block a25-subtle a25-small">{s.gate.coverage}</span>
+                </dd>
               </div>
               <div>
                 <dt>{s.register.label}</dt>
