@@ -1,5 +1,6 @@
-# Article25 checks: lint, copy lint, backend tests, frontend tests (incl. axe), production build and
-# bundle budgets. No secrets, no deploys, read-only token. Forge deploys stay manual.
+# Article25 checks: lint, copy lint, backend tests, frontend tests (incl. axe), colour contrast in real
+# Chromium against the ADS light/dark themes, production build and bundle budgets.
+# No secrets, no deploys, read-only token. Forge deploys stay manual.
 name: checks
 
 on:
@@ -36,4 +37,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:ui
+      - name: Install Chromium for the real-browser contrast check
+        run: npx playwright install --with-deps chromium
+        working-directory: app/frontend
+      - run: npm run test:contrast
       - run: npm run build:ui
