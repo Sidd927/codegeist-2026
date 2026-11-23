@@ -73,13 +73,13 @@ export function DeskRoutes({ appContext }) {
       page = <Inbox />;
       break;
     case 'review':
-      page = <Review issueKey={route.params.issueKey} />;
+      page = <Review issueKey={route.params.issueKey} appContext={appContext} />;
       break;
     case 'record':
       page = <Register />;
       break;
     case 'settings':
-      page = <Settings />;
+      page = <Settings section={route.params.section ?? null} />;
       break;
     default:
       page = <NotFound />;

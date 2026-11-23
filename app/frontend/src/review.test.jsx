@@ -95,7 +95,7 @@ describe('Decision form', () => {
 
   it.each([
     ['NOT_REVIEWER', /Only members of the reviewer group/],
-    ['SOD', /another reviewer must decide/],
+    ['SOD', /Another reviewer must decide/],
     ['STALE_EVIDENCE', /Re-check it so the decision is made on the current text/],
     ['CHECKING', /being checked/],
     ['NOT_CONFIGURED', /not configured on this site/],

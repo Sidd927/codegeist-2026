@@ -43,6 +43,9 @@ function ReviewSummary({ review, gate }) {
         </span>
       ) : null}
       {review.assignee ? <span className="a25-small a25-subtle">{copy.panel.reviewer(review.assignee.name)}</span> : null}
+      {review.you?.decideReason === 'SOD' && copy.panel.sod[review.you.youAre] ? (
+        <span className="a25-small a25-panel__sod">{copy.panel.sodNext(copy.panel.sod[review.you.youAre])}</span>
+      ) : null}
       {gate ? <GateLine gate={gate} /> : null}
     </div>
   );

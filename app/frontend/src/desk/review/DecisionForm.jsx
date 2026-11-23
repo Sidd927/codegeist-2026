@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react';
 import { api, newRequestId } from '../../shared/api.js';
 import { copy } from '../../shared/copy/en.js';
+import { useRouter } from '../router.jsx';
 import { Button, SectionMessage } from '../../shared/components/ui.jsx';
 
 const D = copy.review.decision;
@@ -66,7 +67,46 @@ function ListEditor({ id, label, kind, items, setItems, error, addLabel }) {
   );
 }
 
-export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
+/**
+ * Separation of duties (P1): the exact restriction, the next practical action, and, for Jira
+ * administrators only, where the audited switch is. Guidance only: the server refuses such a decision
+ * regardless (SOD_BLOCKED). Only the viewer's own relation to the work item is shown.
+ */
+function SodGuidance({ youAre, viewer }) {
+  const G = D.guidance;
+  const router = useRouter();
+  return (
+    <SectionMessage appearance="information" title={G.sodTitle} headingLevel="h3">
+      <p>
+        {G.sodYou[youAre] ?? ''} {G.sodRule}
+      </p>
+      <p>{G.sodNext}</p>
+      {viewer?.isAdmin ? (
+        <p className="a25-small">
+          {G.sodAdmin}{' '}
+          {router ? (
+            <button type="button" className="a25-linkbutton" onClick={() => router.navigate('/settings/review')}>
+              {G.sodAdminAction}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
+    </SectionMessage>
+  );
+}
+
+/** Not in the reviewer group: a permission, not separation of duties. */
+function NotReviewerGuidance({ viewer }) {
+  const G = D.guidance;
+  return (
+    <SectionMessage appearance="information" title={G.notReviewerTitle} headingLevel="h3">
+      <p>{G.notReviewer(viewer?.reviewerGroup ?? null)}</p>
+      <p>{G.notReviewerNext}</p>
+    </SectionMessage>
+  );
+}
+
+export function DecisionForm({ issueKey, review, onRecorded, client = api, viewer = null }) {
   const [decision, setDecision] = useState(null);
   const [rationale, setRationale] = useState('');
   const [conditions, setConditions] = useState(['']);
@@ -78,6 +118,8 @@ export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
   const requestId = useRef(newRequestId());
   const { permissions, binding } = review;
 
+  if (!permissions.canDecide && permissions.decideReason === 'SOD') return <SodGuidance youAre={permissions.youAre} viewer={viewer} />;
+  if (!permissions.canDecide && permissions.decideReason === 'NOT_REVIEWER') return <NotReviewerGuidance viewer={viewer} />;
   if (!permissions.canDecide) {
     return (
       <div className="a25-decision__unavailable">

@@ -298,3 +298,25 @@
 .a25-file:focus-visible { outline: 2px solid var(--ds-border-focused, #4688ec); outline-offset: 2px; }
 .a25-history__sig { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-100, 8px); }
 .a25-record__text { font-size: 12px; line-height: 1.4; word-break: break-all; }
+
+/* ---------- P1: Get started ---------- */
+.a25-getstarted { display: flex; flex-direction: column; gap: var(--ds-space-150, 12px); margin-bottom: var(--a25-zone-gap); }
+.a25-getstarted__group {
+  font: var(--ds-font-heading-xxsmall, 653 12px/16px ui-sans-serif, -apple-system, sans-serif);
+  color: var(--ds-text-subtle, #505258);
+  margin-top: var(--ds-space-100, 8px);
+}
+.a25-getstarted__details > summary { cursor: pointer; color: var(--ds-link, #1868db); width: fit-content; }
+.a25-getstarted__details[open] > summary { margin-bottom: var(--ds-space-100, 8px); }
+.a25-steps { list-style: none; display: flex; flex-direction: column; }
+.a25-step { display: flex; gap: var(--ds-space-150, 12px); padding: var(--ds-space-150, 12px) 0; border-top: 1px solid var(--ds-border, #0b120e24); }
+.a25-step__icon { flex: none; margin-top: 2px; color: var(--ds-icon-subtle, #6b6e76); }
+.a25-step__icon--done { color: var(--ds-icon-success, #6a9a23); }
+.a25-step__icon--todo, .a25-step__icon--check { color: var(--ds-icon-warning, #e06c00); }
+.a25-step__icon--info { color: var(--ds-icon-information, #357de8); }
+.a25-step__body { display: flex; flex-direction: column; gap: var(--ds-space-075, 6px); min-width: 0; flex: 1; }
+.a25-step__head { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-100, 8px); flex-wrap: wrap; }
+.a25-step__title { font: var(--ds-font-heading-xsmall, 653 14px/20px ui-sans-serif, -apple-system, sans-serif); }
+.a25-step__text { max-width: 72ch; }
+.a25-tryit { padding-left: var(--ds-space-250, 20px); display: flex; flex-direction: column; gap: var(--ds-space-075, 6px); }
+.a25-tryit__progress { list-style: none; color: var(--ds-text-success, #4c6b1f); display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); }

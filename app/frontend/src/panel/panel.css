@@ -8,3 +8,4 @@ html, body { background: transparent; }
 }
 
 .a25-panel__review { display: flex; flex-direction: column; gap: var(--ds-space-025, 2px); padding: var(--ds-space-100, 8px) 0; border-top: 1px solid var(--ds-border, #0b120e24); border-bottom: 1px solid var(--ds-border, #0b120e24); }
+.a25-panel__sod { color: var(--ds-text, #292a2e); }

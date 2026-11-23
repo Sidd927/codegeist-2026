@@ -39,6 +39,7 @@ export const api = {
   decide: (payload) => call('recordDecision', payload),
   verifyRecord: (issueKey) => call('verifyRecord', { issueKey }),
   gateOverview: () => call('getGateOverview'),
+  setupStatus: () => call('getSetupStatus'),
   setGateMode: (payload) => call('setGateMode', payload),
   setSeparationOfDuties: (payload) => call('setSeparationOfDuties', payload),
   recordStatus: () => call('getRecordStatus'),

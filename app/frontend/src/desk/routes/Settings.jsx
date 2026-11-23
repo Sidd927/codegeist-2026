@@ -1,12 +1,12 @@
 // Settings entry point (UX_DESIGN_SPEC §3.7). Access is decided server-side on every call; the nav
 // only hides the link. Sections are listed with their real status; configuration arrives later.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, newRequestId } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
-import { GateSettings } from '../settings/GateSettings.jsx';
-import { RecordSettings } from '../settings/RecordSettings.jsx';
+import { GateSettingsView } from '../settings/GateSettings.jsx';
+import { RecordSettingsView } from '../settings/RecordSettings.jsx';
 import { Button, Lozenge, SectionMessage } from '../../shared/components/ui.jsx';
 
 /** Audited admin switch for separation of duties (server re-checks admin rights). */
@@ -144,8 +144,19 @@ function ReviewStatus({ r, onChanged }) {
   );
 }
 
-export function SettingsView({ resource, gate = <GateSettings />, record = <RecordSettings /> }) {
+// Deep links (/settings/<section>) land on the section's heading, for keyboard and screen-reader users too.
+const SECTION_HEADING = { gate: 'a25-gate-title', record: 'a25-record-title', review: 'a25-review-settings-title', checks: 'a25-screening-title' };
+
+export function SettingsView({ resource, gate = null, record = null, section = null }) {
   const { status, data, error, reload, refresh } = resource;
+  useEffect(() => {
+    if (status !== 'success' || !SECTION_HEADING[section]) return;
+    const h = document.getElementById(SECTION_HEADING[section]);
+    if (!h) return;
+    h.setAttribute('tabindex', '-1');
+    h.scrollIntoView?.({ block: 'start' });
+    h.focus({ preventScroll: true });
+  }, [status, section]);
   return (
     <div className="a25-page a25-settings">
       <div className="a25-page__head">
@@ -194,7 +205,11 @@ export function SettingsView({ resource, gate = <GateSettings />, record = <Reco
   );
 }
 
-export function Settings() {
+export function Settings({ section = null }) {
+  // P1 performance: all three requests start together. Previously the gate and record sections began
+  // fetching only after the overview had arrived (a waterfall of two invocations).
   const resource = useResource(() => api.settingsOverview(), []);
-  return <SettingsView resource={resource} />;
+  const gate = useResource(() => api.gateOverview(), []);
+  const record = useResource(() => api.recordStatus(), []);
+  return <SettingsView resource={resource} section={section} gate={<GateSettingsView resource={gate} />} record={<RecordSettingsView resource={record} />} />;
 }
