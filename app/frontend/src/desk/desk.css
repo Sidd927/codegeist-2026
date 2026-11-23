@@ -297,3 +297,4 @@
 .a25-file { font: var(--ds-font-body, 400 14px/20px ui-sans-serif, sans-serif); color: var(--ds-text, #292a2e); }
 .a25-file:focus-visible { outline: 2px solid var(--ds-border-focused, #4688ec); outline-offset: 2px; }
 .a25-history__sig { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-100, 8px); }
+.a25-record__text { font-size: 12px; line-height: 1.4; word-break: break-all; }

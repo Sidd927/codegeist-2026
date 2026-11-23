@@ -23,7 +23,7 @@ describe('Decision record page', () => {
     const onOpen = vi.fn();
     const { container } = render(<RegisterView resource={resource({ data: REG })} page={1} setPage={vi.fn()} onOpen={onOpen} />);
     expect(screen.getByText(/signed with Ed25519/)).toBeTruthy();
-    expect(screen.getByText(/Last signed backup/)).toBeTruthy();
+    expect(screen.getByText(/Last signed archive exported/)).toBeTruthy();
     expect(screen.getByText('Ed25519')).toBeTruthy();
     expect(screen.getByText('Legacy (HMAC)')).toBeTruthy();
     expect(screen.getByText('Being signed')).toBeTruthy();
@@ -62,7 +62,7 @@ describe('Decision record settings', () => {
     const { container } = render(<RecordSettingsView resource={resource({ data: STATUS() })} client={{}} />);
     expect(screen.getByText(/ab12 ab12/)).toBeTruthy();
     expect(screen.getByText(/Save this fingerprint somewhere outside Jira/)).toBeTruthy();
-    expect(screen.getByText('2 records are not in any downloaded backup.')).toBeTruthy();
+    expect(screen.getByText('2 records are not in any exported archive.')).toBeTruthy();
     expect(screen.getByText(/Restore is only possible when this site has no decisions/)).toBeTruthy();
     expect(screen.getByText(/soft-deletes app data/)).toBeTruthy();
     expect(screen.getByText(/needs additional Confluence permissions/)).toBeTruthy();
@@ -88,6 +88,11 @@ describe('Decision record settings', () => {
     expect(screen.getByText(/should now save article25-record-2026-11-23-seq7.json/)).toBeTruthy();
     expect(screen.queryByText(/Downloaded/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy archive' })).toBeTruthy();
+    // Live finding: sandboxed iframes may block both downloads and clipboard writes. The text view
+    // always works (the user selects and copies it themself).
+    fireEvent.click(screen.getByRole('button', { name: 'Show archive text' }));
+    expect(screen.getByLabelText(/Archive \(JSON\)/).value).toBe('{"a":1}');
+    expect(screen.getByRole('button', { name: 'Select all' })).toBeTruthy();
   });
 
   it('restore: uploads in chunks, shows the verification report, and restores only after explicit confirmation', async () => {

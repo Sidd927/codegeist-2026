@@ -124,7 +124,7 @@ function Integrity({ status, onChanged, client }) {
         {R.records(status.counts.records)}.{' '}
         {status.lastVerify ? (
           <span>
-            {R.lastVerify(relativeTime(status.lastVerify.at), '')}
+            {R.lastVerify(relativeTime(status.lastVerify.at))}{' '}
             <Lozenge appearance={OUTCOME_TONE[status.lastVerify.outcome] ?? 'default'}>{status.lastVerify.outcome.replace('_', ' ')}</Lozenge>
           </span>
         ) : (
@@ -156,6 +156,8 @@ function Backup({ status, onChanged, client }) {
   const [progress, setProgress] = useState(null);
   const [msg, setMsg] = useState(null);
   const [fallback, setFallback] = useState(null);
+  const [showText, setShowText] = useState(false);
+  const areaRef = useRef(null);
   const run = async () => {
     setMsg(null);
     setFallback(null);
@@ -195,13 +197,37 @@ function Backup({ status, onChanged, client }) {
       </span>
       <Msg msg={msg} />
       {fallback ? (
-        <Button
-          onClick={async () => {
-            setMsg((await copyText(fallback)) ? { tone: 'ok', text: R.copied } : { tone: 'error', text: copy.common.errorTitle });
-          }}
-        >
-          {R.copyArchive}
-        </Button>
+        <span className="a25-assign__row">
+          <Button
+            onClick={async () => {
+              setMsg((await copyText(fallback)) ? { tone: 'ok', text: R.copied } : { tone: 'error', text: R.copyBlocked });
+            }}
+          >
+            {R.copyArchive}
+          </Button>
+          <Button appearance="subtle" aria-expanded={showText} onClick={() => setShowText(!showText)}>
+            {showText ? R.hideText : R.showText}
+          </Button>
+        </span>
+      ) : null}
+      {fallback && showText ? (
+        // Always-available route out of a sandboxed iframe: the user selects and copies the text themself.
+        <div className="a25-field">
+          <label htmlFor="a25-archive-text" className="a25-field__label">
+            {R.textLabel}
+          </label>
+          <textarea id="a25-archive-text" ref={areaRef} className="a25-input a25-textarea a25-mono a25-record__text" readOnly value={fallback} rows={8} />
+          <span>
+            <Button
+              onClick={() => {
+                areaRef.current?.focus();
+                areaRef.current?.select();
+              }}
+            >
+              {R.selectAll}
+            </Button>
+          </span>
+        </div>
       ) : null}
       <p className="a25-subtlest a25-small">{R.exportHint}</p>
       <p className="a25-subtlest a25-small a25-mono">{R.verifyOffline}</p>
@@ -218,14 +244,15 @@ function Restore({ status, onChanged, client }) {
   const lastRestoreFailed = status.lastRestore?.outcome === 'failed_partial';
   const empty = status.counts.decisions === 0 && status.counts.records === 0;
 
-  const start = async () => {
+  const [pasted, setPasted] = useState('');
+  const start = async (fromText = false) => {
     setMsg(null);
     setVerify(null);
     const file = fileRef.current?.files?.[0];
-    if (!file) return;
+    if (!fromText && !file) return;
     try {
       setStage('uploading');
-      const text = await readFileText(file);
+      const text = fromText ? pasted.trim() : await readFileText(file);
       const transferId = newTransferId();
       const chunks = Math.max(1, Math.ceil(text.length / UPLOAD_CHUNK));
       for (let i = 0; i < chunks; i++) {
@@ -273,10 +300,21 @@ function Restore({ status, onChanged, client }) {
             <input id="a25-restore-file" ref={fileRef} type="file" accept="application/json,.json" className="a25-file" />
           </div>
           <span>
-            <Button onClick={start} isDisabled={stage === 'uploading' || stage === 'restoring'}>
+            <Button onClick={() => start(false)} isDisabled={stage === 'uploading' || stage === 'restoring'}>
               {progress ?? R.restoreVerify}
             </Button>
           </span>
+          <div className="a25-field">
+            <label htmlFor="a25-restore-text" className="a25-field__label">
+              {R.restorePaste}
+            </label>
+            <textarea id="a25-restore-text" className="a25-input a25-textarea a25-mono a25-record__text" rows={4} value={pasted} onChange={(e) => setPasted(e.target.value)} />
+            <span>
+              <Button onClick={() => start(true)} isDisabled={!pasted.trim() || stage === 'uploading' || stage === 'restoring'}>
+                {R.restoreFromText}
+              </Button>
+            </span>
+          </div>
           {verify ? (
             <div className="a25-record__report" role="region" aria-label={R.reportTitle}>
               <p>
