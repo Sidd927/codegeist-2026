@@ -15,9 +15,25 @@ const ALLOWED_FIELDS = new Set([
   'value', // numeric metric value
   'issueId', // numeric Jira issue id (not personal data, not content)
   'count',
+  'outcome', // screening outcome code
+  'mode', // 'ai' | 'rules'
+  'reason', // job reason code
+  'shape', // structural key names only (e.g. changelog item keys), never values
+  'dbMs', // time spent in SQL statements
+  'jiraMs', // time spent reading Jira
+  'modelMs', // time spent in the LLM call
+  'queueMs', // enqueue → processing start
+  'rejected', // count of model quotes rejected by verification
+  'dropped', // count of model items dropped by schema validation
+  'sensitive', // 1 if a sensitive-data finding exists (code-level metric, no content)
+  'tokensIn',
+  'tokensOut',
+  'costMicros', // AI cost of this call in micro-USD
+  'aiStatus', // ok | not_enabled | over_budget | unavailable | malformed_output
+  'finish', // model finish reason enum (e.g. tool_calls, length)
 ]);
 
-const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count']);
+const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count', 'dbMs', 'jiraMs', 'modelMs', 'queueMs', 'rejected', 'dropped', 'sensitive', 'tokensIn', 'tokensOut', 'costMicros']);
 const SAFE_STRING = /^[A-Za-z0-9_.:\-/]{1,64}$/;
 
 /** Keep only allow-listed fields with safe primitive values. Exported for tests. */

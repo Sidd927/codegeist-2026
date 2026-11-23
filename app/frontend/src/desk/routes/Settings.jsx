@@ -1,10 +1,66 @@
 // Settings entry point (UX_DESIGN_SPEC §3.7). Access is decided server-side on every call; the nav
 // only hides the link. Sections are listed with their real status; configuration arrives later.
+import { useState } from 'react';
 import Lozenge from '@atlaskit/lozenge';
+import Button from '@atlaskit/button/new';
 import { api } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
+
+function ScreeningStatus({ s }) {
+  const T = copy.settings;
+  const [msg, setMsg] = useState(null);
+  const states = Object.entries(s.countsByState ?? {});
+  return (
+    <section className="a25-card a25-settings__screening" aria-labelledby="a25-screening-title">
+      <h2 id="a25-screening-title" className="a25-card__title">
+        {T.screeningTitle}
+      </h2>
+      <dl className="a25-setup">
+        <div>
+          <dt>{T.aiLabel}</dt>
+          <dd>{s.ai === 'on' ? T.aiOn(s.aiModel) : T.aiOff}</dd>
+        </div>
+        <div>
+          <dt>{T.budgetLabel}</dt>
+          <dd>{T.budgetValue(s.dailyAiBudget)}</dd>
+        </div>
+        <div>
+          <dt>{T.scopeLabel}</dt>
+          <dd>{s.scopeProjects.length ? s.scopeProjects.join(', ') : T.scopeAll}</dd>
+        </div>
+        <div>
+          <dt>{T.todayLabel}</dt>
+          <dd>{T.todayValue(s.today)}</dd>
+        </div>
+        <div>
+          <dt>{T.statesLabel}</dt>
+          <dd className="a25-mono">{states.length ? states.map(([k, n]) => `${k} ${n}`).join(' · ') : '–'}</dd>
+        </div>
+      </dl>
+      <div>
+        <Button
+          onClick={async () => {
+            try {
+              await api.applySchema();
+              setMsg(T.schemaQueued);
+            } catch (e) {
+              setMsg(e?.message ?? copy.common.errorTitle);
+            }
+          }}
+        >
+          {T.schemaAction}
+        </Button>
+        {msg ? (
+          <p role="status" className="a25-subtle a25-small">
+            {msg}
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 export function SettingsView({ resource }) {
   const { status, data, error, reload } = resource;
@@ -36,6 +92,7 @@ export function SettingsView({ resource }) {
             ))}
           </ul>
           <p className="a25-subtle a25-small">{copy.settings.availableLater}</p>
+          {data.screening ? <ScreeningStatus s={data.screening} /> : null}
           <dl className="a25-settings__meta a25-small">
             <div>
               <dt>{copy.settings.environment}</dt>

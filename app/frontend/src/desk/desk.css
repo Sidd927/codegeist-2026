@@ -161,3 +161,27 @@
   .a25-desk__header, .a25-desk__main { padding-left: var(--ds-space-200, 16px); padding-right: var(--ds-space-200, 16px); }
   .a25-desk__tagline { display: none; }
 }
+
+/* ---------- M2: inbox rows + summary strip, margin zone ---------- */
+.a25-strip { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ds-space-100, 8px); max-width: 760px; }
+@media (max-width: 599px) { .a25-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.a25-stat { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; background: none; cursor: pointer; font: inherit; color: inherit; border: 1px solid var(--ds-border, #0b120e24); border-radius: var(--ds-border-radius-200, 8px); padding: var(--ds-space-100, 8px) var(--ds-space-150, 12px); }
+.a25-stat:hover { background: var(--ds-background-neutral-subtle-hovered, #0515240f); }
+.a25-stat__value { font: var(--ds-font-heading-medium, 600 20px/24px ui-sans-serif, sans-serif); }
+.a25-stat__label { color: var(--ds-text-subtle, #505258); }
+
+.a25-inbox__list { padding: 0; }
+.a25-inbox__list > .a25-skeleton-group, .a25-inbox__list > .a25-empty { padding: var(--ds-space-200, 16px); }
+.a25-rows { list-style: none; }
+.a25-row + .a25-row { border-top: 1px solid var(--ds-border, #0b120e24); }
+.a25-row__button { width: 100%; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); padding: var(--ds-space-150, 12px) var(--ds-space-200, 16px); }
+.a25-row__button:hover { background: var(--ds-background-neutral-subtle-hovered, #0515240f); }
+.a25-row__line { display: flex; align-items: center; gap: var(--ds-space-100, 8px); min-width: 0; }
+.a25-row__line--meta { justify-content: space-between; padding-left: 2px; }
+.a25-row__key { color: var(--ds-text-subtle, #505258); flex: none; }
+.a25-row__summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--ds-font-weight-medium, 500); }
+.a25-row__age { flex: none; }
+
+.a25-margin { display: flex; flex-direction: column; gap: var(--ds-space-150, 12px); }
+.a25-margin__why { font-weight: var(--ds-font-weight-medium, 500); }
+.a25-settings__screening { max-width: 880px; }

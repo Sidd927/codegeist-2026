@@ -34,5 +34,7 @@ export const api = {
   workspace: (issueKey) => call('getWorkspace', { issueKey }),
   inbox: (view) => call('getInbox', { view }),
   settingsOverview: () => call('getSettingsOverview'),
+  rescreen: (issueKey) => call('requestRescreen', issueKey ? { issueKey } : {}),
+  applySchema: () => call('applySchema'),
   reportMetrics: (surface, metrics) => call('reportClientMetrics', { surface, metrics }).catch(() => undefined),
 };

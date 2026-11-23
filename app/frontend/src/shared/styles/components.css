@@ -88,3 +88,32 @@
   border-radius: var(--ds-border-radius, 4px);
   padding: var(--ds-space-075, 6px) var(--ds-space-100, 8px);
 }
+
+/* ---------- M2: screening presentation ---------- */
+.a25-mode { font: var(--ds-font-body-small, 400 12px/16px ui-sans-serif, sans-serif); }
+.a25-mode--ai .a25-mode__label { color: var(--a25-ai-fg); }
+.a25-mode--rules .a25-mode__label { color: var(--ds-text-warning, #9e4c00); font-weight: var(--ds-font-weight-medium, 500); }
+
+.a25-findings { display: flex; flex-direction: column; gap: var(--ds-space-075, 6px); }
+.a25-findings__list { list-style: none; display: flex; flex-direction: column; gap: var(--ds-space-100, 8px); }
+.a25-finding { display: flex; flex-direction: column; gap: var(--ds-space-025, 2px); padding-left: var(--ds-space-100, 8px); border-left: 2px solid var(--a25-margin-rule); }
+.a25-finding__head { display: flex; align-items: flex-start; gap: var(--ds-space-075, 6px); }
+.a25-finding__head > :last-child:not(.a25-finding__label) { flex: none; margin-left: auto; }
+.a25-finding__label { font-weight: var(--ds-font-weight-semibold, 600); min-width: 0; }
+
+.a25-note__explanation { color: var(--ds-text-subtle, #505258); }
+.a25-note__meta { display: flex; flex-wrap: wrap; gap: var(--ds-space-100, 8px); }
+.a25-note__certainty { font-weight: var(--ds-font-weight-medium, 500); }
+.a25-note__certainty--high { color: var(--ds-text-danger, #ae2e24); }
+.a25-note__certainty--medium { color: var(--ds-text-warning, #9e4c00); }
+.a25-note__certainty--low, .a25-note__certainty--info { color: var(--ds-text-subtle, #505258); }
+
+.a25-questions { display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); }
+.a25-questions__title { font: var(--ds-font-heading-xxsmall, 600 12px/16px ui-sans-serif, sans-serif); color: var(--ds-text-subtle, #505258); }
+.a25-questions__list { padding-left: var(--ds-space-200, 16px); }
+
+.a25-trace__body { display: flex; flex-direction: column; gap: var(--ds-space-050, 4px); padding-top: var(--ds-space-050, 4px); }
+.a25-trace__list { padding-left: var(--ds-space-200, 16px); }
+
+.a25-recheck { display: inline-flex; align-items: center; gap: var(--ds-space-100, 8px); flex-wrap: wrap; }
+.a25-panel__meta, .a25-margin__meta { display: flex; align-items: center; gap: var(--ds-space-150, 12px); flex-wrap: wrap; }
