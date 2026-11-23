@@ -1,0 +1,9 @@
+
+# Demo film: generated media (rebuild with submission/video/VIDEO_PRODUCTION_NOTES.md)
+submission/video/build/
+submission/video/film/assets/shots/
+submission/video/film/assets/voice/
+submission/video/film/renders/
+submission/video/film/.hyperframes/
+submission/video/film/snapshots/
+submission/video/film/assets/sfx/

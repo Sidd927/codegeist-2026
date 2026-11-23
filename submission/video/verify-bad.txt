@@ -1,0 +1,7 @@
+Trust anchor: pinned key k2d0f1f97948dae7c
+Site: (synthetic test site)
+Created: 2026-11-23T11:33:29.790Z · head seq 3 · 3 records · 3 decisions
+Key k2d0f1f97948dae7c: trusted (anchor)
+error: archive digest does not match its content (archive was modified)
+error: decision 10001#1: row changed
+RESULT: NOT VALID

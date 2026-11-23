@@ -1,0 +1,55 @@
+1
+00:00:01,200 --> 00:00:16,197
+Every week, someone opens a Jira work item that quietly changes how a company handles personal data. A session replay tool here. A new messaging vendor there. Nobody meant to skip the privacy review. It just wasn't part of the workflow.
+
+2
+00:00:18,200 --> 00:00:27,928
+And when a review does happen, it is an email thread and a thumbs up. Weeks later, the work changes. New data, a new vendor. And the old approval still says yes.
+
+3
+00:00:30,030 --> 00:00:40,121
+Article25 is privacy review that lives inside Jira, and actually enforces the decision. Detect. Review. Decide. Enforce. Record.
+
+4
+00:00:42,920 --> 00:00:57,683
+An administrator installs it, and Get started shows exactly what is left to do, checked live. Installing protects nothing by itself, so Article25 says so, until a workflow transition carries the Article25 gate.
+
+5
+00:01:00,080 --> 00:01:21,840
+A developer files a work item: add session replay to checkout, with a vendor called Fernwick. Article25 reads the text and flags it. Health data. Systematic monitoring. A data protection impact assessment is likely. Every finding quotes the exact words it is based on. This build runs rule based checks, and the panel says so.
+
+6
+00:01:24,240 --> 00:01:42,139
+The privacy reviewer opens it in the review desk. The text is on the left, the evidence in the margin. Select a finding, and its words light up. She approves with conditions: mask every form input, and keep prescription pages out. The decision is bound to this exact text, and signed.
+
+7
+00:01:44,540 --> 00:01:51,729
+The developer who reported it cannot approve their own work. Article25 explains why, and what to do instead.
+
+8
+00:01:53,730 --> 00:02:03,693
+Jira's workflow now asks Article25 before work can start. Without an approval, the transition is refused, and the developer is told what to do next.
+
+9
+00:02:06,690 --> 00:02:19,213
+Teams can start in Monitoring, where nothing is blocked and Article25 records what it would have stopped, then switch to Enforcing when they are ready. Settings shows exactly which transitions carry the gate.
+
+10
+00:02:21,610 --> 00:02:40,426
+Then the work changes. Someone adds one sentence: send shopper email addresses to an S M S provider. Article25 checks the new text, finds contact data that was never reviewed, and invalidates the approval on its own. The gate closes again, until a reviewer looks at what is new.
+
+11
+00:02:43,430 --> 00:02:59,153
+Every decision becomes a signed record in a hash chain. An administrator can verify the whole history, and export a signed archive. Anyone can check that archive offline, with nothing but a public key. Change a single word, and the verifier says so.
+
+12
+00:03:02,350 --> 00:03:16,835
+Uninstalling a Forge app deletes its data. Article25 restores the signed archive into a fresh install, verifies the entire chain, and checks every work item again. Only approvals of unchanged text count.
+
+13
+00:03:19,440 --> 00:03:39,472
+Under the hood, Forge triggers and queues check every change. A versioned rules engine sets each outcome, and an optional AI step must quote the text it relies on. The workflow validator reads only Article25's own records, and every decision is signed with Ed25519.
+
+14
+00:03:43,270 --> 00:03:52,486
+Article25. Privacy review that actually enforces the decision. Built entirely on Atlassian Forge, with no external services.

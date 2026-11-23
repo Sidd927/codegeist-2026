@@ -1,0 +1,34 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="setup" data-width="1920" data-height="1080">
+  <div id="setup-bg" class="clip" data-start="0" data-duration="17.16" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="setup-eb" class="clip" data-start="0.10" data-duration="17.01" data-track-index="2"><div id="setup-eb-i" class="eyebrow"><b>Set up</b>Get started, checked live</div></div>
+  <div id="setup-e1" class="clip" data-start="0.40" data-duration="16.71" data-track-index="1"><div id="setup-e1-i" class="" style=""><div class="window" style="left:120px;top:170px;width:1180px;"><img id="setup-e1-img" src="assets/shots/crop-getstarted.png" alt=""></div></div></div>
+<div id="setup-e2" class="clip" data-start="7.21" data-duration="9.90" data-track-index="1"><div id="setup-e2-i" class="cap" style="left:1350px;top:300px;width:470px;">Installing protects <em>nothing</em> by itself.</div></div>
+<div id="setup-e3" class="clip" data-start="6.22" data-duration="10.89" data-track-index="1"><div id="setup-e3-i" class="" style=""><div class="note" style="left:1350px;top:470px;width:460px">Each line is a server-side check: reviewer group, signing key, real workflow coverage, mode, backups.</div></div></div>
+<div id="setup-e4" class="clip" data-start="9.95" data-duration="7.16" data-track-index="1"><div id="setup-e4-i" class="chip" style="left:1350px;top:640px;background:#FFECEB;color:#C9372C;">Not protected</div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#setup-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.40);
+tl.fromTo("#setup-e1-img", {scale: 1}, {scale: 1.06, duration: 16.71, ease: "none", transformOrigin: "40% 38%"}, 0.40);
+tl.fromTo("#setup-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 7.21);
+tl.fromTo("#setup-e3-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 6.22);
+tl.fromTo("#setup-e4-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 9.95);
+tl.fromTo("#setup-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["setup"] = tl;
+</script>
+</template>

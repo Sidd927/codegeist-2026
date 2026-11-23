@@ -1,0 +1,35 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="hook" data-width="1920" data-height="1080">
+  <div id="hook-bg" class="clip" data-start="0" data-duration="17.60" data-track-index="0"><div class="ground-night"></div></div>
+  
+  <div id="hook-e1" class="clip" data-start="0.00" data-duration="17.55" data-track-index="1"><div id="hook-e1-i" class="" style=""><div style="position:absolute;left:160px;top:250px;font:500 30px/1 Inter;letter-spacing:.2em;color:#8C8F99;text-transform:uppercase">Every week, in every Jira</div></div></div>
+<div id="hook-e2" class="clip" data-start="7.62" data-duration="9.93" data-track-index="1"><div id="hook-e2-i" class="" style=""><div style="position:absolute;left:160px;top:330px;font:600 76px/1.08 'EB Garamond';color:#F3F0E8;width:1500px">A session replay tool here.</div></div></div>
+<div id="hook-e3" class="clip" data-start="9.40" data-duration="8.15" data-track-index="1"><div id="hook-e3-i" class="" style=""><div style="position:absolute;left:160px;top:430px;font:600 76px/1.08 'EB Garamond';color:#F3F0E8;width:1500px">A new messaging vendor there.</div></div></div>
+<div id="hook-e4" class="clip" data-start="11.30" data-duration="6.25" data-track-index="1"><div id="hook-e4-i" class="" style=""><div style="position:absolute;left:160px;top:600px;font:600 54px/1.2 'EB Garamond';color:#B9BBC3;width:1500px">Nobody meant to skip the privacy review.<br><span style="color:#E9B93A">It just wasn’t part of the workflow.</span></div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#hook-e1", {y: 0}, {y: -14, duration: 17.55, ease: "none"}, 0.00);
+tl.fromTo("#hook-e2", {y: 0}, {y: -14, duration: 9.93, ease: "none"}, 7.62);
+tl.fromTo("#hook-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 7.62);
+tl.fromTo("#hook-e3", {y: 0}, {y: -14, duration: 8.15, ease: "none"}, 9.40);
+tl.fromTo("#hook-e3-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 9.40);
+tl.fromTo("#hook-e4", {y: 0}, {y: -14, duration: 6.25, ease: "none"}, 11.30);
+tl.fromTo("#hook-e4-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 11.30);
+window.__timelines["hook"] = tl;
+</script>
+</template>

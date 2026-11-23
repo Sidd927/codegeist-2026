@@ -1,0 +1,58 @@
+[
+  {
+    "id": "s01-hook",
+    "text": "Every week, someone opens a Jira work item that quietly changes how a company handles personal data. A session replay tool here. A new messaging vendor there. Nobody meant to skip the privacy review. It just wasn't part of the workflow."
+  },
+  {
+    "id": "s02-tension",
+    "text": "And when a review does happen, it is an email thread and a thumbs up. Weeks later, the work changes. New data, a new vendor. And the old approval still says yes."
+  },
+  {
+    "id": "s03-reveal",
+    "text": "Article25 is privacy review that lives inside Jira, and actually enforces the decision. Detect. Review. Decide. Enforce. Record."
+  },
+  {
+    "id": "s04-setup",
+    "text": "An administrator installs it, and Get started shows exactly what is left to do, checked live. Installing protects nothing by itself, so Article25 says so, until a workflow transition carries the Article25 gate."
+  },
+  {
+    "id": "s05-detect",
+    "text": "A developer files a work item: add session replay to checkout, with a vendor called Fernwick. Article25 reads the text and flags it. Health data. Systematic monitoring. A data protection impact assessment is likely. Every finding quotes the exact words it is based on. This build runs rule based checks, and the panel says so."
+  },
+  {
+    "id": "s06-review",
+    "text": "The privacy reviewer opens it in the review desk. The text is on the left, the evidence in the margin. Select a finding, and its words light up. She approves with conditions: mask every form input, and keep prescription pages out. The decision is bound to this exact text, and signed."
+  },
+  {
+    "id": "s07-sod",
+    "text": "The developer who reported it cannot approve their own work. Article25 explains why, and what to do instead."
+  },
+  {
+    "id": "s08-gate",
+    "text": "Jira's workflow now asks Article25 before work can start. Without an approval, the transition is refused, and the developer is told what to do next."
+  },
+  {
+    "id": "s08b-modes",
+    "text": "Teams can start in Monitoring, where nothing is blocked and Article25 records what it would have stopped, then switch to Enforcing when they are ready. Settings shows exactly which transitions carry the gate."
+  },
+  {
+    "id": "s09-invalidate",
+    "text": "Then the work changes. Someone adds one sentence: send shopper email addresses to an S M S provider. Article25 checks the new text, finds contact data that was never reviewed, and invalidates the approval on its own. The gate closes again, until a reviewer looks at what is new."
+  },
+  {
+    "id": "s10-record",
+    "text": "Every decision becomes a signed record in a hash chain. An administrator can verify the whole history, and export a signed archive. Anyone can check that archive offline, with nothing but a public key. Change a single word, and the verifier says so."
+  },
+  {
+    "id": "s11-recover",
+    "text": "Uninstalling a Forge app deletes its data. Article25 restores the signed archive into a fresh install, verifies the entire chain, and checks every work item again. Only approvals of unchanged text count."
+  },
+  {
+    "id": "s11b-tech",
+    "text": "Under the hood, Forge triggers and queues check every change. A versioned rules engine sets each outcome, and an optional AI step must quote the text it relies on. The workflow validator reads only Article25's own records, and every decision is signed with Ed25519."
+  },
+  {
+    "id": "s12-close",
+    "text": "Article25. Privacy review that actually enforces the decision. Built entirely on Atlassian Forge, with no external services."
+  }
+]

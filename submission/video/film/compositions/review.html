@@ -1,0 +1,41 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="review" data-width="1920" data-height="1080">
+  <div id="review-bg" class="clip" data-start="0" data-duration="20.30" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="review-eb" class="clip" data-start="0.10" data-duration="20.15" data-track-index="2"><div id="review-eb-i" class="eyebrow"><b>02 · 03</b>Review and decide</div></div>
+  <div id="review-e1" class="clip" data-start="0.40" data-duration="6.69" data-track-index="1"><div id="review-e1-i" class="" style=""><div class="window" style="left:120px;top:190px;width:1680px;"><img id="review-e1-img" src="assets/shots/crop-evidence-idle.png" alt=""></div></div></div>
+<div id="review-e2" class="clip" data-start="6.89" data-duration="13.36" data-track-index="1"><div id="review-e2-i" class="" style=""><div class="window" style="left:120px;top:190px;width:1680px;"><img id="review-e2-img" src="assets/shots/crop-evidence.png" alt=""></div></div></div>
+<div id="review-e3" class="clip" data-start="9.44" data-duration="10.81" data-track-index="1"><div id="review-e3-i" class="" style=""><div class="window" style="left:1180px;top:60px;width:560px;height:960px;"><img id="review-e3-img" src="assets/shots/decision-filled.png" alt=""></div></div></div>
+<div id="review-e4" class="clip" data-start="15.16" data-duration="5.09" data-track-index="1"><div id="review-e4-i" class="cap" style="left:140px;top:760px;width:980px;">Bound to <em>this exact text</em> — and signed.</div></div>
+<div id="review-e5" class="clip" data-start="11.63" data-duration="8.62" data-track-index="1"><div id="review-e5-i" class="" style=""><div class="note" style="left:140px;top:860px;width:980px">Conditions: mask every form input · exclude prescription pages.</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#review-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.40);
+tl.fromTo("#review-e1-img", {scale: 1}, {scale: 1.02, duration: 6.69, ease: "none", transformOrigin: "50% 40%"}, 0.40);
+tl.to("#review-e1-i", {opacity: 0, duration: 0.4, ease: "power2.in"}, 6.89);
+tl.fromTo("#review-e2-i", {opacity: 0}, {opacity: 1, duration: 0.7, ease: "power2.out"}, 6.89);
+tl.fromTo("#review-e2-img", {scale: 1}, {scale: 1.04, duration: 13.36, ease: "none", transformOrigin: "20% 40%"}, 6.89);
+tl.to("#review-e2-i", {scale: .62, duration: .7, ease: "power3.inOut", transformOrigin: "0% 0%"}, 9.44);
+tl.fromTo("#review-e3-i", {opacity: 0}, {opacity: 1, duration: 0.7, ease: "power2.out"}, 9.44);
+tl.fromTo("#review-e3-img", {scale: 1}, {scale: 1.0, duration: 10.81, ease: "none", transformOrigin: "50% 40%"}, 9.44);
+tl.fromTo("#review-e3-img", {y: 0}, {y: -700, duration: 4.5, ease: "power2.inOut"}, 10.13);
+tl.fromTo("#review-e4-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 15.16);
+tl.fromTo("#review-e5-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 11.63);
+tl.fromTo("#review-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["review"] = tl;
+</script>
+</template>

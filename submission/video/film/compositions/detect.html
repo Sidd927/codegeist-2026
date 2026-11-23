@@ -1,0 +1,40 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="detect" data-width="1920" data-height="1080">
+  <div id="detect-bg" class="clip" data-start="0" data-duration="24.16" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="detect-eb" class="clip" data-start="0.10" data-duration="24.01" data-track-index="2"><div id="detect-eb-i" class="eyebrow"><b>01</b>Detect</div></div>
+  <div id="detect-e1" class="clip" data-start="0.50" data-duration="23.61" data-track-index="1"><div id="detect-e1-i" class="" style=""><div style="position:absolute;left:120px;top:200px;width:720px;font:500 28px/1.45 Inter;color:#5E6068">A developer files <b style="color:#17181C">SHOP-214</b><br><span style="font:600 44px/1.2 'EB Garamond';color:#17181C">Add session replay to checkout with Fernwick</span></div></div></div>
+<div id="detect-e2" class="clip" data-start="1.20" data-duration="22.91" data-track-index="1"><div id="detect-e2-i" class="" style=""><div class="window" style="left:1000px;top:150px;width:720px;"><img id="detect-e2-img" src="assets/shots/panel.png" alt=""></div></div></div>
+<div id="detect-e3" class="clip" data-start="9.48" data-duration="14.63" data-track-index="1"><div id="detect-e3-i" class="chip" style="left:120px;top:520px;background:#FFF5DB;color:#7A4A00;">Health data</div></div>
+<div id="detect-e4" class="clip" data-start="10.35" data-duration="13.76" data-track-index="1"><div id="detect-e4-i" class="chip" style="left:330px;top:520px;background:#FFF5DB;color:#7A4A00;">Systematic monitoring</div></div>
+<div id="detect-e5" class="clip" data-start="11.88" data-duration="12.23" data-track-index="1"><div id="detect-e5-i" class="chip" style="left:120px;top:600px;background:#C9372C;color:#fff;">DPIA likely</div></div>
+<div id="detect-e6" class="clip" data-start="15.02" data-duration="9.09" data-track-index="1"><div id="detect-e6-i" class="cap" style="left:120px;top:720px;width:800px;">Every finding quotes <em>the exact words</em> it is based on.</div></div>
+<div id="detect-e7" class="clip" data-start="18.56" data-duration="5.55" data-track-index="1"><div id="detect-e7-i" class="" style=""><div class="note" style="left:120px;top:900px;width:780px">This build runs rule-based checks (limited recall) — and says so.</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#detect-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.50);
+tl.fromTo("#detect-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 1.20);
+tl.fromTo("#detect-e2-img", {scale: 1}, {scale: 1.03, duration: 22.91, ease: "none", transformOrigin: "50% 30%"}, 1.20);
+tl.fromTo("#detect-e3-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 9.48);
+tl.fromTo("#detect-e4-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 10.35);
+tl.fromTo("#detect-e5-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 11.88);
+tl.fromTo("#detect-e6-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 15.02);
+tl.fromTo("#detect-e7-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 18.56);
+tl.fromTo("#detect-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["detect"] = tl;
+</script>
+</template>
