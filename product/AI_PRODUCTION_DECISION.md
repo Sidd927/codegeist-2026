@@ -3,7 +3,8 @@
 **Date:** 23 Nov 2026 · **Decision owner:** you (billable)
 
 > **DECISION (23 Nov 2026): Option A, hybrid with a hard spend cap, approved by the owner.**
-> - The per-installation dollar cap is **still to be named** (recommended $10, about 3,800 checks; $5 is about 1,900).
+> - **Cap: $5 per installation** (owner, 23 Nov 2026). That is about 1,900 checks per site at $0.0026 each; the worst case is $5 × the number of installations.
+> - Daily budget: 300 checks.
 > - Nothing is configured yet. Production still has no variables, and development keeps AI **off**.
 > - The variables are set together with the production deploy (runbook §1.3), after the deploy is approved.
 > - The `llm` module stays in the manifest for the scope freeze.

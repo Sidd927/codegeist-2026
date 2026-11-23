@@ -57,7 +57,7 @@ Please don't put unnecessary personal data in rationales, conditions or question
 - **It never logs work-item text, rationales or account IDs.**
 
 ## AI processing
-**In the published build, AI-assisted checks are on, within a spending cap set by the developer.** If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so. [CONFIRM the cap before publication]
+**In the published build, AI-assisted checks are on, within a spending cap set by the developer.** If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so.
 
 **When AI-assisted checks run:**
 - work-item text is sent to **Atlassian's Forge LLM service**, which runs within Atlassian's platform, to extract possible privacy signals;

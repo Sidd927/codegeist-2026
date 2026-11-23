@@ -10,7 +10,7 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 | Forge environments | Development: installed (v6), AI **off**, gate **Monitoring**. `recovery`: empty, no install. Staging: unused. **Production: deployed 22 Nov, no install, no variables** | `forge environments/variables/install list` | Production setup needs you |
 | Scopes | `read:jira-work`, `read:jira-user`, `read:workflow:jira` + `llm` module; no egress | `manifest.yml` | Freeze by **4 Dec** (you) |
 | Signing keys | Development: Ed25519 + legacy HMAC. Production: **none** | variables list | **Yes:** production key (you generate) |
-| AI decision | ✅ **Decided: hybrid with a hard cap** (owner, 23 Nov). The dollar cap is still to be named | `AI_PRODUCTION_DECISION.md` | The cap figure (you) |
+| AI decision | ✅ **Decided: hybrid, $5 cap per installation, 300 checks a day** (owner, 23 Nov). Configured with the production deploy | `AI_PRODUCTION_DECISION.md` | No |
 | Sharing link | Not created | — | **Yes** (you) |
 | Privacy policy | Rewritten from the code; not published; contact and legal review open | `docs/privacy-policy.md` | **Yes** (you) |
 | Clean-site rehearsal | Isolated first-run and recovery done live; a real clean site needs you | `docs/CLEAN_SITE_REHEARSAL.md` | Strongly recommended |
@@ -47,7 +47,7 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 ## 4. Decisions and actions that need you (in order)
 | # | Decision or action | Why it's yours | By |
 |---|---|---|---|
-| 1 | ~~AI in production~~ **Hybrid decided.** Still needed: **the $ cap per installation** (recommended $10) | Billable | 1 Dec |
+| 1 | ✅ ~~AI in production~~: **hybrid, $5 cap per installation** (decided 23 Nov) | — | Done |
 | 2 | **Freeze scopes** as listed, **keeping the `llm` module** (follows #1) | Re-consent after judges install | **4 Dec** |
 | 3 | **Generate the production signing key** (runbook §1.1) and pin its fingerprint | Production key | Before #5 |
 | 4 | **Privacy policy:** add a contact email, get legal review of the [REVIEW] items, publish to a public URL | Publishing | Before #5 |

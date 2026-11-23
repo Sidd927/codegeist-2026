@@ -42,7 +42,7 @@ forge variables set -e production A25_AI_ENABLED false
 forge variables set -e production A25_AI_SPEND_CAP_USD 0
 ```
 
-Hybrid (only after approval; replace `<cap>`):
+Hybrid (**decided: $5 cap per installation**; run with the production deploy, after it is approved):
 
 ```bash
 forge variables set -e production A25_AI_ENABLED true
@@ -57,7 +57,7 @@ forge variables set -e production A25_AI_DAILY_BUDGET 300
 ```
 
 ```bash
-forge variables set -e production A25_AI_SPEND_CAP_USD <cap>
+forge variables set -e production A25_AI_SPEND_CAP_USD 5
 ```
 
 **1.4 Leave unset** (the defaults are correct for judges):
