@@ -79,6 +79,13 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
         log.warn({ evt: 'gate.error', reason: res.reason, code: e?.code ?? 'INTERNAL', errName: e?.name });
       }
     }
+    // Monitor mode never blocks, not even when the evaluation itself failed (final audit: during the M5
+    // deploy the snapshot read new tables before their migration ran, and monitor-mode sites were
+    // blocked). Only the mode is re-read, from the M4 settings table. Unreadable or "enforce" → block.
+    if (res.verdict === 'block' && res.mode === 'unknown') {
+      const stored = await withDeadline(settingsSvc.current('gate.mode'), auditMs).then((c) => c.value).catch(() => null);
+      if (stored === 'monitor') res = { ...res, outcome: { result: true }, verdict: 'would_block', mode: 'monitor' };
+    }
     const ms = clock() - t0;
     await record({ at: clock(), issueId: res.issueId ?? null, projectKey: res.projectKey ?? null, from, to, mode: res.mode, verdict: res.verdict, reason: res.reason, policyVersion: GATE_POLICY_VERSION, decisionSeq: res.decisionSeq ?? null, contentRef: res.contentRef ?? null, ms });
     log.info({ evt: 'gate.evaluated', issueId: res.issueId ?? undefined, mode: res.mode, outcome: res.verdict, reason: res.reason, ms });

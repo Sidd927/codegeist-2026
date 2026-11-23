@@ -259,10 +259,11 @@ test('missing signing key or unknown site never bypasses the gate', async () => 
   assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, recordKey: null } })).outcome.result, false);
 });
 
-test('infrastructure failures block even in monitor mode (mode unknown) and are audited when possible', async () => {
+test('infrastructure failures block when enforcing or when the mode cannot be read, and are audited when possible', async () => {
   const w = await world();
   await w.screen(10001);
   await decision(w, REV1, 'SHOP-1', APPROVE);
+  await setMode(w, 'enforce');
   w.fake.failures.gateSnapshot = true; // SQL unavailable
   let r = await validate(w, 'SHOP-1');
   assert.deepEqual([r.outcome.result, r.reason], [false, 'SYSTEM_UNAVAILABLE']);
@@ -281,7 +282,28 @@ test('infrastructure failures block even in monitor mode (mode unknown) and are 
   w.jiraFailure.current = new TypeError('unexpected'); // any other function failure
   assert.equal((await validate(w, 'SHOP-1')).reason, 'SYSTEM_UNAVAILABLE');
   w.jiraFailure.current = null;
+  // The mode itself cannot be read either: block (fail closed).
+  w.fake.failures.gateSnapshot = true;
+  w.fake.failures.settingsRead = true;
+  assert.equal((await validate(w, 'SHOP-1')).outcome.result, false);
+  w.fake.failures.gateSnapshot = false;
+  w.fake.failures.settingsRead = false;
   assert.ok(w.fake.gev.every((e) => e.verdict === 'block' && e.mode === 'unknown'));
+});
+
+test('monitor mode never blocks, even when the evaluation fails (the M5 deploy incident); the outage is recorded as "would block"', async () => {
+  const w = await world();
+  await w.screen(10001);
+  await decision(w, REV1, 'SHOP-1', APPROVE);
+  w.fake.failures.schemaMissing = true; // new tables not migrated yet; the M4 settings table is readable
+  let r = await validate(w, 'SHOP-1');
+  assert.deepEqual([r.outcome.result, r.reason], [true, 'SYSTEM_UNAVAILABLE']);
+  w.fake.failures.schemaMissing = false;
+  w.jiraFailure.current = new AppError(ErrorCode.UPSTREAM_UNAVAILABLE);
+  r = await validate(w, 'SHOP-1');
+  assert.equal(r.outcome.result, true);
+  w.jiraFailure.current = null;
+  assert.ok(w.fake.gev.every((e) => e.verdict === 'would_block' && e.mode === 'monitor' && e.reason === 'SYSTEM_UNAVAILABLE'));
 });
 
 test('a failing audit write never changes the verdict (allow stays allow, block stays block)', async () => {
