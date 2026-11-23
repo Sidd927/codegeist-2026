@@ -217,9 +217,17 @@ Until finalisation the item remains **not cleared**, so the gate stays closed. T
   - review state written last;
   - compensation on failure.
 
+> **M5 amendment (implemented in development, 23 Nov 2026).** See [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md) §2–§9. §5.5 and §5.6 above are kept as designed; what was built differs as follows:
+> - **Signing:** new `core/ledger.js` (pure) adds Ed25519 v3 records, a self-signed key registry, signed key successions, and signed checkpoints (`attestation`, `export`). Trust is anchored only in environment-variable keys. `services/ledger.js` owns anchoring, verification, export, restore, status and key adoption. The gate gets trusted keys from `ledger.trust()` and gains `RECORD_KEY_UNTRUSTED` and `RESTORE_INCOMPLETE`.
+> - **§5.5 Publishing:** **not built (BLOCKED on Confluence scopes).** The outbox and read-only page design is preserved for when it is approved (M5 §9). There is no `publish-queue` yet.
+> - **§5.6 Recovery:** the source is a **signed archive** uploaded or pasted by an admin (chunked through `uploadArchiveChunk`), not the Confluence page. The write order is decisions → chain → keys → successions → checkpoints → assignments → settings, with `RESTORE_INCOMPLETE` keeping the gate closed until it completes. It is **resumable** (idempotent writes) rather than compensating. Restored work items are re-screened through the maintenance queue (`rescreen` job). The group check is Jira admin for now.
+> - **New resolvers:** `getRecordStatus`, `verifyLedger`, `exportArchive`, `getTransferChunk`, `uploadArchiveChunk`, `beginRestore`, `confirmRestore`, `adoptPreviousKey`, `getDecisionRecord`, `getRegister`.
+> - **Offline verifier:** `app/scripts/verify-archive.mjs` (Node crypto only).
+
 ### 5.7 Retention and deletion
 - `avi:jira:deleted:issue` → delete screenings and the work-item state for that issue. Decisions remain in the ledger (accountability), but their excerpts are not stored there.
 - Hourly purge: `gate_events` older than 30 days; `screenings` superseded more than 90 days ago (configurable later).
+- **M5 amendment:** the `gate_events` 30-day purge and a 1-hour purge of `transfer_chunks` are implemented in the reconciler. The `screenings` purge is not implemented yet.
 
 ## 6. AI screening pipeline
 | Aspect | Design |

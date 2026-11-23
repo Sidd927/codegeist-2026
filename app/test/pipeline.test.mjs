@@ -5,7 +5,7 @@ import { createFakeRepos } from './fakes.mjs';
 import { createScreeningService, MAX_ATTEMPTS, LEASE_MS } from '../src/backend/services/screening.js';
 import { createLlmAdapter, AI_STATUS } from '../src/backend/adapters/llm.js';
 import { settingsFromEnv } from '../src/backend/lib/config.js';
-import { createPricing } from '../src/backend/adapters/pricing.js';
+import { createPricing, estimateInputTokens } from '../src/backend/adapters/pricing.js';
 
 // Haiku 5.5 runtime pricing as observed in Stage 1: 5 credits per 1M tokens ($0.50 in / $2.50 out).
 const PRICING = createPricing(async () => ({ models: [{ model: 'claude-haiku-5-5', pricing: { inputCreditsPerMillionTokens: 5, outputCreditsPerMillionTokens: 5 } }, { model: 'claude-sonnet-5-5', pricing: { inputCreditsPerMillionTokens: 20, outputCreditsPerMillionTokens: 20 } }] }));
@@ -258,9 +258,43 @@ test('hard spend cap: a call whose worst-case cost exceeds the remaining cap is 
   const s = setup({ chat: async () => toolResponse(AI_ARGS), env: { A25_AI_SPEND_CAP_USD: '0.001' } });
   await s.svc.onIssueEvent({ issueId: '10001', issueKey: 'SHOP-1', projectKey: 'SHOP', contentChange: true });
   const [r] = await drain(s);
-  assert.equal(r.aiStatus, AI_STATUS.OVER_BUDGET);
+  assert.equal(r.aiStatus, AI_STATUS.SPEND_CAP); // labelled distinctly from the daily budget
   assert.equal(s.chatCalls.length, 0);
   assert.equal(s.fake.spendState.micros, 0);
+});
+test('hard spend cap under concurrency: parallel screenings never reserve past the cap', async () => {
+  const issues = {};
+  for (let i = 0; i < 20; i++) issues[20000 + i] = { key: `SHOP-${i}`, projectKey: 'SHOP', ...RISKY };
+  // Worst-case reservation for one RISKY item: one token per character plus prompt, plus max output.
+  const one = await PRICING.costMicros('claude-haiku-5-5', estimateInputTokens(RISKY.summary.length + 2 + 94 + 16), 2000);
+  const capUsd = ((3 * one + 1) / 1e6).toFixed(6);
+  let peak = 0;
+  const s = setup({ issues, env: { A25_AI_SPEND_CAP_USD: capUsd }, chat: async () => { await new Promise((r) => setTimeout(r, 15)); return toolResponse(AI_ARGS); } });
+  const reserve = s.fake.repos.spend.reserve;
+  s.fake.repos.spend.reserve = async (a) => { const ok = await reserve(a); peak = Math.max(peak, s.fake.spendState.micros); return ok; };
+  for (const id of Object.keys(issues)) await s.svc.onIssueEvent({ issueId: id, issueKey: issues[id].key, projectKey: 'SHOP', contentChange: true });
+  const jobs = s.queue.splice(0);
+  const results = await Promise.all(jobs.map((j) => s.svc.processJob(j)));
+  const cap = Math.floor(Number(capUsd) * 1e6);
+  assert.ok(peak <= cap, `peak reservation ${peak} exceeded cap ${cap}`);
+  assert.equal(s.chatCalls.length, 3); // exactly as many calls as the cap can cover at worst case
+  assert.equal(results.filter((r) => r.aiStatus === AI_STATUS.SPEND_CAP).length, 17);
+  assert.ok(results.every((r) => r.status === 'screened')); // every item is still checked (rule-based)
+  assert.ok(s.fake.spendState.micros <= cap);
+});
+test('daily AI budget under concurrency: exactly the budgeted number of calls are made', async () => {
+  const issues = {};
+  for (let i = 0; i < 12; i++) issues[30000 + i] = { key: `SHOP-${i}`, projectKey: 'SHOP', ...RISKY };
+  const s = setup({ issues, env: { A25_AI_DAILY_BUDGET: '4' }, chat: async () => { await new Promise((r) => setTimeout(r, 10)); return toolResponse(AI_ARGS); } });
+  for (const id of Object.keys(issues)) await s.svc.onIssueEvent({ issueId: id, issueKey: issues[id].key, projectKey: 'SHOP', contentChange: true });
+  const results = await Promise.all(s.queue.splice(0).map((j) => s.svc.processJob(j)));
+  assert.equal(s.chatCalls.length, 4);
+  assert.equal(results.filter((r) => r.aiStatus === AI_STATUS.OVER_BUDGET).length, 8);
+  assert.equal(results.filter((r) => r.mode === 'ai').length, 4);
+});
+test('the reservation is an upper bound: one token per character of input', () => {
+  assert.equal(estimateInputTokens(0), 1600);
+  assert.equal(estimateInputTokens(32000), 33600);
 });
 test('spend is reserved at worst case, then settled to the actual token cost', async () => {
   const s = setup({ chat: async () => toolResponse(AI_ARGS) });

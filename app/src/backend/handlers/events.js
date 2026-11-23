@@ -8,10 +8,12 @@ import { createJiraAdapter } from '../adapters/jira.js';
 import { createLlmAdapter } from '../adapters/llm.js';
 import { createScreeningService } from '../services/screening.js';
 import { createReviewService } from '../services/review.js';
+import { createLedgerService } from '../services/ledger.js';
 import * as repos from '../repositories/sql-repositories.js';
 import { applyMigrations } from '../db/schema.js';
 import { configFor, settingsFromEnv } from '../lib/config.js';
 import { log } from '../lib/logger.js';
+import { isSchemaMissing, isSqlExecutionError } from '../lib/errors.js';
 
 export const SCREENING_QUEUE = 'a25-screening';
 export const MAINTENANCE_QUEUE = 'a25-maintenance';
@@ -30,9 +32,19 @@ export function siteIdOf(context, event) {
   return m ? m[1] : null;
 }
 
-export function buildReview(environmentType, siteId) {
+/** Ledger (signed record) for this site. Keys are only usable when the site id is known. */
+export function buildLedger(siteId) {
+  const settings = settingsFromEnv();
+  return createLedgerService({
+    repos, log, siteId,
+    settings: siteId ? settings : { ...settings, signingKey: null, recordKey: null, recordKeyPrevious: null, recordTrustedKeys: [] },
+    rescreen: (issueId) => maintenanceQueue.push({ body: { type: 'rescreen', issueId: String(issueId) } }),
+  });
+}
+
+export function buildReview(environmentType, siteId, ledger = buildLedger(siteId)) {
   const config = configFor(environmentType);
-  return createReviewService({ repos, jira: createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs }), log, settings: { ...settingsFromEnv(), signingKey: siteId ? settingsFromEnv().signingKey : null }, siteId });
+  return createReviewService({ repos, jira: createJiraAdapter({ timeoutMs: config.upstreamTimeoutMs }), log, settings: settingsFromEnv(), siteId, ledger });
 }
 
 export function buildScreening(environmentType, siteId = null) {
@@ -61,7 +73,6 @@ export function classifyChange(event) {
   return items.every((it) => name(it)) ? 'irrelevant' : 'unknown';
 }
 
-const isSchemaMissing = (e) => /doesn'?t exist|no such table|unknown table/i.test(String(e?.message ?? e));
 
 export async function onIssueEvent(event, context) {
   const issueId = String(event?.issue?.id ?? '');
@@ -112,7 +123,19 @@ export async function screeningConsumer(event, context) {
   }
 }
 
-export async function maintenanceConsumer(event) {
+export async function maintenanceConsumer(event, context) {
+  // After a restore: re-check each restored work item so approvals bind to its CURRENT text again.
+  if (event?.body?.type === 'rescreen') {
+    const issueId = String(event.body.issueId ?? '');
+    if (!/^\d{1,18}$/.test(issueId)) return undefined;
+    try {
+      const doc = await createJiraAdapter({ timeoutMs: 8000 }).getIssueForScreening(issueId);
+      await buildScreening(context?.environmentType, siteIdOf(context, event)).onIssueEvent({ issueId, issueKey: doc.key, projectKey: doc.projectKey, contentChange: true });
+    } catch (e) {
+      log.warn({ evt: 'rescreen.failed', issueId, code: e?.code ?? 'INTERNAL' }); // deleted issues stay unscreened (gate blocks)
+    }
+    return undefined;
+  }
   if (event?.body?.type !== 'migrate') return undefined;
   try {
     const applied = await applyMigrations();
@@ -130,10 +153,18 @@ export async function reconcileSchedule(event, context) {
     const r = await buildScreening(context?.environmentType, siteId).reconcile();
     if (r.requeued || r.failed) log.info({ evt: 'reconcile', count: r.requeued, value: r.failed });
     if (siteId) {
-      const repaired = await buildReview(context?.environmentType, siteId).repairChain();
+      const ledger = buildLedger(siteId);
+      await ledger.ensureKeys().catch((e) => log.warn({ evt: 'reconcile.keys_failed', code: e?.code ?? 'INTERNAL' }));
+      const repaired = await buildReview(context?.environmentType, siteId, ledger).repairChain();
       if (repaired) log.info({ evt: 'reconcile.chain', count: repaired });
     }
+    // Retention: gate events are operational evidence, kept 30 days (decisions are kept indefinitely).
+    const purged = await repos.purgeGateEvents(Date.now() - 30 * 24 * 3600 * 1000).catch(() => 0);
+    if (purged) log.info({ evt: 'reconcile.gate_events_purged', count: purged });
+    // Archive transfers are temporary (they contain decision data): keep them one hour at most.
+    await repos.transfers.purge(Date.now() - 3600 * 1000).catch(() => 0);
   } catch (e) {
+    if (isSqlExecutionError(e)) await maintenanceQueue.push({ body: { type: 'migrate' } }).catch(() => undefined); // self-heal a fresh install
     log.error({ evt: 'reconcile.failed', code: e?.code ?? 'INTERNAL' });
   }
 }

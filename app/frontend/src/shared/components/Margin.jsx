@@ -1,8 +1,8 @@
 // The Margin experience: the work item text is the page, findings are numbered margin notes, and
 // each note is linked to the exact words that triggered it (UX_DESIGN_SPEC §2, §3.4).
 import { useMemo } from 'react';
-import Lozenge from '@atlaskit/lozenge';
 import { locateMarks, segment } from '../margin.js';
+import { Lozenge } from './ui.jsx';
 
 const markId = (prefix, id) => `${prefix}-mark-${id}`;
 

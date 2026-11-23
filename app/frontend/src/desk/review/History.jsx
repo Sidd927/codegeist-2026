@@ -6,6 +6,7 @@ import { api } from '../../shared/api.js';
 import { StatusLozenge } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
 import { relativeTime } from '../../shared/findings.js';
+import { downloadText } from '../../shared/download.js';
 
 const H = copy.review.history;
 const F = copy.findings;
@@ -29,7 +30,9 @@ function When({ ms }) {
   );
 }
 
-function DecisionEntry({ d }) {
+function DecisionEntry({ d, issueKey, canDownload, client }) {
+  const [busy, setBusy] = useState(false);
+  const [dlMsg, setDlMsg] = useState(null);
   const system = d.kind === 'system';
   const label = d.decision === 'APPROVAL_INVALIDATED' ? 'APPROVAL_STALE' : d.decision === 'APPROVAL_RECONFIRMED' ? d.detail?.carried ?? 'APPROVED' : d.decision;
   const added = addedLabels(d.detail?.added);
@@ -43,6 +46,7 @@ function DecisionEntry({ d }) {
       {d.decision === 'APPROVAL_INVALIDATED' ? (
         <div className="a25-small">
           <p>{H.invalidated}</p>
+          {d.detail?.recheck?.approvedWith === 'ai' && d.detail?.recheck?.checkedWith === 'rules' ? <p className="a25-subtle">{H.lessThorough}</p> : null}
           {added.length ? (
             <p className="a25-subtle">
               {H.added}: {added.join(', ')}
@@ -74,6 +78,35 @@ function DecisionEntry({ d }) {
         </div>
       ) : null}
       <span className="a25-subtlest a25-small a25-mono">{H.contentRef(d.contentRef)}</span>
+      <span className="a25-history__sig a25-small">
+        <span className={d.record ? 'a25-subtle' : 'a25-subtlest'}>{d.record ? copy.record.signed(copy.record.format[d.record.format] ?? d.record.format, d.record.kid) : copy.record.unsigned}</span>
+        {canDownload && d.record ? (
+          <button
+            type="button"
+            className="a25-linkbutton"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setDlMsg(null);
+              try {
+                const b = await client.decisionRecord({ issueKey, seq: d.seq });
+                if (!downloadText(`article25-${issueKey}-decision-${d.seq}.json`, JSON.stringify(b, null, 2))) setDlMsg(copy.record.downloadBlocked);
+              } catch (e) {
+                setDlMsg(e?.message ?? copy.common.errorTitle);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? copy.record.downloading : copy.record.download}
+          </button>
+        ) : null}
+      </span>
+      {dlMsg ? (
+        <span role="alert" className="a25-field-error">
+          {dlMsg}
+        </span>
+      ) : null}
     </li>
   );
 }
@@ -92,7 +125,7 @@ function AssignmentEntry({ a }) {
 export function History({ issueKey, review, client = api }) {
   const [verify, setVerify] = useState(null);
   const [busy, setBusy] = useState(false);
-  const entries = [...review.decisions.map((d) => ({ at: d.decidedAt, key: `d${d.seq}`, el: <DecisionEntry key={`d${d.seq}`} d={d} /> })), ...review.assignments.map((a) => ({ at: a.assignedAt, key: `a${a.seq}`, el: <AssignmentEntry key={`a${a.seq}`} a={a} /> }))].sort((x, y) => y.at - x.at);
+  const entries = [...review.decisions.map((d) => ({ at: d.decidedAt, key: `d${d.seq}`, el: <DecisionEntry key={`d${d.seq}`} d={d} issueKey={issueKey} canDownload={review.permissions.isReviewer} client={client} /> })), ...review.assignments.map((a) => ({ at: a.assignedAt, key: `a${a.seq}`, el: <AssignmentEntry key={`a${a.seq}`} a={a} /> }))].sort((x, y) => y.at - x.at);
 
   const runVerify = async () => {
     setBusy(true);

@@ -28,5 +28,7 @@ export function createPricing(listModels) {
   };
 }
 
-/** Conservative input-token estimate for reservations (≈3 characters per token, plus prompt and schema). */
-export const estimateInputTokens = (textChars) => Math.ceil(textChars / 3) + 1_600;
+/** Input-token upper bound for reservations: one token per character (ordinary text averages 3–4
+ *  characters per token), plus the system prompt and tool schema. Over-reserving is harmless (it is
+ *  settled to the actual cost right after the call); under-reserving could let the cap be exceeded. */
+export const estimateInputTokens = (textChars) => textChars + 1_600;

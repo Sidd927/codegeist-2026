@@ -1,0 +1,33 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="tension" data-width="1920" data-height="1080">
+  <div id="tension-bg" class="clip" data-start="0" data-duration="11.93" data-track-index="0"><div class="ground-night"></div></div>
+  
+  <div id="tension-e1" class="clip" data-start="0.50" data-duration="11.38" data-track-index="1"><div id="tension-e1-i" class="" style=""><div style="position:absolute;left:160px;top:250px;width:1100px;padding:40px 48px;border:1px solid #2C2F3A;border-radius:16px;background:#181A22"><div style="font:500 28px Inter;color:#9A9DA7;letter-spacing:.14em">PRIVACY REVIEW · EMAIL THREAD</div><div style="font:600 52px/1.2 'EB Garamond';color:#F3F0E8;margin-top:18px">“Looks fine to me — approved”</div></div></div></div>
+<div id="tension-e2" class="clip" data-start="4.83" data-duration="7.05" data-track-index="1"><div id="tension-e2-i" class="" style=""><div style="position:absolute;left:160px;top:560px;font:600 40px/1.3 'EB Garamond';color:#B9BBC3;width:1500px">Weeks later the work changes:<br><span style="color:#F3F0E8;background:linear-gradient(transparent 78%, rgba(201,55,44,.75) 78%)">+ send shopper email addresses to a new vendor</span></div></div></div>
+<div id="tension-e3" class="clip" data-start="9.22" data-duration="2.66" data-track-index="1"><div id="tension-e3-i" class="chip" style="left:1340px;top:300px;background:#2F7A57;color:#fff;">Still approved</div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#tension-e1", {y: 0}, {y: -14, duration: 11.38, ease: "none"}, 0.50);
+tl.fromTo("#tension-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.50);
+tl.fromTo("#tension-e2", {y: 0}, {y: -14, duration: 7.05, ease: "none"}, 4.83);
+tl.fromTo("#tension-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 4.83);
+tl.fromTo("#tension-e3", {y: 0}, {y: -14, duration: 2.66, ease: "none"}, 9.22);
+tl.fromTo("#tension-e3-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 9.22);
+window.__timelines["tension"] = tl;
+</script>
+</template>

@@ -1,11 +1,14 @@
 // Desk overview (entry point). Explains the loop, shows the caller's access and this site's setup,
 // and illustrates the Margin review with a clearly labelled fictional example (no decision controls).
 import { useState } from 'react';
-import Heading from '@atlaskit/heading';
-import Lozenge from '@atlaskit/lozenge';
+import { api } from '../../shared/api.js';
+import { useResource } from '../../shared/useResource.js';
+import { useRouter } from '../router.jsx';
+import { GetStarted } from './GetStarted.jsx';
 import { copy } from '../../shared/copy/en.js';
 import { EvidenceDocument, MarginNotes } from '../../shared/components/Margin.jsx';
 import { StatusLozenge } from '../../shared/components/States.jsx';
+import { Button, Heading, Lozenge } from '../../shared/components/ui.jsx';
 
 // Fictional, synthetic example. It is not stored, not linked to any work item, and has no decision.
 const EXAMPLE = {
@@ -69,8 +72,32 @@ function ExampleReview() {
   );
 }
 
-export function Home({ appContext }) {
+/** For people who are not Jira administrators: what they can do here, and where. */
+function YourRole({ appContext }) {
+  const { navigate } = useRouter();
+  const R = copy.home.role;
+  return (
+    <section className="a25-card" aria-labelledby="a25-role-title">
+      <Heading as="h2" size="xsmall" id="a25-role-title">
+        {R.title}
+      </Heading>
+      <p className="a25-subtle">{appContext.roles?.reviewer ? R.reviewer : R.notReviewer(appContext.reviewerGroup ?? '')}</p>
+      {appContext.roles?.reviewer ? (
+        <span>
+          <Button onClick={() => navigate('/inbox')}>{R.openInbox}</Button>
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+// Started together with the app context (no waterfall). Non-administrators get NOT_AUTHORISED, which
+// simply means there is no Get started for them.
+const loadSetup = (client) => client.setupStatus().catch((e) => (e?.code === 'NOT_AUTHORISED' ? null : Promise.reject(e)));
+
+export function Home({ appContext, client = api }) {
   const isAdmin = appContext?.roles?.jiraAdmin === true;
+  const setup = useResource(() => loadSetup(client), [client]);
   const s = copy.home.setup;
   const checksOn = appContext?.features?.screening === true;
   return (
@@ -81,6 +108,8 @@ export function Home({ appContext }) {
         </h1>
         <p className="a25-page__lead a25-subtle">{copy.home.lead}</p>
       </div>
+
+      {isAdmin ? <GetStarted resource={setup} /> : null}
 
       <div className="a25-home__grid">
         <div className="a25-home__main">
@@ -110,6 +139,8 @@ export function Home({ appContext }) {
             </Heading>
             <p className="a25-subtle">{appContext ? (isAdmin ? copy.home.access.admin : copy.home.access.notAdmin) : copy.common.loading}</p>
           </section>
+          {appContext && !isAdmin ? <YourRole appContext={appContext} /> : null}
+          {isAdmin ? null : (
           <section className="a25-card" aria-labelledby="a25-setup-title">
             <Heading as="h2" size="xsmall" id="a25-setup-title">
               {copy.home.setupTitle}
@@ -134,11 +165,12 @@ export function Home({ appContext }) {
                 </dd>
               </div>
               <div>
-                <dt>{s.register.label}</dt>
-                <dd>{s.register.value}</dd>
+                <dt>{s.record.label}</dt>
+                <dd>{appContext ? (s.record[appContext.record?.signing] ?? s.record.none) : '–'}</dd>
               </div>
             </dl>
           </section>
+          )}
         </aside>
       </div>
     </div>

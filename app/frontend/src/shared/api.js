@@ -39,8 +39,19 @@ export const api = {
   decide: (payload) => call('recordDecision', payload),
   verifyRecord: (issueKey) => call('verifyRecord', { issueKey }),
   gateOverview: () => call('getGateOverview'),
+  setupStatus: () => call('getSetupStatus'),
   setGateMode: (payload) => call('setGateMode', payload),
   setSeparationOfDuties: (payload) => call('setSeparationOfDuties', payload),
+  recordStatus: () => call('getRecordStatus'),
+  verifyLedger: () => call('verifyLedger'),
+  exportArchive: () => call('exportArchive'),
+  transferChunk: (payload) => call('getTransferChunk', payload),
+  uploadArchiveChunk: (payload) => call('uploadArchiveChunk', payload),
+  beginRestore: (payload) => call('beginRestore', payload),
+  confirmRestore: (payload) => call('confirmRestore', payload),
+  adoptPreviousKey: (payload) => call('adoptPreviousKey', payload),
+  decisionRecord: (payload) => call('getDecisionRecord', payload),
+  register: (filters) => call('getRegister', filters),
   settingsOverview: () => call('getSettingsOverview'),
   rescreen: (issueKey) => call('requestRescreen', issueKey ? { issueKey } : {}),
   applySchema: () => call('applySchema'),
@@ -53,5 +64,12 @@ export function newRequestId() {
   if (c?.randomUUID) return c.randomUUID();
   const b = new Uint8Array(16);
   c.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** 32 hex characters for a transfer id (uploads are chunked: requests are limited to 500 KB). */
+export function newTransferId() {
+  const b = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 }

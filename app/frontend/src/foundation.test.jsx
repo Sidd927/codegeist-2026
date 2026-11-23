@@ -147,7 +147,7 @@ describe('Review workspace (Margin with verified highlights)', () => {
     expect(marks[0].getAttribute('aria-describedby')).toBe('a25-rv-note-f2');
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Record decision' })).toBeNull();
-    expect(screen.getByText(/Only members of the reviewer group can record decisions/)).toBeTruthy();
+    expect(screen.getByText(/Only members of the reviewer group can record privacy decisions/)).toBeTruthy();
     expect(screen.getAllByText('Awaiting review').length).toBeGreaterThan(0);
     // Processing summary: only verified findings; transfers are explicitly not assessed by rules.
     expect(screen.getByText('What the text says')).toBeTruthy();

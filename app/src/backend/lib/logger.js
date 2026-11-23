@@ -33,7 +33,7 @@ const ALLOWED_FIELDS = new Set([
   'tokensIn',
   'tokensOut',
   'costMicros', // AI cost of this call in micro-USD
-  'aiStatus', // ok | not_enabled | over_budget | unavailable | malformed_output
+  'aiStatus', // ok | not_enabled | over_budget | spend_cap_reached | unavailable | malformed_output
   'finish', // model finish reason enum (e.g. tool_calls, length)
 ]);
 

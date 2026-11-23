@@ -1,6 +1,5 @@
 // Article25 desk (Jira global page): product identity, navigation and routed views.
 import { useEffect, useRef } from 'react';
-import Lozenge from '@atlaskit/lozenge';
 import { useRouter } from './router.jsx';
 import { useResource } from '../shared/useResource.js';
 import { api } from '../shared/api.js';
@@ -10,11 +9,14 @@ import { Home } from './routes/Home.jsx';
 import { Inbox } from './routes/Inbox.jsx';
 import { Review } from './routes/Review.jsx';
 import { Settings } from './routes/Settings.jsx';
+import { Register } from './routes/Register.jsx';
 import { NotFound } from './routes/NotFound.jsx';
+import { Lozenge } from '../shared/components/ui.jsx';
 
 const NAV = [
   { name: 'home', path: '/', label: copy.nav.home },
   { name: 'inbox', path: '/inbox', label: copy.nav.inbox, also: ['review'] },
+  { name: 'record', path: '/record', label: copy.nav.record },
   { name: 'settings', path: '/settings', label: copy.nav.settings, adminOnly: true },
 ];
 
@@ -71,10 +73,13 @@ export function DeskRoutes({ appContext }) {
       page = <Inbox />;
       break;
     case 'review':
-      page = <Review issueKey={route.params.issueKey} />;
+      page = <Review issueKey={route.params.issueKey} appContext={appContext} />;
+      break;
+    case 'record':
+      page = <Register />;
       break;
     case 'settings':
-      page = <Settings />;
+      page = <Settings section={route.params.section ?? null} />;
       break;
     default:
       page = <NotFound />;

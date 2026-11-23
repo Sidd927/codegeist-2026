@@ -2,9 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppError, ErrorCode, toEnvelope } from '../src/backend/lib/errors.js';
-import { verifyHistory } from '../src/core/chain-core.js';
 import { createReviewService } from '../src/backend/services/review.js';
-import { world, decision, adf, silent, KEY, REV1, REV2, INACTIVE, REPORTER, DEV, OUTSIDER, APPROVE, codeOf, nextRid } from './world.mjs';
+import { world, decision, adf, silent, REV1, REV2, INACTIVE, REPORTER, DEV, OUTSIDER, APPROVE, codeOf, nextRid } from './world.mjs';
 
 // ---------------------------------------------------------------- end-to-end happy path
 test('screened issue → inbox → assignment → decision → history (bound to the exact screened content)', async () => {
@@ -52,7 +51,7 @@ test('all four human outcomes are recorded with their required content; history 
   assert.deepEqual(ws.review.decisions[3].questions, ['Where is ReplayCloud data hosted?']);
   assert.deepEqual(ws.review.decisions[1].conditions, ['Mask all form inputs', 'Exclude prescription pages']);
   assert.deepEqual(w.fake.dec.map((d) => d.seq), [1, 2, 3, 4]);
-  assert.equal(verifyHistory(KEY, 'site-test', await w.fake.repos.chain.all()).valid, true);
+  assert.equal((await w.ledgerFor().verify()).status, 'verified');
 });
 
 // ---------------------------------------------------------------- authorisation
@@ -111,7 +110,7 @@ test('separation of duties: the reporter or assignee cannot decide; can be switc
 });
 
 test('decisions fail closed without a signing key (no unsigned approvals)', async () => {
-  const w = await world({ signingKey: null });
+  const w = await world({ signingKey: null, recordKey: null });
   await w.screen(10001);
   assert.equal((await w.desk(REV1).workspace('SHOP-1', REV1)).review.permissions.decideReason, 'NOT_CONFIGURED');
   await assert.rejects(decision(w, REV1, 'SHOP-1', APPROVE), codeOf('NOT_CONFIGURED'));
@@ -220,7 +219,7 @@ test('concurrent decisions by two reviewers on the same version: exactly one win
   assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
   assert.equal(results.find((r) => r.status === 'rejected').reason.code, 'CONFLICT');
   assert.equal(w.fake.dec.length, 1);
-  assert.equal(verifyHistory(KEY, 'site-test', await w.fake.repos.chain.all()).valid, true);
+  assert.equal((await w.ledgerFor().verify()).status, 'verified');
 });
 
 test('a decision made on an outdated view (someone decided since) is a CONFLICT, not an overwrite', async () => {

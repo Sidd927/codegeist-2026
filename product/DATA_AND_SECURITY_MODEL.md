@@ -21,6 +21,8 @@ Migrations run only from install/upgrade triggers and an admin action **[VERIFIE
 
 KVS is used only for the recovery nonce (TTL semantics) **[VERIFIED]**. App-environment secret: `A25_SIGNING_KEY` (encrypted Forge variable; separate per environment; never logged) **[VERIFIED]**. M3: created in **development only** (generated locally, never printed). Production has no key, and decisions fail closed (`NOT_CONFIGURED`) without one.
 
+> **M5 amendment (23 Nov 2026):** the recovery token lives in **SQL** (`recovery_sessions`: SHA-256 of the token only, atomic single-use `UPDATE`), not in KVS. New encrypted variables: `A25_RECORD_SIGNING_KEY` (Ed25519 PKCS#8; development only) and the optional `A25_RECORD_SIGNING_KEY_PREVIOUS` for handover. `A25_SIGNING_KEY` (HMAC) is kept to verify legacy v2 records. M5 tables v010–v015 (`record_keys`, `key_successions`, `checkpoints`, `ledger_events`, `recovery_sessions`, `transfer_chunks`) are described in [M5_RECORD_RESULTS.md §4](M5_RECORD_RESULTS.md). Retention: `gate_events` 30 days and `transfer_chunks` 1 hour, both now enforced by the reconciler; decisions and records are never purged. **Exported archives contain decision text and reviewer account IDs**, and the customer must store them securely.
+
 **M3 tables (implemented, migrations v005–v007):**
 - `decisions`: append-only, PK `(issue_id, seq)`, unique `decision_id` and `request_id`. Binds `screening_id`, `fp`, `pipeline_version`, `outcome` and `signal_set`; `decided_by` is the account ID or NULL for system records.
 - `assignments`: append-only, PK `(issue_id, seq)`, unique `request_id`.
@@ -82,6 +84,8 @@ Pure function: `policy.gate(state, settings) → {allow, reasonCode}`. **Unit-te
 | Settings read/write | Jira global `ADMINISTER` permission for the caller **[UNVERIFIED Q4]** |
 | Monitor mode | admin + confirmation + audit + banner |
 | Recovery verify/confirm | recovery group **[VERIFIED]** + empty store + nonce bound to user and page + expiry + re-verify |
+| Record export, verify, restore, key adoption (**M5**) | Jira administrator (deviation from the recovery group, deferred) + empty store + single-use token (SHA-256 stored) bound to the user and the archive digest + 10 min expiry + re-verify; transfer chunks readable only by the exporting admin |
+| Single decision record download (**M5**) | reviewer group + an as-user read of the work item |
 | Sample creation | admin + explicit confirmation; creates issues **as the user** (attributable) |
 | Validator | platform invocation; reads app SQL only; never trusts issue properties **[VERIFIED]** |
 
@@ -95,6 +99,10 @@ Identity always comes from `context.accountId`; payload identity fields are igno
 | Approve-then-change | Scope changed after approval | Evidence-locked approval → `STALE` | PROPOSED (live demo test) |
 | Ledger tampering | Edit, delete, reorder or replay the Confluence backup | Hash chain + checkpoints + receipts; restore refuses | **VERIFIED** (doc 22) |
 | Consistent rollback by a space admin | Roll back backup + versions + receipts together | Residual risk; documented; recovery is two-step and audited | **ACCEPTED** (doc 22 §5) |
+| Archive tampering or forged archive (**M5**) | Edit, truncate or re-sign an exported archive; insert a key in SQL | Ed25519 records, archive digest + signature, trust only from environment-variable anchors through signed successions; offline verifier pins the fingerprint | **VERIFIED** (tests; live tamper and truncation NOT VALID) |
+| Partial restore lets work through (**M5**) | Crash part-way through a restore | Gate-safe write order + `RESTORE_INCOMPLETE` gate reason; resumable | **VERIFIED** (tests) |
+| Rollback to an older genuine archive (**M5**) | Restore an old but valid archive after an uninstall | Empty store only, admin only, report shows the date and head, re-screen invalidates approvals whose text changed | **ACCEPTED** (M5 §11) |
+| Key loss or substitution (**M5**) | Lose the record key; swap a key in the database | Old approvals blocked (`RECORD_KEY_UNTRUSTED`) until the previous key is adopted by typed fingerprint; database keys are never trusted | **VERIFIED** (tests) |
 | Prompt injection | Ticket text instructs the model | Delimited input; the LLM cannot set the outcome; quotes verified; human decision required to clear | PROPOSED + eval cases |
 | Disable the gate | Remove the validator from a workflow; add an ungated transition | Gate health (last seen per project) shown to admins and reviewers; documented limitation | PROPOSED |
 | Monitor-mode abuse | Admin turns enforcement off | Audit + persistent banner + register note | PROPOSED |
@@ -138,3 +146,17 @@ Carried from `docs/privacy-policy-review.md` §3. The product must not ship mark
 - a developer controller/processor role.
 
 These claims require review first.
+
+---
+
+## Final audit amendment (23 Nov 2026)
+Details: [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) §6.
+- **Key scope.** Forge environment variables belong to the app environment. In production one Ed25519 key signs every site's records. Each record names its site, so records cannot be moved across sites. Key compromise or loss is a **vendor** incident.
+- **Trust anchors.** The current key, the previous key during a handover, and the **public** keys of retired keys (`A25_RECORD_TRUSTED_KEYS`, not secret). Trust is still never derived from database contents.
+- **Restore lock.** An `in_progress` marker is written before any restore write. While a restore is being verified, applied or is incomplete:
+  - the gate blocks (`RESTORE_INCOMPLETE`);
+  - no decision, assignment, system decision or signature is written.
+
+  A rejected confirm is logged as `restore_rejected` and cannot mask an incomplete restore. Restores run in resumable rounds of at most 18 s.
+- **Monitor mode.** Infrastructure failures no longer block in monitor mode. Enforce mode, or an unreadable mode, remains fail-closed.
+- **Accepted risk (unchanged).** Restoring an older genuine archive after an uninstall cannot be detected. Every restored approval is re-checked against the current text.

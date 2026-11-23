@@ -22,6 +22,7 @@ export default defineConfig({
     root: import.meta.dirname,
     environment: 'jsdom',
     include: ['src/**/*.test.{js,jsx}'],
+    exclude: ['src/**/*.browser.test.{js,jsx}', 'node_modules/**'],
     setupFiles: ['src/test-setup.js'],
   },
 });

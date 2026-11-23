@@ -12,6 +12,7 @@ export const ErrorCode = Object.freeze({
   STALE_EVIDENCE: 'STALE_EVIDENCE', // the reviewed screening/content is no longer current
   SOD_BLOCKED: 'SOD_BLOCKED', // separation of duties
   NOT_CONFIGURED: 'NOT_CONFIGURED', // a required server-side setting (e.g. signing key) is missing
+  SETTING_UP: 'SETTING_UP', // first minutes after install/upgrade: the database schema is being applied
   INTERNAL: 'INTERNAL',
 });
 
@@ -25,10 +26,27 @@ const DEFAULT_MESSAGES = {
   STALE_EVIDENCE: 'The work item changed since these findings were produced. Re-check it before deciding.',
   SOD_BLOCKED: "You can't decide on a work item you reported or are assigned to.",
   NOT_CONFIGURED: 'Article25 is not fully configured to record decisions. Ask your Jira administrator.',
+  SETTING_UP: 'Article25 is finishing its setup on this site. This takes about a minute; try again shortly.',
   INTERNAL: 'Something went wrong in Article25. Try again.',
 };
 
-const RETRYABLE = new Set([ErrorCode.UPSTREAM_UNAVAILABLE, ErrorCode.INTERNAL]);
+const RETRYABLE = new Set([ErrorCode.UPSTREAM_UNAVAILABLE, ErrorCode.INTERNAL, ErrorCode.SETTING_UP]);
+
+/** A Forge SQL error that means the schema has not been applied yet (fresh install or pending migration). */
+// Forge SQL may report only "Unknown SQL execution error" in `message`, with details in `suggestion`
+// or `context`; MySQL's ER_NO_SUCH_TABLE is errno 1146.
+export const isSchemaMissing = (e) => {
+  let ctx = '';
+  try {
+    ctx = e?.context ? JSON.stringify(e.context) : '';
+  } catch {
+    ctx = '';
+  }
+  const text = `${e?.message ?? e ?? ''} ${e?.suggestion ?? ''} ${ctx}`;
+  return /doesn'?t exist|no such table|unknown table|\b1146\b/i.test(text);
+};
+/** Any Forge SQL execution failure: worth queueing the (idempotent, cheap when current) migration. */
+export const isSqlExecutionError = (e) => e?.code === 'SQL_EXECUTION_ERROR' || isSchemaMissing(e);
 
 export class AppError extends Error {
   constructor(code, message) {
@@ -40,8 +58,8 @@ export class AppError extends Error {
 export const ok = (data) => ({ ok: true, data });
 
 export function toEnvelope(err) {
-  const code = err instanceof AppError ? err.code : ErrorCode.INTERNAL;
-  const message = err instanceof AppError ? err.message : DEFAULT_MESSAGES.INTERNAL;
+  const code = err instanceof AppError ? err.code : isSchemaMissing(err) ? ErrorCode.SETTING_UP : ErrorCode.INTERNAL;
+  const message = err instanceof AppError ? err.message : DEFAULT_MESSAGES[code];
   // Field-level validation codes (e.g. { rationale: 'rationale_too_short' }) are returned for forms.
   const fields = err instanceof AppError && err.fields && typeof err.fields === 'object' ? Object.fromEntries(Object.entries(err.fields).filter(([k, v]) => /^[a-z]{1,20}$/.test(k) && /^[a-z_]{1,40}$/.test(String(v)))) : undefined;
   return { ok: false, error: { code, message, retryable: RETRYABLE.has(code), ...(fields ? { fields } : {}) } };

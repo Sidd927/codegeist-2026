@@ -189,3 +189,13 @@ app/frontend/
 - **Keyboard walkthrough checklist** per screen, done before code freeze.
 - **Copy lint:** CI grep fails on the banned words "compliant", "legal advice", "guarantee" in `copy/`.
 - **Visual review in both themes** before recording the demo.
+
+---
+
+## P1 amendment (23 Nov 2026): Atlaskit components replaced by token-styled primitives
+- **The original decision (§2–§3)** was ADS tokens plus a small set of `@atlaskit` components. It stands for tokens. For components it is amended.
+- **Measured problem:** `@atlaskit/button`, `heading`, `lozenge` and `section-message` brought in feature-flag clients, analytics, `top-layer`, `popper`, tooltip and motion. Together these were well over half of each bundle; the panel was at 193.4 of 200 KB.
+- **Replacement:** `src/shared/components/ui.jsx` provides `Button`, `Heading`, `Lozenge` and `SectionMessage` with the same props, native elements and the same semantics. They are styled only with ADS token variables, so Jira's light and dark themes apply as before.
+- **Result:** initial gzip panel 81.4 KB and desk 101.4 KB.
+- **Contrast:** checked in real Chromium against the ADS light and dark themes (`src/contrast.browser.test.jsx`, in CI).
+- Details: [P1_EXPERIENCE_RESULTS.md](P1_EXPERIENCE_RESULTS.md).

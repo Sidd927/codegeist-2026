@@ -2,7 +2,7 @@
 
 **Stage 2** · 2026-11-22 · Scope: [MVP_SCOPE.md](MVP_SCOPE.md) · Deadline: **Tue 22 Dec 2026, 12:00 PT** (submission). The app must keep working through judging, until **3 Feb 2027**.
 
-## 0. Progress (updated 23 Nov 2026, after M4)
+## 0. Progress (updated 23 Nov 2026, after M5)
 | Milestone | Status | Branch / PR (drafts, stacked) | Results |
 |---|---|---|---|
 | Stage 1/1.5 research + spikes | ✅ Done | `stage1-research-and-spikes` (#1) | `research/` |
@@ -11,13 +11,17 @@
 | M2 Detect (screening, AI validated at $0.40) | ✅ Done | `milestone-m2-detect` (#4) | [M2_DETECT_RESULTS.md](M2_DETECT_RESULTS.md) |
 | M3 Review (inbox, Margin workspace, assignment, four decisions, evidence-locked approval, signed record) | ✅ Done (development) | `milestone-m3-review` (#5) | [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md) |
 | **M4 Enforce** (workflow validator, policy g1, monitor/enforce, audited settings, verified coverage health check, CI) | ✅ **Done (development)** | `milestone-m4-enforce` (#6) | [M4_ENFORCE_RESULTS.md](M4_ENFORCE_RESULTS.md) |
-| M5 Record (Confluence register, uninstall-safe recovery) | ⏭ **Recommended next** | — | see below |
-| Onboarding, admin polish, release | Planned | — | phases 9–12 below |
+| **M5 Record & Recovery** (Ed25519 ledger v3, trusted-key lifecycle, signed archive + offline verifier, verified restore, Record page, retention) | ✅ **Done (development)**; Confluence register **BLOCKED** on scope approval | `milestone-m5-record` (#7) | [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md) |
+| **Final readiness audit** (CI, live isolated reinstall/restore, crypto audit, 11 defects fixed, README, judge guide) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) |
+| **P1 experience** (Get started, separation-of-duties guidance, bundles −55%, parallel loading, real-browser contrast check in CI) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [P1_EXPERIENCE_RESULTS.md](P1_EXPERIENCE_RESULTS.md) |
+| **Competition package** (runbook, AI memo, privacy policy rewrite, clean-site rehearsal, 3:57 demo film from real footage, Devpost draft and checklist) | ✅ **Done** (awaiting your decisions) | `milestone-m5-record` (#7) | [RELEASE_READINESS.md](RELEASE_READINESS.md) |
+| Release: production, Sharing, clean site, YouTube, submission | **Needs you**: decisions 1–11 in [RELEASE_READINESS.md §4](RELEASE_READINESS.md#4-decisions-and-actions-that-need-you-in-order) | — | [PRODUCTION_RUNBOOK.md](PRODUCTION_RUNBOOK.md) |
 
 **Scope changes so far:**
 - M3 added `read:jira-user`.
 - M4 added `read:workflow:jira` (read-only; approved 23 Nov). `manage:jira-configuration` was rejected.
 - Both are in development only. Production gets them at the scope freeze, **with user approval**.
+- M5 added **no** scope. The Confluence register needs `read:page:confluence` + `write:page:confluence` (approval request: [M5_RECORD_RESULTS.md §19](M5_RECORD_RESULTS.md)).
 
 **Deferred from M3/M4 (reason → dependency → target):**
 | Item | Why deferred | Depends on | Target |
@@ -27,8 +31,40 @@
 | Multi-reviewer test with real accounts | The demo site has one reviewer | Clean site + a second user (user action) | C1 rehearsal |
 | Opt-in automatic clearance for **AI-mode** CLEAR on protected transitions | Strict by design in g1; needs an explicit admin policy + audit | Admin policy UI | M8 |
 | Per-project / per-transition gate policies | One global mode is enough for MVP | Settings UX | Should (post-MVP) |
-| `gate_events` retention purge (30 days) | Low volume in development | Reconciler | M10 |
+| ~~`gate_events` retention purge (30 days)~~ | **Done in M5** (reconciler purges after 30 days) | — | — |
 | Separation-of-duties change history shown in the UI | Recorded and audited; only the current value is shown | — | M8 |
+| Confluence register (outbox, read-only page, checkpoint anchor) | New scopes + multi-app compatibility (preview, paid-listing only) | **User approval before the 4 Dec scope freeze** | M5b / M8 |
+| Live uninstall → reinstall → restore rehearsal | Would wipe dev evidence | A separate Forge environment | Before C1 rehearsal |
+| Recovery group and dual control for restore | Restore is Jira-admin only today | Product decision | M8 |
+| Paged export/verify for very large stores (≳ 50,000 decisions) | Not needed at MVP scale | — | M10 |
+
+**Recommended next (after the final readiness audit, 23 Nov):** the release blockers B1–B7 in [FINAL_READINESS_AUDIT.md §13](FINAL_READINESS_AUDIT.md#13-release-blockers). All of them need you:
+- production deploy + Sharing;
+- frozen scopes, **4 Dec**;
+- a production signing key;
+- the clean-site rehearsal;
+- the AI-in-production decision;
+- the privacy policy URL;
+- the submission.
+
+*Update (P1, 23 Nov): items 1–3 below are **done** (Get started; separation-of-duties guidance in the workspace and panel; bundles −55%, parallel loading). A real-browser contrast check was added to CI. Item 4, publishing the standalone verifier, remains open.*
+
+In parallel I can build P1 work that needs no new scope:
+1. a Get-started checklist;
+2. an inline separation-of-duties hint for admins;
+3. a cold-start bundle trim;
+4. publishing the standalone verifier.
+
+The Confluence decision is made: **archive only**. The live reinstall/restore is **done** in the isolated `recovery` environment.
+
+> *Historical (after M5, kept for the record):*
+
+**Recommended next (after M5, 23 Nov): M8 onboarding and clean-site rehearsal**, preceded by one decision from you:
+1. **Confluence scopes (before the 4 Dec scope freeze):** keep the archive only, or approve `read:page` + `write:page:confluence` for the register (options in [M5_RECORD_RESULTS.md §19](M5_RECORD_RESULTS.md)).
+2. **Clean-site rehearsal** is now the highest-impact item (judges install the app): install, configure keys, pin the fingerprint, decide, enforce, export, verify offline.
+3. **Live reinstall/restore** in a separate environment, so recovery is demonstrated live without touching dev evidence.
+
+> *Historical (after M4, kept for the record):*
 
 **Recommended next milestone: M5 RECORD.**
 1. **It closes the product loop** (DETECT → REVIEW → DECIDE → ENFORCE → **RECORD**). Decisions become a customer-owned, published Confluence register.

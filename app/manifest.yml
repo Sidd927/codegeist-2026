@@ -6,7 +6,7 @@ modules:
       resource: panel
       resolver:
         function: resolver
-      title: Privacy
+      title: Article25 privacy # final audit: "Privacy" alone was not recognisable next to other apps
       icon: resource:panel;icon.svg
   jira:globalPage:
     - key: desk

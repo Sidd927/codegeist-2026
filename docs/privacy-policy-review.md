@@ -1,3 +1,11 @@
+> **Update (23 Nov 2026).** This review compared draft v1 with the Stage 1 *spike*. The product build resolves its engineering findings:
+> - logs are allow-listed and content-free (#1);
+> - there is no Confluence register and no issue properties: archive-only, read-only Jira (#3, #5);
+> - screening respects the project scope (#7);
+> - spike-only features are absent (#15).
+>
+> `docs/privacy-policy.md` has been rewritten from the product code. **The ⚖️ items in §3 still need legal review** before publication. The Forge LLM terms (#9) still need confirming if AI is enabled.
+
 # Privacy policy review: draft vs. actual implementation
 
 **Date:** 2026-11-22 · **Reviewed:** `docs/privacy-policy.md` (draft v1, 2026-11-22), compared with the code in `spikes/article25-core-spike` (dev v3.5.0), `spikes/article25-ai-spike/forge-llm-harness`, and live behaviour on the demo site.

@@ -3,6 +3,7 @@
 // or logged; failures map to AppError codes.
 import api, { route, assumeTrustedRoute } from '@forge/api';
 import { AppError, ErrorCode } from '../lib/errors.js';
+import { collectPages } from '../lib/paging.js';
 
 const withTimeout = (promise, ms) =>
   Promise.race([
@@ -97,15 +98,15 @@ export function createJiraAdapter({ timeoutMs }) {
      * Used only by the admin health check to find where the Article25 gate is configured.
      */
     async searchWorkflowsWithTransitions({ pageSize = 50, maxPages = 20 } = {}) {
+      const fetchPage = (startAt) => getJson(route`/rest/api/3/workflows/search?expand=${'values.transitions'}&maxResults=${String(pageSize)}&startAt=${String(startAt)}`, { asApp: true });
+      const { pages, truncated } = await collectPages(fetchPage, { pageSize, maxPages });
       const workflows = [];
       const statuses = new Map();
-      for (let page = 0; page < maxPages; page++) {
-        const j = await getJson(route`/rest/api/3/workflows/search?expand=${'values.transitions'}&maxResults=${String(pageSize)}&startAt=${String(page * pageSize)}`, { asApp: true });
+      for (const j of pages) {
         for (const w of j.values ?? []) workflows.push(w);
         for (const st of j.statuses ?? []) statuses.set(st.statusReference ?? st.id, st);
-        if (j.isLast !== false || !(j.values ?? []).length) return { workflows, statuses: [...statuses.values()], truncated: false };
       }
-      return { workflows, statuses: [...statuses.values()], truncated: true };
+      return { workflows, statuses: [...statuses.values()], truncated };
     },
     /** Workflow status name (as the user; read:jira-work). */
     async statusName(id) {

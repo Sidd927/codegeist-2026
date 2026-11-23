@@ -3,8 +3,6 @@
 // the screened text. The decision zone renders the server's review block: status, reviewer,
 // decision form (only when the server says this user may decide) and the append-only history.
 import { useMemo, useState } from 'react';
-import Button from '@atlaskit/button/new';
-import SectionMessage from '@atlaskit/section-message';
 import { api } from '../../shared/api.js';
 import { useResource, usePolling } from '../../shared/useResource.js';
 import { openIssue } from '../../shared/platform.js';
@@ -19,11 +17,12 @@ import { Assignment } from '../review/Assignment.jsx';
 import { DecisionForm } from '../review/DecisionForm.jsx';
 import { History } from '../review/History.jsx';
 import { GatePreview } from '../review/GatePreview.jsx';
+import { Button, SectionMessage } from '../../shared/components/ui.jsx';
 
 const S = copy.screening;
 const LABELS = { document: copy.review.documentLabel, summary: copy.review.summaryHeading, description: copy.review.descriptionHeading, noDescription: copy.review.noDescription };
 
-function DecisionZone({ issueKey, review, gate, onChanged }) {
+function DecisionZone({ issueKey, review, gate, onChanged, viewer }) {
   return (
     <section className="a25-zone a25-zone--decision" aria-labelledby="a25-decision-title">
       <h2 id="a25-decision-title" className="a25-zone__title">
@@ -46,7 +45,7 @@ function DecisionZone({ issueKey, review, gate, onChanged }) {
             </>
           ) : null}
           <div className="a25-zone__divider" />
-          <DecisionForm issueKey={issueKey} review={review} onRecorded={onChanged} />
+          <DecisionForm issueKey={issueKey} review={review} onRecorded={onChanged} viewer={viewer} />
           <div className="a25-zone__divider" />
           <History issueKey={issueKey} review={review} />
         </>
@@ -86,7 +85,7 @@ function MarginZone({ screening, activeId, onActivate, onRecheck }) {
   );
 }
 
-export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
+export function ReviewView({ resource, onBack, onOpenIssue, onRecheck, viewer = null }) {
   const [tab, setTab] = useState('text');
   const [activeId, setActiveId] = useState(null);
   const [recheckMsg, setRecheckMsg] = useState(null);
@@ -211,14 +210,15 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
           <MarginZone screening={screening} activeId={activeId} onActivate={setActiveId} onRecheck={recheck} />
         </section>
 
-        <DecisionZone issueKey={issue.key} review={review} gate={gate} onChanged={refresh} />
+        <DecisionZone issueKey={issue.key} review={review} gate={gate} onChanged={refresh} viewer={viewer} />
       </div>
     </div>
   );
 }
 
-export function Review({ issueKey }) {
+export function Review({ issueKey, appContext = null }) {
   const { navigate } = useRouter();
   const resource = useResource(() => api.workspace(issueKey), [issueKey]);
-  return <ReviewView resource={resource} onBack={() => navigate('/inbox')} onOpenIssue={openIssue} onRecheck={(key) => api.rescreen(key)} />;
+  const viewer = appContext ? { isAdmin: appContext.roles?.jiraAdmin === true, reviewerGroup: appContext.reviewerGroup ?? null } : null;
+  return <ReviewView resource={resource} onBack={() => navigate('/inbox')} onOpenIssue={openIssue} onRecheck={(key) => api.rescreen(key)} viewer={viewer} />;
 }

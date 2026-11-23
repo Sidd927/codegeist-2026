@@ -8,7 +8,9 @@ export const ROUTES = [
   { name: 'home', pattern: /^\/?$/ },
   { name: 'inbox', pattern: /^\/inbox\/?$/ },
   { name: 'review', pattern: /^\/review\/([^/]+)\/?$/, params: ['issueKey'] },
-  { name: 'settings', pattern: /^\/settings\/?$/ },
+  { name: 'record', pattern: /^\/record\/?$/ },
+  // P1: /settings/<section> deep links (Get started and guidance link straight to a section).
+  { name: 'settings', pattern: /^\/settings(?:\/(gate|record|review|checks))?\/?$/, params: ['section'] },
 ];
 
 export function matchRoute(pathname) {
@@ -17,6 +19,7 @@ export function matchRoute(pathname) {
     if (m) {
       const params = {};
       (r.params ?? []).forEach((p, i) => {
+        if (m[i + 1] === undefined) return;
         try {
           params[p] = decodeURIComponent(m[i + 1]);
         } catch {

@@ -19,16 +19,27 @@ const ISSUE_KEY = /^[A-Z][A-Z0-9_]{0,99}-[1-9]\d{0,9}$/;
 const STATUS_ID = /^\d{1,20}$/;
 export const GATE_MODULE_KEY = 'article25-gate';
 
+/** This installation's Forge environment id: from the context, or from the module's localId ARI. */
+export function environmentIdOf(context) {
+  const direct = String(context?.environmentId ?? '');
+  if (/^[0-9a-f-]{36}$/.test(direct)) return direct;
+  const m = /^ari:cloud:ecosystem::extension\/[0-9a-f-]{36}\/([0-9a-f-]{36})\//.exec(String(context?.localId ?? ''));
+  return m ? m[1] : null;
+}
+
+
 class Deadline extends Error {}
 const withDeadline = (p, ms) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Deadline()), ms))]);
 
-export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, deadlineMs = 9000, auditMs = 1500, appId = null }) {
-  const signing = { signingKey: settings.signingKey ?? null, siteId: siteId ?? null };
+export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, ledger, deadlineMs = 9000, auditMs = 1500, appId = null, environmentId = null }) {
 
   /** Read and evaluate one issue. Throws on infrastructure failure (callers decide what that means). */
   async function evaluateIssue(issueKey) {
     const doc = await jira.getIssueForScreening(issueKey); // as app: identity + current text
-    const snap = await repos.gateSnapshot(String(doc.id));
+    // One SQL statement for the issue's state, and the trusted signing keys (anchored only by the
+    // keys in encrypted environment variables), in parallel.
+    const [snap, trust] = await Promise.all([repos.gateSnapshot(String(doc.id), clock()), ledger.trust()]);
+    const signing = { siteId: siteId ?? null, keys: trust.keys, hmacKey: trust.hmacKey };
     const currentFp = buildScreeningText(doc).fingerprint;
     const evaluation = evaluateGate({ ...snap, currentFp, inScope: settings.isProjectInScope(doc.projectKey), signing });
     const mode = GATE_MODES.includes(snap.mode) ? snap.mode : snap.mode === null ? DEFAULT_GATE_MODE : 'enforce'; // unknown stored value → strictest
@@ -68,6 +79,13 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
         log.warn({ evt: 'gate.error', reason: res.reason, code: e?.code ?? 'INTERNAL', errName: e?.name });
       }
     }
+    // Monitor mode never blocks, not even when the evaluation itself failed (final audit: during the M5
+    // deploy the snapshot read new tables before their migration ran, and monitor-mode sites were
+    // blocked). Only the mode is re-read, from the M4 settings table. Unreadable or "enforce" → block.
+    if (res.verdict === 'block' && res.mode === 'unknown') {
+      const stored = await withDeadline(settingsSvc.current('gate.mode'), auditMs).then((c) => c.value).catch(() => null);
+      if (stored === 'monitor') res = { ...res, outcome: { result: true }, verdict: 'would_block', mode: 'monitor' };
+    }
     const ms = clock() - t0;
     await record({ at: clock(), issueId: res.issueId ?? null, projectKey: res.projectKey ?? null, from, to, mode: res.mode, verdict: res.verdict, reason: res.reason, policyVersion: GATE_POLICY_VERSION, decisionSeq: res.decisionSeq ?? null, contentRef: res.contentRef ?? null, ms });
     log.info({ evt: 'gate.evaluated', issueId: res.issueId ?? undefined, mode: res.mode, outcome: res.verdict, reason: res.reason, ms });
@@ -103,48 +121,43 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
   const EXTENSION = /^ari:cloud:ecosystem::extension\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/static\/([A-Za-z0-9_-]+)$/;
   const isGateRule = (rule) => {
     const m = EXTENSION.exec(String(rule?.parameters?.key ?? ''));
-    return Boolean(m) && m[3] === GATE_MODULE_KEY && (!appId || m[1] === appId);
+    // The environment matters: a workflow rule calls ONE environment's validator. Another environment of
+    // this app installed on the same site (staging, a recovery test) must not claim that coverage.
+    return Boolean(m) && m[3] === GATE_MODULE_KEY && (!appId || m[1] === appId) && (!environmentId || m[2] === environmentId);
   };
 
   async function health() {
     const checks = {};
-    // Dependencies (never claim "protected" when the validator could not work).
-    try {
-      await repos.gateTablesReachable();
-      checks.database = 'ok';
-    } catch (e) {
-      checks.database = /doesn'?t exist|no such table|unknown table/i.test(String(e?.message)) ? 'migration_missing' : 'unavailable';
-    }
-    checks.signing = signing.signingKey && signing.siteId ? 'configured' : 'missing';
-    let mode = { mode: 'unknown', seq: 0, isDefault: false, changedAt: null };
-    try {
-      const m = await currentMode();
-      mode = { mode: m.mode, seq: m.seq, isDefault: m.isDefault, changedAt: m.changedAt }; // no account ids in responses
-    } catch {
-      /* reported as unknown */
-    }
-    // Coverage: read workflows (read:workflow:jira) and find transitions carrying our validator.
-    let coverage = { status: 'unknown', workflows: [], ruleKeysSeen: 0 };
-    try {
-      const { workflows, statuses } = await jira.searchWorkflowsWithTransitions();
-      const analysed = analyseCoverage(workflows, statuses, isGateRule);
-      coverage = {
-        status: analysed.length === 0 ? 'none' : analysed.some((w) => w.coverage === 'partial') ? 'partial' : 'complete',
-        workflows: analysed,
-        workflowsScanned: workflows.length,
-      };
-    } catch (e) {
-      log.warn({ evt: 'gate.health.coverage_failed', code: e?.code ?? 'INTERNAL', status: e?.status });
-      coverage = { status: 'unknown', workflows: [], error: e?.code === ErrorCode.NOT_AUTHORISED || e?.status === 403 ? 'not_permitted' : 'unavailable' };
-    }
+    checks.signing = siteId && ledger.mode !== 'none' ? 'configured' : 'missing';
     const since = clock() - 7 * 24 * 3600 * 1000;
-    let activity = null;
-    try {
-      const rows = await repos.gateEvents.summary(since);
-      activity = Object.fromEntries(rows.map((r) => [r.verdict, Number(r.n)]));
-    } catch {
-      activity = null;
-    }
+    // P1 performance: the four reads are independent, so they run together (the workflow scan dominates).
+    const [database, mode, coverage, activity] = await Promise.all([
+      // Dependencies (never claim "protected" when the validator could not work).
+      repos.gateTablesReachable().then(
+        () => 'ok',
+        (e) => (/doesn'?t exist|no such table|unknown table/i.test(String(e?.message)) ? 'migration_missing' : 'unavailable'),
+      ),
+      currentMode().then(
+        (m) => ({ mode: m.mode, seq: m.seq, isDefault: m.isDefault, changedAt: m.changedAt }), // no account ids in responses
+        () => ({ mode: 'unknown', seq: 0, isDefault: false, changedAt: null }),
+      ),
+      // Coverage: read workflows (read:workflow:jira) and find transitions carrying our validator.
+      jira.searchWorkflowsWithTransitions().then(
+        ({ workflows, statuses }) => {
+          const analysed = analyseCoverage(workflows, statuses, isGateRule);
+          return { status: analysed.length === 0 ? 'none' : analysed.some((w) => w.coverage === 'partial') ? 'partial' : 'complete', workflows: analysed, workflowsScanned: workflows.length };
+        },
+        (e) => {
+          log.warn({ evt: 'gate.health.coverage_failed', code: e?.code ?? 'INTERNAL', status: e?.status });
+          return { status: 'unknown', workflows: [], error: e?.code === ErrorCode.NOT_AUTHORISED || e?.status === 403 ? 'not_permitted' : 'unavailable' };
+        },
+      ),
+      repos.gateEvents.summary(since).then(
+        (rows) => Object.fromEntries(rows.map((r) => [r.verdict, Number(r.n)])),
+        () => null,
+      ),
+    ]);
+    checks.database = database;
     const ready = checks.database === 'ok' && checks.signing === 'configured';
     const overall = !ready ? 'not_ready' : coverage.status === 'unknown' ? 'unknown' : coverage.status === 'none' ? 'not_protected' : coverage.status === 'partial' ? 'gaps' : mode.mode === 'enforce' ? 'enforcing' : 'monitoring';
     return { overall, mode, checks, coverage, activity, policyVersion: GATE_POLICY_VERSION, checkedAt: clock() };

@@ -1,9 +1,9 @@
 // Screening result building blocks shared by the panel and the review workspace.
 // Every element renders backend results; nothing here decides or infers a privacy outcome.
 import { useId, useState } from 'react';
-import Lozenge from '@atlaskit/lozenge';
 import { copy } from '../copy/en.js';
 import { findingLabel, findingDetail, relativeTime, reasonText } from '../findings.js';
+import { Lozenge } from './ui.jsx';
 
 /** Says how the result was produced: AI-assisted (quotes verified) or the limited rule-based check. */
 export function ModeNote({ result }) {

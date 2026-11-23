@@ -64,6 +64,10 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-G7 | Works in company-managed and team-managed projects. | M | ✅ live, M4 (A25GC, A25GT; bulk transitions per issue) |
 | FR-G8 (M4) | **Conditional approvals** never authorise a protected transition until a reviewer confirms the conditions by recording Approve for the current text. | M | ✅ live, M4 |
 
+> **Final audit amendment (23 Nov 2026):**
+> - **FR-G6:** monitor mode now never blocks, even when the evaluation itself fails. The gate re-reads only the stored mode; enforce, or an unreadable mode, still blocks. This fixes the M5 deploy incident.
+> - **FR-G5:** coverage counts only this environment's validator.
+
 ### 2.4 Record (ledger, register, recovery)
 | ID | Requirement | P | Basis |
 |---|---|---|---|
@@ -76,6 +80,31 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-L7 | Decision export (CSV/JSON). | S | [PROPOSED] |
 | FR-L8 | Receipts indexed via `jira:entityProperty` for full-site enumeration at recovery. | L | doc 22 §5 |
 
+> **M5 amendment (implemented in development, 23 Nov 2026).** See [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md). The original rows above are kept as written.
+> - **FR-L1:** new records are **Ed25519-signed (ledger v3)** and continue the v2 HMAC chain. The legacy prefix is made publicly verifiable by a signed attestation checkpoint. Key trust comes only from encrypted environment variables, with signed key successions for rotation. ✅ live.
+> - **FR-L2 / FR-L3 (Confluence register):** ⛔ **BLOCKED.** Needs `read:page:confluence` + `write:page:confluence`, a Confluence installation and multi-app compatibility (approval request in M5 §19). The design is kept (outbox, read-only page, checkpoint anchor), and the gate never depends on it.
+> - **FR-L4:** ✅ live. "Verify the whole record" in Settings, a per-item Verify in History, and the last verification time.
+> - **FR-L5:** ✅ implemented, tested in integration (live reinstall not run). Source: a **signed archive** (upload or paste), not Confluence. Two steps, empty store, single-use token bound to the user and the archive digest, re-verify at confirm, gate-safe order with `RESTORE_INCOMPLETE`, resumable, outcome classified, re-screen after restore. **Deviation:** restricted to **Jira administrators**; a separate recovery-admin group is deferred (M8). Restore is resumable rather than all-or-nothing, and the gate stays closed until it completes.
+> - **FR-L6:** ✅ extended with `ledger_events` (export, verify, restore check, restore, key adoption).
+> - **FR-L7:** ✅ **upgraded**: a signed JSON archive (chunked) plus an offline verifier (`scripts/verify-archive.mjs`, pinned fingerprint), and a single-decision signed record for reviewers. CSV is not provided.
+> - **FR-L8:** ⏭ not needed. Restore enumerates from the archive. It would need `write:jira-work`, and Stage 1 showed issue properties are editable by users.
+> - **New FR-L9 (M5):** **Record page** listing decisions on visible work items with their signature and backup status; account IDs only for reviewers. ✅ live.
+> - **New FR-L10 (M5):** **key lifecycle**: rotation with a handover is co-signed; after a key loss, old approvals are blocked (`RECORD_KEY_UNTRUSTED`) until an admin adopts the previous key by its exact fingerprint. ✅ tested.
+
+> **Final audit amendment (23 Nov 2026)** · details in [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md)
+> - **FR-L2 / FR-L3:** **closed, not built.** The owner chose the archive-only design (no Confluence scopes, no multi-app installation, no preview shared storage). The Record page plus signed archives are the register.
+> - **FR-L5:** ✅ **live-verified** in an isolated Forge environment:
+>   - export → offline verification → uninstall → reinstall (empty) → restore → whole-chain verification → automatic re-check → gate preview;
+>   - only the Ed25519 approval of unchanged text was allowed.
+>
+>   Two fail-open paths found in this audit are fixed:
+>   - no marker while a restore was being written;
+>   - a rejected confirm masking a partial restore.
+>
+>   Large restores now run in resumable rounds.
+> - **New FR-L11:** **retired keys by their public half** (`A25_RECORD_TRUSTED_KEYS`): archives and approvals signed by a rotated-out or lost key stay verifiable and restorable without keeping its private key. ✅ tested and live.
+> - **FR-L10 note:** in production one key signs every site (environment variables are per environment), so key loss is handled once by the vendor through FR-L11. Per-site adoption by fingerprint remains available.
+
 ### 2.5 Administration and onboarding
 | ID | Requirement | P | Basis |
 |---|---|---|---|
@@ -85,7 +114,7 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-A4 | **AI settings:** AI on/off, daily budget, model (one of the active models from `list()`; default `claude-haiku-5-5`). | M | models [VERIFIED] 22 Nov |
 | FR-A5 | **Inventory editor:** approved vendors (site-wide), known data categories per project. | M | [PROPOSED] |
 | FR-A6 | **Sample scenario:** load a sample inventory and, with explicit confirmation, create 3 sample work items (benign, review-required, DPIA-likely) in a chosen in-scope project. | M | issue create [VERIFIED] |
-| FR-A7 | Reviewer group and recovery group are configurable, and the existence of each group is validated. | M | [PROPOSED] |
+| FR-A7 | Reviewer group and recovery group are configurable, and the existence of each group is validated. | M | [PROPOSED] **M5 amendment:** restore is Jira-admin only for now; the recovery group is deferred to M8. |
 | FR-A8 | Settings require Jira **Administer** global permission, checked server-side for the calling user. | M | [PROPOSED]; permission check [UNVERIFIED] scope |
 
 ### 2.6 Work-item panel (requester surface)

@@ -95,7 +95,7 @@ describe('Decision form', () => {
 
   it.each([
     ['NOT_REVIEWER', /Only members of the reviewer group/],
-    ['SOD', /another reviewer must decide/],
+    ['SOD', /Another reviewer must decide/],
     ['STALE_EVIDENCE', /Re-check it so the decision is made on the current text/],
     ['CHECKING', /being checked/],
     ['NOT_CONFIGURED', /not configured on this site/],
@@ -164,6 +164,12 @@ describe('History', () => {
     expect(items[1].textContent).toContain('Proportionate with masking.');
     expect(items[2].textContent).toContain('Assigned to Reviewer One by Reviewer Two');
     expect(await axeViolations(container)).toEqual([]);
+  });
+  it('says when an approval was invalidated because the edit could only be checked rule-based', () => {
+    const lessThorough = [{ ...decisions[0], detail: { carried: 'APPROVED', added: {}, escalated: false, from: 'DPIA_LIKELY', to: 'DPIA_LIKELY', reason: 'LESS_THOROUGH_RECHECK', recheck: { approvedWith: 'ai', checkedWith: 'rules' } } }, decisions[1]];
+    render(<History issueKey="SHOP-42" review={review({ decisions: lessThorough, assignments: [] })} client={{ verifyRecord: vi.fn() }} />);
+    expect(screen.getByText(/based on AI-assisted checks, but the edited text could only be checked rule-based/)).toBeTruthy();
+    expect(screen.queryByText(/New since the approval/)).toBeNull();
   });
   it('verifies the signed record on request (reviewers only)', async () => {
     const client = { verifyRecord: vi.fn().mockResolvedValue({ status: 'verified' }) };

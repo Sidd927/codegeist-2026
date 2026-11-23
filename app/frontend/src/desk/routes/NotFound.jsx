@@ -1,7 +1,7 @@
-import Button from '@atlaskit/button/new';
 import { EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
 import { useRouter } from '../router.jsx';
+import { Button } from '../../shared/components/ui.jsx';
 
 export function NotFound() {
   const { navigate } = useRouter();

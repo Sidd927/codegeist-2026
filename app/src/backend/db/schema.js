@@ -157,6 +157,83 @@ export const MIGRATIONS = [
       INDEX idx_gate_events_issue (issue_id, at)
     )`,
   ],
+  // M5 RECORD & RECOVERY. Ed25519 key registry (public keys only; private keys live in encrypted
+  // environment variables), signed key successions, signed checkpoints, a ledger event log
+  // (exports / verifications / restores) and single-use recovery sessions.
+  [
+    'v010_record_keys',
+    `CREATE TABLE IF NOT EXISTS record_keys (
+      kid VARCHAR(20) PRIMARY KEY,
+      alg VARCHAR(10) NOT NULL,
+      public_key VARCHAR(200) NOT NULL,
+      registered_at VARCHAR(30) NOT NULL,
+      self_sig VARCHAR(200) NOT NULL
+    )`,
+  ],
+  [
+    'v011_key_successions',
+    `CREATE TABLE IF NOT EXISTS key_successions (
+      from_kid VARCHAR(20) NOT NULL,
+      to_kid VARCHAR(20) NOT NULL,
+      at VARCHAR(30) NOT NULL,
+      to_sig VARCHAR(200) NOT NULL,
+      from_sig VARCHAR(200) NULL,
+      PRIMARY KEY (from_kid, to_kid)
+    )`,
+  ],
+  [
+    'v012_checkpoints',
+    `CREATE TABLE IF NOT EXISTS checkpoints (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      seq INT NOT NULL,
+      hash CHAR(64) NOT NULL,
+      kid VARCHAR(20) NOT NULL,
+      at VARCHAR(30) NOT NULL,
+      purpose VARCHAR(16) NOT NULL,
+      sig VARCHAR(200) NOT NULL,
+      UNIQUE KEY uq_checkpoints (seq, purpose, kid)
+    )`,
+  ],
+  [
+    'v013_ledger_events',
+    `CREATE TABLE IF NOT EXISTS ledger_events (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      at BIGINT NOT NULL,
+      type VARCHAR(16) NOT NULL,
+      actor VARCHAR(128) NULL,
+      outcome VARCHAR(24) NOT NULL,
+      head_seq INT NULL,
+      digest CHAR(64) NULL,
+      summary MEDIUMTEXT NULL,
+      INDEX idx_ledger_events_type (type, at)
+    )`,
+  ],
+  [
+    'v014_recovery_sessions',
+    `CREATE TABLE IF NOT EXISTS recovery_sessions (
+      token_hash CHAR(64) PRIMARY KEY,
+      actor VARCHAR(128) NOT NULL,
+      digest CHAR(64) NOT NULL,
+      created_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      used_at BIGINT NULL
+    )`,
+  ],
+  // Chunked archive transfers (Custom UI requests are limited to 500 KB, responses to 5 MB).
+  // Chunks are immutable (INSERT IGNORE) and bound to the admin who created the transfer.
+  [
+    'v015_transfer_chunks',
+    `CREATE TABLE IF NOT EXISTS transfer_chunks (
+      transfer_id CHAR(32) NOT NULL,
+      idx INT NOT NULL,
+      kind VARCHAR(10) NOT NULL,
+      actor VARCHAR(128) NOT NULL,
+      data MEDIUMTEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (transfer_id, idx),
+      INDEX idx_transfer_created (created_at)
+    )`,
+  ],
 ];
 
 /** Apply pending migrations. Called only from the migration queue consumer (never per request). */

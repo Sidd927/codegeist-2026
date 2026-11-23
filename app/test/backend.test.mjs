@@ -13,6 +13,7 @@ import { adfToBlocks } from '../src/core/text.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
 import { createReviewService } from '../src/backend/services/review.js';
 import { createGateService } from '../src/backend/services/gate.js';
+import { createLedgerService } from '../src/backend/services/ledger.js';
 
 const silentLog = { info() {}, warn() {}, error() {} };
 const ADF = {
@@ -51,12 +52,13 @@ function fakeJira({ admin = false, deny = false, adminThrows = false, visible = 
 }
 const svc = (opts = {}) => {
   const fake = opts.fake ?? createFakeRepos();
-  const screening = { aiAvailable: false, requestManual: async () => ({ status: 'queued' }) };
+  const screening = { aiAvailable: opts.aiAvailable ?? false, requestManual: async () => ({ status: 'queued' }) };
   const jira = fakeJira(opts);
-  const settings = settingsFromEnv({});
-  const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
-  const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
-  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review, gate });
+  const settings = settingsFromEnv(opts.env ?? {});
+  const ledger = createLedgerService({ repos: fake.repos, log: silentLog, settings, siteId: 'site-test' });
+  const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
+  const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
+  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review, gate, ledger });
 };
 
 // ---- logger: content-free by construction
@@ -72,6 +74,13 @@ test('logger rejects unsafe strings and non-numeric metrics', () => {
 // ---- errors
 test('error envelope hides internal error details and marks retryable codes', () => {
   assert.deepEqual(toEnvelope(new Error('db password=secret')), { ok: false, error: { code: 'INTERNAL', message: 'Something went wrong in Article25. Try again.', retryable: true } });
+  // Final audit: a missing table (first minutes after install) is a retryable SETTING_UP, not a generic failure,
+  // and the raw SQL message is never echoed.
+  const setup = toEnvelope(new Error("Table 'article25.decisions' doesn't exist"));
+  assert.deepEqual([setup.error.code, setup.error.retryable, /article25\.decisions/.test(setup.error.message)], ['SETTING_UP', true, false]);
+  const forgeShape = Object.assign(new Error('Unknown SQL execution error'), { code: 'SQL_EXECUTION_ERROR', context: { debug: { errno: 1146 } } });
+  assert.equal(toEnvelope(forgeShape).error.code, 'SETTING_UP');
+  assert.equal(toEnvelope(Object.assign(new Error('Unknown SQL execution error'), { code: 'SQL_EXECUTION_ERROR' })).error.code, 'INTERNAL');
   assert.equal(toEnvelope(new AppError(ErrorCode.NOT_AUTHORISED)).error.retryable, false);
   assert.deepEqual(ok({ a: 1 }), { ok: true, data: { a: 1 } });
 });
@@ -167,8 +176,20 @@ test('settings are refused for non-admins and when the admin check fails (fail c
   await assert.rejects(svc({ admin: false }).settingsOverview(), (e) => e.code === 'NOT_AUTHORISED');
   await assert.rejects(svc({ adminThrows: true }).settingsOverview(), (e) => e.code === 'NOT_AUTHORISED');
   const s = await svc({ admin: true }).settingsOverview();
-  assert.equal(s.sections.length, 6);
+  // Only sections that exist (the unbuilt "What is already approved" placeholder was removed at the final audit).
+  assert.deepEqual(s.sections.map((x) => x.key), ['scope', 'people', 'ai', 'record', 'gate']);
   assert.equal(s.screening.ai, 'off');
+});
+test('AI shows as on only when switched on, available AND a spending limit is set; spend is reported', async () => {
+  const noCap = await svc({ admin: true, aiAvailable: true, env: { A25_AI_ENABLED: 'true' } }).settingsOverview();
+  assert.equal(noCap.screening.ai, 'off'); // no cap → no AI call is ever made, so the UI must not claim AI
+  assert.deepEqual(noCap.screening.aiSpend, { usedMicros: 0, capMicros: 0 });
+  const fake = createFakeRepos();
+  await fake.repos.spend.reserve({ micros: 1234, capMicros: 5_000_000 });
+  const on = await svc({ admin: true, aiAvailable: true, fake, env: { A25_AI_ENABLED: 'true', A25_AI_SPEND_CAP_USD: '5' } }).settingsOverview();
+  assert.equal(on.screening.ai, 'on');
+  assert.deepEqual(on.screening.aiSpend, { usedMicros: 1234, capMicros: 5_000_000 });
+  assert.equal(on.sections.find((x) => x.key === 'ai').status, 'on');
 });
 test('app context reports roles without personal identifiers', async () => {
   const c = await svc({ admin: true }).appContext('acc-admin');
@@ -181,7 +202,7 @@ test('presenter: queued/screening and failed states never present a result as cu
   assert.equal(presentScreening({ state: 'SCREENED', screened_fp: 'a' }, null).state, 'NOT_SCREENED');
 });
 test('screening, decisions and the workflow gate are on; the register stays off until its milestone', () => {
-  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: true, register: false });
+  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: true, register: false, record: true });
 });
 
 test('version-aware: a stored result from an older pipeline version is shown as rescreening required', () => {

@@ -1,0 +1,39 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="record" data-width="1920" data-height="1080">
+  <div id="record-bg" class="clip" data-start="0" data-duration="18.92" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="record-eb" class="clip" data-start="0.10" data-duration="18.77" data-track-index="2"><div id="record-eb-i" class="eyebrow"><b>05</b>Record</div></div>
+  <div id="record-e1" class="clip" data-start="0.40" data-duration="8.53" data-track-index="1"><div id="record-e1-i" class="" style=""><div class="window" style="left:120px;top:190px;width:1180px;"><img id="record-e1-img" src="assets/shots/crop-record.png" alt=""></div></div></div>
+<div id="record-e2" class="clip" data-start="0.60" data-duration="18.27" data-track-index="1"><div id="record-e2-i" class="cap" style="left:1360px;top:260px;width:460px;">A signed record, <em>Ed25519</em>, in a hash chain.</div></div>
+<div id="record-e3" class="clip" data-start="8.93" data-duration="4.42" data-track-index="1"><div id="record-e3-i" class="" style=""><div style="position:absolute;left:120px;top:190px;width:1680px;padding:34px 40px;background:#14161C;border-radius:14px;font:500 28px/1.55 'IBM Plex Mono';color:#C9CBD3;box-shadow:0 40px 90px rgba(0,0,0,.25)"><div style="color:#8C8F99">$ node verify-archive.mjs archive.json --fingerprint "…"</div><div style="color:#C9CBD3">Trust anchor: pinned key k2d0f1f97948dae7c</div><div style="color:#C9CBD3">Site: (synthetic test site)</div><div style="color:#C9CBD3">Created: 2026-11-23T11:33:29.790Z · head seq 3 · 3 records · 3 decisions</div><div style="color:#C9CBD3">Key k2d0f1f97948dae7c: trusted (anchor)</div><div style="color:#6CCB8F">RESULT: VALID and complete</div></div></div></div>
+<div id="record-e4" class="clip" data-start="13.35" data-duration="5.52" data-track-index="1"><div id="record-e4-i" class="" style=""><div style="position:absolute;left:120px;top:190px;width:1680px;padding:34px 40px;background:#14161C;border-radius:14px;font:500 28px/1.55 'IBM Plex Mono';color:#C9CBD3;box-shadow:0 40px 90px rgba(0,0,0,.25)"><div style="color:#8C8F99">$ node verify-archive.mjs archive-one-word-changed.json --fingerprint "…"</div><div style="color:#C9CBD3">Trust anchor: pinned key k2d0f1f97948dae7c</div><div style="color:#C9CBD3">Site: (synthetic test site)</div><div style="color:#C9CBD3">Created: 2026-11-23T11:33:29.790Z · head seq 3 · 3 records · 3 decisions</div><div style="color:#C9CBD3">Key k2d0f1f97948dae7c: trusted (anchor)</div><div style="color:#FF7A6E">error: archive digest does not match its content (archive was modified)</div><div style="color:#FF7A6E">error: decision 10001#1: row changed</div><div style="color:#FF7A6E">RESULT: NOT VALID</div></div></div></div>
+<div id="record-e5" class="clip" data-start="10.83" data-duration="8.04" data-track-index="1"><div id="record-e5-i" class="" style=""><div class="note" style="left:120px;top:760px;width:1600px">Offline. No Jira access. No secrets. Just the public key you pinned.</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#record-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.40);
+tl.fromTo("#record-e1-img", {scale: 1}, {scale: 1.03, duration: 8.53, ease: "none", transformOrigin: "50% 40%"}, 0.40);
+tl.to("#record-e1-i", {opacity: 0, duration: 0.4, ease: "power2.in"}, 8.63);
+tl.fromTo("#record-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.60);
+tl.fromTo("#record-e3", {y: 0}, {y: -14, duration: 4.42, ease: "none"}, 8.93);
+tl.fromTo("#record-e3-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 8.93);
+tl.fromTo("#record-e4", {y: 0}, {y: -14, duration: 5.52, ease: "none"}, 13.35);
+tl.fromTo("#record-e4-i", {opacity: 0}, {opacity: 1, duration: 0.7, ease: "power2.out"}, 13.35);
+tl.fromTo("#record-e5-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 10.83);
+tl.fromTo("#record-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["record"] = tl;
+</script>
+</template>

@@ -1,17 +1,19 @@
 // M4 ENFORCE tests: the gate policy (pure) and the validator path through the REAL screening,
 // review, desk and gate services over in-memory repositories. Synthetic data only. Run: npm test
 import { test } from 'node:test';
+import { environmentIdOf } from '../src/backend/services/gate.js';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { evaluateGate, verifyDecisionRecord, applyMode, analyseCoverage, REASONS, jiraMessage, GATE_POLICY_VERSION } from '../src/core/gate.js';
 import { canonical, buildRecord, genesis } from '../src/core/chain-core.js';
 import { decisionIdOf } from '../src/core/review.js';
 import { AppError, ErrorCode } from '../src/backend/lib/errors.js';
-import { world, decision, adf, KEY, REV1, REV2, REPORTER, OUTSIDER, ADMIN, APPROVE, codeOf, nextRid } from './world.mjs';
+import { world, decision, adf, KEY, REV1, REV2, REPORTER, OUTSIDER, ADMIN, APPROVE, codeOf, nextRid, newRecordKey } from './world.mjs';
 
 const FP = 'a'.repeat(64);
 const FP2 = 'b'.repeat(64);
-const SIGN = { signingKey: KEY, siteId: 'site-test' };
+// Legacy (v2, HMAC) records are verified with the legacy key; v3 records with trusted public keys.
+const SIGN = { siteId: 'site-test', keys: new Map(), hmacKey: KEY };
 const ALLOWING = Object.entries(REASONS).filter(([, r]) => r.allow).map(([k]) => k);
 
 /** A signed decision row + chain record, exactly as the review service would store them. */
@@ -100,9 +102,9 @@ test('policy: record integrity — edited row, forged/mismatched record, wrong k
   // A self-consistent forgery: valid row hash, record re-signed with the wrong key.
   const forged = { ...record, sig: createHmac('sha256', 'guess').update(canonical(record)).digest('hex') };
   assert.equal(verifyDecisionRecord(row, forged, SIGN), 'RECORD_INVALID');
-  assert.equal(verifyDecisionRecord(row, record, { signingKey: null, siteId: 'site-test' }), 'SIGNING_NOT_CONFIGURED');
-  assert.equal(verifyDecisionRecord(row, record, { signingKey: KEY, siteId: null }), 'SIGNING_NOT_CONFIGURED');
-  assert.equal(gate({ item: ITEM(), latest: row, latestHuman: row, latestRecord: record, humanRecord: record, signing: { signingKey: null, siteId: null } }).reason, 'SIGNING_NOT_CONFIGURED');
+  assert.equal(verifyDecisionRecord(row, record, { siteId: 'site-test', keys: new Map(), hmacKey: null }), 'SIGNING_NOT_CONFIGURED');
+  assert.equal(verifyDecisionRecord(row, record, { siteId: null, keys: new Map(), hmacKey: KEY }), 'SIGNING_NOT_CONFIGURED');
+  assert.equal(gate({ item: ITEM(), latest: row, latestHuman: row, latestRecord: record, humanRecord: record, signing: { siteId: null, keys: new Map(), hmacKey: null } }).reason, 'SIGNING_NOT_CONFIGURED');
 });
 
 test('policy: unknown or inconsistent inputs fail closed', () => {
@@ -248,16 +250,20 @@ test('missing signing key or unknown site never bypasses the gate', async () => 
   await w.screen(10001);
   await setMode(w, 'enforce');
   await decision(w, REV1, 'SHOP-1', APPROVE);
-  assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, signingKey: null } })).reason, 'SIGNING_NOT_CONFIGURED');
+  assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, signingKey: null, recordKey: null } })).reason, 'SIGNING_NOT_CONFIGURED');
   assert.equal((await validate(w, 'SHOP-1', { siteId: null })).reason, 'SIGNING_NOT_CONFIGURED');
   assert.equal((await validate(w, 'SHOP-1', { siteId: 'another-site' })).reason, 'RECORD_INVALID');
-  assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, signingKey: 'rotated-key-without-migration' } })).reason, 'RECORD_INVALID');
+  // The record key replaced WITHOUT a handover (no previous key, no adopted predecessor): old approvals are not trusted.
+  assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, recordKey: newRecordKey() } })).reason, 'RECORD_KEY_UNTRUSTED');
+  // A legacy-mode deployment (HMAC only) cannot verify Ed25519 records it does not trust either.
+  assert.equal((await validate(w, 'SHOP-1', { settings: { ...w.settings, recordKey: null } })).outcome.result, false);
 });
 
-test('infrastructure failures block even in monitor mode (mode unknown) and are audited when possible', async () => {
+test('infrastructure failures block when enforcing or when the mode cannot be read, and are audited when possible', async () => {
   const w = await world();
   await w.screen(10001);
   await decision(w, REV1, 'SHOP-1', APPROVE);
+  await setMode(w, 'enforce');
   w.fake.failures.gateSnapshot = true; // SQL unavailable
   let r = await validate(w, 'SHOP-1');
   assert.deepEqual([r.outcome.result, r.reason], [false, 'SYSTEM_UNAVAILABLE']);
@@ -276,7 +282,28 @@ test('infrastructure failures block even in monitor mode (mode unknown) and are 
   w.jiraFailure.current = new TypeError('unexpected'); // any other function failure
   assert.equal((await validate(w, 'SHOP-1')).reason, 'SYSTEM_UNAVAILABLE');
   w.jiraFailure.current = null;
+  // The mode itself cannot be read either: block (fail closed).
+  w.fake.failures.gateSnapshot = true;
+  w.fake.failures.settingsRead = true;
+  assert.equal((await validate(w, 'SHOP-1')).outcome.result, false);
+  w.fake.failures.gateSnapshot = false;
+  w.fake.failures.settingsRead = false;
   assert.ok(w.fake.gev.every((e) => e.verdict === 'block' && e.mode === 'unknown'));
+});
+
+test('monitor mode never blocks, even when the evaluation fails (the M5 deploy incident); the outage is recorded as "would block"', async () => {
+  const w = await world();
+  await w.screen(10001);
+  await decision(w, REV1, 'SHOP-1', APPROVE);
+  w.fake.failures.schemaMissing = true; // new tables not migrated yet; the M4 settings table is readable
+  let r = await validate(w, 'SHOP-1');
+  assert.deepEqual([r.outcome.result, r.reason], [true, 'SYSTEM_UNAVAILABLE']);
+  w.fake.failures.schemaMissing = false;
+  w.jiraFailure.current = new AppError(ErrorCode.UPSTREAM_UNAVAILABLE);
+  r = await validate(w, 'SHOP-1');
+  assert.equal(r.outcome.result, true);
+  w.jiraFailure.current = null;
+  assert.ok(w.fake.gev.every((e) => e.verdict === 'would_block' && e.mode === 'monitor' && e.reason === 'SYSTEM_UNAVAILABLE'));
 });
 
 test('a failing audit write never changes the verdict (allow stays allow, block stays block)', async () => {
@@ -404,6 +431,14 @@ test('health: never claims protection without verified coverage and working depe
   const otherModule = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/a25-validator-lambda` } };
   w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [otherApp, otherModule, { ruleKey: 'article25-gate' }])])], statuses: ST };
   assert.equal((await w.gateFor(ADMIN, { appId: APP }).health()).coverage.status, 'none');
+  // Final audit: a rule that calls ANOTHER environment of this app (e.g. development, while this is a
+  // staging or recovery-test installation on the same site) is not this installation's coverage.
+  w.workflowFixture.current = { workflows: [wf([t(11, 'DIRECTED', 's-ip', ['s-todo'], [GATE_RULE])])], statuses: ST };
+  assert.equal((await w.gateFor(ADMIN, { appId: APP, environmentId: ENV }).health()).coverage.status, 'complete');
+  assert.equal((await w.gateFor(ADMIN, { appId: APP, environmentId: '00000000-0000-4000-8000-000000000002' }).health()).coverage.status, 'none');
+  assert.equal(environmentIdOf({ environmentId: ENV }), ENV);
+  assert.equal(environmentIdOf({ localId: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/desk` }), ENV);
+  assert.equal(environmentIdOf({}), null);
   w.workflowFixture.current = Object.assign(new AppError(ErrorCode.NOT_AUTHORISED), { status: 403 });
   h = (await d.gateOverview(ADMIN)).health;
   assert.deepEqual([h.overall, h.coverage.status, h.coverage.error], ['unknown', 'unknown', 'not_permitted']);
@@ -411,7 +446,7 @@ test('health: never claims protection without verified coverage and working depe
   h = (await d.gateOverview(ADMIN)).health;
   assert.deepEqual([h.overall, h.checks.database], ['not_ready', 'migration_missing']);
   w.fake.failures.schemaMissing = false;
-  h = await w.gateFor(ADMIN, { settings: { ...w.settings, signingKey: null } }).health();
+  h = await w.gateFor(ADMIN, { settings: { ...w.settings, signingKey: null, recordKey: null } }).health();
   assert.deepEqual([h.overall, h.checks.signing], ['not_ready', 'missing']);
 });
 

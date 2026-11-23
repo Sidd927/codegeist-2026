@@ -1,0 +1,20 @@
+# Storyboard (as built: `film/build.py` → `film/index.html` + `film/compositions/*.html`)
+
+Times are from the rendered film. "Real" means a capture of Article25's own UI (see the shot list for its source); "motion" means a graphic that explains and never imitates the product.
+
+| # | Time | Scene | Picture | Words on screen | Sound |
+|---|---|---|---|---|---|
+| 1 | 0:00.0–0:17.6 | **Hook** (ink) | Motion: "Every week, in every Jira" (visible on frame 0, so it works as the thumbnail); two serif lines arrive on their words; amber resolution line | "A session replay tool here." / "A new messaging vendor there." / "Nobody meant to skip the privacy review. *It just wasn't part of the workflow.*" | VO |
+| 2 | 0:17.6–0:29.5 | **Tension** (ink) | Motion: an e-mail approval card ("Looks fine to me — approved"); a red-underlined added line; green "Still approved" chip pops | "Weeks later the work changes: + send shopper email addresses to a new vendor" | VO, whoosh, pop |
+| 3 | 0:29.5–0:42.3 | **Reveal** (paper) | The app's real icon; wordmark "Article25"; tagline with amber highlight; the five steps pop in on their spoken words | "Privacy review that actually enforces the decision." · 01 Detect … 05 Record | VO, five pops |
+| 4 | 0:42.3–0:59.5 | **Set up** | Real: Get started on a fresh install (to do, mixed states), slow push towards "Protect a workflow transition" | "Installing protects *nothing* by itself." · note on the live checks · red chip "Not protected" | VO, pop |
+| 5 | 0:59.5–1:26.2 | **Detect** | Left: SHOP-214's title. Right, real: the issue panel (developer's view), DPIA likely, quoted findings, rule-based label | Chips: Health data · Systematic monitoring · DPIA likely · "Every finding quotes *the exact words* it is based on." · "Each result names its mode: AI-assisted or rule-based. This one: rule-based." | VO, pops |
+| 6 | 1:26.2–1:46.5 | **Review and decide** | Real: the review workspace (text + margin); cross-fade to the same view with "Health data" selected (its quote highlighted); the view shrinks top-left as the real decision form slides in (Approve with conditions chosen); the form scrolls to show the condition and rationale | "Bound to *this exact text* — and signed." · conditions note | VO, whoosh |
+| 7 | 1:46.5–1:55.7 | **Separation of duties** | Real: the guidance "Another reviewer must decide" for the reporter | "You can't approve *your own work*." | VO |
+| 8 | 1:55.7–2:08.6 | **Enforce** | Real, **live Jira capture**: "Transition failed: Article25: This work item needs a privacy review…" (M4 enforcement test) | "No approval? *The transition is refused.*" · "Captured live in Jira." | VO |
+| 9 | 2:08.6–2:23.5 | **Monitoring → Enforcing** | Real: Settings → Workflow gate (enforcing, verified coverage, recent checks) | Chips: Monitoring → Enforcing · notes | VO, pops |
+| 10 | 2:23.6–2:45.4 | **Invalidation** | Real, side by side: BEFORE (Approved · Allowed now) → AFTER (Approval invalidated · Blocked now) | The added sentence in amber · chips: New: contact details · Approval invalidated · Gate: blocked again | VO, pops |
+| 11 | 2:45.4–3:04.3 | **Record** | Real: the Record page (Ed25519 records), then the real verifier output in a terminal: VALID and complete → (one word changed) NOT VALID | "A signed record, *Ed25519*, in a hash chain." · "Offline. No Jira access. No secrets. Just the public key you pinned." | VO |
+| 12 | 3:04.3–3:21.4 | **Recovery** | Motion: three numbered steps (Uninstall → Reinstall → Restore). Real: the record settings after a verified restore | "Only approvals of *unchanged text* count." | VO |
+| 13 | 3:21.4–3:45.2 | **Under the hood** | Motion: six component cards (Jira change → Rules engine; Optional AI; Forge SQL; Workflow validator; Ed25519 ledger) pop in on their words | "No external services · no data leaves Atlassian's platform · scopes: read-only Jira" | VO, pops |
+| 14 | 3:45.2–3:59.2 | **Close** (ink) | The icon, wordmark and promise; platform line | "Article25 · Privacy review that actually enforces the decision. · Built on Atlassian Forge · Codegeist 2026" | VO, riser, impact |

@@ -6,13 +6,19 @@ import { createScreeningService } from '../src/backend/services/screening.js';
 import { createReviewService } from '../src/backend/services/review.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
 import { createGateService } from '../src/backend/services/gate.js';
+import { createLedgerService } from '../src/backend/services/ledger.js';
+import { generateKeyPairSync } from 'node:crypto';
 import { createLlmAdapter } from '../src/backend/adapters/llm.js';
+import { createPricing } from '../src/backend/adapters/pricing.js';
 import { configFor, settingsFromEnv } from '../src/backend/lib/config.js';
 import { AppError, ErrorCode } from '../src/backend/lib/errors.js';
 
 export const silent = { info() {}, warn() {}, error() {} };
 export const adf = (t) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: t }] }] });
 export const KEY = 'test-signing-key-0123456789abcdef0123456789abcdef';
+/** A fresh Ed25519 private key (base64 PKCS#8 DER), in memory only — test runs never persist keys. */
+export const newRecordKey = () => generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64');
+export const RECORD_KEY = newRecordKey();
 export const REV1 = 'acc-rev-1';
 export const REV2 = 'acc-rev-2';
 export const INACTIVE = 'acc-rev-old';
@@ -21,7 +27,9 @@ export const DEV = 'acc-dev';
 export const OUTSIDER = 'acc-outsider';
 export const ADMIN = 'acc-admin';
 
-export function world({ signingKey = KEY, sod = 'on' } = {}) {
+// `chat` (optional): a MOCKED LLM transport, so tests can switch between AI-assisted and rule-based
+// checks. No billable calls are ever made. `aiEnv` overrides the AI limits.
+export function world({ signingKey = KEY, recordKey = RECORD_KEY, recordKeyPrevious = null, sod = 'on', siteId = 'site-test', chat = null, aiEnv = {} } = {}) {
   const fake = createFakeRepos();
   let now = 1_800_000_000_000;
   const clock = () => now;
@@ -67,24 +75,31 @@ export function world({ signingKey = KEY, sod = 'on' } = {}) {
     statusName: async (id) => ({ 1: 'To Do', 3: 'In Progress', 10001: 'Done' })[id] ?? null,
     searchWorkflowsWithTransitions: async () => { if (workflowFixture.current instanceof Error) throw workflowFixture.current; return workflowFixture.current; },
   });
-  const env = { A25_AI_ENABLED: 'false', ...(signingKey ? { A25_SIGNING_KEY: signingKey } : {}) };
+  const env = { A25_AI_ENABLED: chat ? 'true' : 'false', ...(chat ? { A25_AI_SPEND_CAP_USD: '5', A25_AI_DAILY_BUDGET: '300' } : {}), ...aiEnv, ...(signingKey ? { A25_SIGNING_KEY: signingKey } : {}), ...(recordKey ? { A25_RECORD_SIGNING_KEY: recordKey } : {}), ...(recordKeyPrevious ? { A25_RECORD_SIGNING_KEY_PREVIOUS: recordKeyPrevious } : {}) };
   // Separation of duties is an audited admin setting (settings_events); seed it directly for tests.
   if (sod === 'off') fake.sev.push({ setting: 'review.separation_of_duties', seq: 1, value: 'off', changed_by: ADMIN, changed_at: 1, request_id: 'seed-sod-off', note: null });
   const settings = settingsFromEnv(env);
-  const reviewFor = (actor) => createReviewService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId: 'site-test' });
+  const rescreened = [];
+  const ledgerFor = (over = {}) => createLedgerService({ repos: fake.repos, log: silent, clock, settings: over.settings ?? settings, siteId: over.siteId === undefined ? siteId : over.siteId, rescreen: async (id) => rescreened.push(id) });
+  const reviewFor = (actor, ledger = ledgerFor()) => createReviewService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId, ledger });
   const queue = [];
   const screening = createScreeningService({
-    repos: fake.repos, jira: jiraFor(null), llm: createLlmAdapter({ chat: null, model: 'claude-haiku-5-5', timeoutMs: 1000 }), queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings,
+    repos: fake.repos, jira: jiraFor(null), llm: createLlmAdapter({ chat, model: 'claude-haiku-5-5', timeoutMs: 1000 }), queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings,
+    pricing: createPricing(async () => ({ models: [{ model: 'claude-haiku-5-5', pricing: { inputCreditsPerMillionTokens: 5, outputCreditsPerMillionTokens: 5 } }] })),
     onCompleted: (args) => reviewFor(null).onScreeningCompleted(args),
   });
-  const gateFor = (actor, over = {}) => createGateService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId: 'site-test', ...over });
-  const desk = (actor) => createDeskServices({ jira: jiraFor(actor), config: configFor('DEVELOPMENT'), log: silent, repos: fake.repos, screening, settings, review: reviewFor(actor), gate: gateFor(actor) });
+  // Overrides of settings/siteId rebuild a matching ledger (keys come from settings + site id).
+  const gateFor = (actor, over = {}) => createGateService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId, ledger: ledgerFor(over), ...over });
+  const desk = (actor, over = {}) => {
+    const ledger = ledgerFor(over);
+    return createDeskServices({ jira: jiraFor(actor), config: configFor('DEVELOPMENT'), log: silent, repos: fake.repos, screening, settings: over.settings ?? settings, review: reviewFor(actor, ledger), gate: gateFor(actor, over), ledger });
+  };
   async function screen(id) {
     await screening.onIssueEvent({ issueId: String(id), issueKey: issues[id].key, projectKey: issues[id].projectKey, contentChange: true });
     while (queue.length) await screening.processJob(queue.shift());
     now += 60_000;
   }
-  return { fake, issues, members, desk, reviewFor, gateFor, screen, settings, groupCalls, admins, workflowFixture, jiraFailure, jiraFor, advance: (ms) => (now += ms), clock };
+  return { fake, issues, members, desk, reviewFor, gateFor, ledgerFor, screen, settings, groupCalls, admins, workflowFixture, jiraFailure, jiraFor, rescreened, siteId, advance: (ms) => (now += ms), clock };
 }
 
 let rid = 0;

@@ -1,0 +1,39 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="tech" data-width="1920" data-height="1080">
+  <div id="tech-bg" class="clip" data-start="0" data-duration="23.83" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="tech-eb" class="clip" data-start="0.10" data-duration="23.68" data-track-index="2"><div id="tech-eb-i" class="eyebrow"><b>Under the hood</b>Atlassian Forge</div></div>
+  <div id="tech-e1" class="clip" data-start="1.81" data-duration="21.97" data-track-index="1"><div id="tech-e1-i" class="" style=""><div style="position:absolute;left:140px;top:300px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Jira change</div><div class="note" style="position:static;margin-top:6px">trigger + queue</div></div></div></div>
+<div id="tech-e2" class="clip" data-start="5.29" data-duration="18.49" data-track-index="1"><div id="tech-e2-i" class="" style=""><div style="position:absolute;left:560px;top:300px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Rules engine</div><div class="note" style="position:static;margin-top:6px">versioned · sets the outcome</div></div></div></div>
+<div id="tech-e3" class="clip" data-start="8.92" data-duration="14.86" data-track-index="1"><div id="tech-e3-i" class="" style=""><div style="position:absolute;left:560px;top:520px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Optional AI</div><div class="note" style="position:static;margin-top:6px">Forge LLM · must quote the text</div></div></div></div>
+<div id="tech-e4" class="clip" data-start="15.57" data-duration="8.21" data-track-index="1"><div id="tech-e4-i" class="" style=""><div style="position:absolute;left:980px;top:300px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Forge SQL</div><div class="note" style="position:static;margin-top:6px">Article25’s own records</div></div></div></div>
+<div id="tech-e5" class="clip" data-start="13.00" data-duration="10.78" data-track-index="1"><div id="tech-e5-i" class="" style=""><div style="position:absolute;left:1400px;top:300px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Workflow validator</div><div class="note" style="position:static;margin-top:6px">allow · block · fail closed</div></div></div></div>
+<div id="tech-e6" class="clip" data-start="19.12" data-duration="4.66" data-track-index="1"><div id="tech-e6-i" class="" style=""><div style="position:absolute;left:980px;top:520px;width:360px;padding:26px 28px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 20px 50px rgba(30,25,10,.12)"><div style="font:600 34px 'EB Garamond';color:#17181C">Ed25519 ledger</div><div class="note" style="position:static;margin-top:6px">signed · chained · exportable</div></div></div></div>
+<div id="tech-e7" class="clip" data-start="20.12" data-duration="3.66" data-track-index="1"><div id="tech-e7-i" class="" style=""><div class="note" style="left:140px;top:820px;width:1640px;color:#17181C;font-weight:600">No external services · no data leaves Atlassian’s platform · scopes: read-only Jira</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#tech-e1-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 1.81);
+tl.fromTo("#tech-e2-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 5.29);
+tl.fromTo("#tech-e3-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 8.92);
+tl.fromTo("#tech-e4-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 15.57);
+tl.fromTo("#tech-e5-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 13.00);
+tl.fromTo("#tech-e6-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 19.12);
+tl.fromTo("#tech-e7-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 20.12);
+tl.fromTo("#tech-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["tech"] = tl;
+</script>
+</template>

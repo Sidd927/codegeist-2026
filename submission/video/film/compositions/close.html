@@ -1,0 +1,36 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="close" data-width="1920" data-height="1080">
+  <div id="close-bg" class="clip" data-start="0" data-duration="14.02" data-track-index="0"><div class="ground-night"></div></div>
+  
+  <div id="close-e1" class="clip" data-start="0.50" data-duration="13.47" data-track-index="1"><div id="close-e1-i" class="" style=""><div style="position:absolute;left:0;right:0;top:300px;text-align:center"><img src="assets/article25-icon.svg" style="width:120px;height:120px" alt=""></div></div></div>
+<div id="close-e2" class="clip" data-start="0.70" data-duration="13.27" data-track-index="1"><div id="close-e2-i" class="" style=""><div style="position:absolute;left:0;right:0;top:450px;text-align:center;font:600 128px/1 'EB Garamond';color:#F3F0E8">Article25</div></div></div>
+<div id="close-e3" class="clip" data-start="1.42" data-duration="12.55" data-track-index="1"><div id="close-e3-i" class="" style=""><div style="position:absolute;left:0;right:0;top:610px;text-align:center;font:500 42px/1.3 'EB Garamond';color:#B9BBC3">Privacy review that <span style="color:#E9B93A">actually enforces the decision.</span></div></div></div>
+<div id="close-e4" class="clip" data-start="5.28" data-duration="8.69" data-track-index="1"><div id="close-e4-i" class="" style=""><div style="position:absolute;left:0;right:0;top:760px;text-align:center;font:600 28px Inter;letter-spacing:.2em;color:#9A9DA7;text-transform:uppercase">Built on Atlassian Forge · Codegeist 2026</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#close-e1", {y: 0}, {y: -14, duration: 13.47, ease: "none"}, 0.50);
+tl.fromTo("#close-e1-i", {opacity: 0, scale: .86}, {opacity: 1, scale: 1, duration: .45, ease: "back.out(2)"}, 0.50);
+tl.fromTo("#close-e2", {y: 0}, {y: -14, duration: 13.27, ease: "none"}, 0.70);
+tl.fromTo("#close-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.70);
+tl.fromTo("#close-e3", {y: 0}, {y: -14, duration: 12.55, ease: "none"}, 1.42);
+tl.fromTo("#close-e3-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 1.42);
+tl.fromTo("#close-e4", {y: 0}, {y: -14, duration: 8.69, ease: "none"}, 5.28);
+tl.fromTo("#close-e4-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 5.28);
+window.__timelines["close"] = tl;
+</script>
+</template>

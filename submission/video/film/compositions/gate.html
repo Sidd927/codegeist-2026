@@ -1,0 +1,32 @@
+<template>
+<style>
+#root { position: absolute; inset: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+.ground-paper { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #FAF8F3 0%, #F3F0E8 55%, #E7E2D6 100%); }
+.ground-night { position: absolute; inset: 0; background: radial-gradient(110% 90% at 50% 35%, #1B1D25 0%, #121318 60%, #0B0C10 100%); }
+.eyebrow { position: absolute; left: 120px; top: 84px; font: 700 28px/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #5E6068; }
+.eyebrow b { color: #8A5A00; font-weight: 700; margin-right: 14px; }
+.window { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.04), 0 40px 90px rgba(30,25,10,.20); overflow: hidden; border: 1px solid rgba(0,0,0,.08); }
+.window img { display: block; width: 100%; height: auto; }
+.cap { position: absolute; font: 600 46px/1.15 'EB Garamond', serif; color: #17181C; letter-spacing: -.01em; }
+.cap em { font-style: normal; background: linear-gradient(transparent 62%, rgba(233,185,58,.55) 62%); }
+.note { position: absolute; font: 500 28px/1.4 'Inter', sans-serif; color: #5E6068; }
+.chip { position: absolute; font: 600 28px/1 'Inter', sans-serif; padding: 12px 18px; border-radius: 10px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+<div id="root" data-composition-id="gate" data-width="1920" data-height="1080">
+  <div id="gate-bg" class="clip" data-start="0" data-duration="12.96" data-track-index="0"><div class="ground-paper"></div></div>
+  <div id="gate-eb" class="clip" data-start="0.10" data-duration="12.81" data-track-index="2"><div id="gate-eb-i" class="eyebrow"><b>04</b>Enforce</div></div>
+  <div id="gate-e1" class="clip" data-start="0.50" data-duration="12.41" data-track-index="1"><div id="gate-e1-i" class="" style=""><div class="window" style="left:980px;top:120px;width:700px;"><img id="gate-e1-img" src="assets/shots/jira-transition-failed.jpg" alt=""></div></div></div>
+<div id="gate-e2" class="clip" data-start="4.50" data-duration="8.41" data-track-index="1"><div id="gate-e2-i" class="cap" style="left:120px;top:330px;width:780px;">No approval? <em>The transition is refused.</em></div></div>
+<div id="gate-e3" class="clip" data-start="0.60" data-duration="12.31" data-track-index="1"><div id="gate-e3-i" class="" style=""><div class="note" style="left:120px;top:520px;width:760px">Jira’s workflow asks Article25’s validator before work starts. Captured live in Jira.</div></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#gate-e1-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.50);
+tl.fromTo("#gate-e1-img", {scale: 1}, {scale: 1.04, duration: 12.41, ease: "none", transformOrigin: "40% 85%"}, 0.50);
+tl.fromTo("#gate-e2-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 4.50);
+tl.fromTo("#gate-e3-i", {opacity: 0, y: 28}, {opacity: 1, y: 0, duration: 0.7, ease: "power3.out"}, 0.60);
+tl.fromTo("#gate-eb-i", {opacity: 0, x: -18}, {opacity: 1, x: 0, duration: .6, ease: "power3.out"}, 0.15);
+window.__timelines["gate"] = tl;
+</script>
+</template>

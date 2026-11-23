@@ -1,10 +1,8 @@
 // Standard async states (UX_DESIGN_SPEC §4): loading skeletons, error with retry, empty state,
 // and the status header used by the panel and the workspace.
-import Lozenge from '@atlaskit/lozenge';
-import SectionMessage from '@atlaskit/section-message';
-import Button from '@atlaskit/button/new';
 import { stateDisplay } from '../states.js';
 import { copy } from '../copy/en.js';
+import { Button, Lozenge, SectionMessage } from './ui.jsx';
 
 export function Skeleton({ lines = 3, label = copy.common.loading }) {
   return (
@@ -18,10 +16,12 @@ export function Skeleton({ lines = 3, label = copy.common.loading }) {
 }
 
 export function ErrorState({ title = copy.common.errorTitle, error, onRetry }) {
+  // The first minute after install or upgrade is not a failure: show it as information.
+  const settingUp = error?.code === 'SETTING_UP';
   return (
     <SectionMessage
-      appearance="error"
-      title={title}
+      appearance={settingUp ? 'information' : 'error'}
+      title={settingUp ? copy.common.settingUpTitle : title}
       actions={error?.retryable !== false && onRetry ? [<Button key="retry" onClick={onRetry}>{copy.common.retry}</Button>] : []}
     >
       <p role="alert">{error?.message ?? copy.common.errorTitle}</p>

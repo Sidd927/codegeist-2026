@@ -3,9 +3,9 @@
 // (reviewer group, active account, optimistic sequence) — this control only reflects them.
 // Reviewers are found by name search; the server returns only active reviewer-group members.
 import { useState } from 'react';
-import Button from '@atlaskit/button/new';
 import { api, newRequestId } from '../../shared/api.js';
 import { copy } from '../../shared/copy/en.js';
+import { Button } from '../../shared/components/ui.jsx';
 
 const A = copy.review.assignment;
 

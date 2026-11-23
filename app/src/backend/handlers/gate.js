@@ -2,13 +2,13 @@
 // Jira passes { issue: { key }, configuration, transition: { from, to, modifiedFields } } and no
 // user identity, so the gate reads as the app. The service never throws; this wrapper also
 // guarantees a fail-closed answer if construction itself fails.
-import { createGateService } from '../services/gate.js';
+import { createGateService, environmentIdOf } from '../services/gate.js';
 import { createJiraAdapter } from '../adapters/jira.js';
 import * as repos from '../repositories/sql-repositories.js';
 import { configFor, settingsFromEnv } from '../lib/config.js';
 import { log } from '../lib/logger.js';
 import { jiraMessage } from '../../core/gate.js';
-import { siteIdOf, requestMigration } from './events.js';
+import { siteIdOf, requestMigration, buildLedger } from './events.js';
 
 const shapeOf = (o) => (o && typeof o === 'object' ? Object.keys(o).sort().join('.').slice(0, 64) : typeof o);
 
@@ -20,9 +20,11 @@ export function buildGate(context, overrides = {}) {
     repos,
     jira: createJiraAdapter({ timeoutMs: Math.min(config.upstreamTimeoutMs, 5000) }),
     log,
-    settings: { ...settings, signingKey: siteId ? settings.signingKey : null },
+    settings,
     siteId,
+    ledger: buildLedger(siteId),
     appId: 'a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1',
+    environmentId: environmentIdOf(context),
     ...overrides,
   });
 }

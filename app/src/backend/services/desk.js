@@ -3,6 +3,7 @@
 //  - every read of findings or review data is preceded by an AS-USER Jira check;
 //  - account ids leave the server only for reviewers (who need them to assign); others see names only;
 //  - all review rules (who may decide/assign, binding, concurrency) live in services/review.js.
+import { randomBytes } from 'node:crypto';
 import { AppError, ErrorCode } from '../lib/errors.js';
 import { FEATURES, APP_VERSION } from '../lib/config.js';
 import { adfToBlocks } from '../../core/text.js';
@@ -22,7 +23,12 @@ const VIEW_FILTER = {
   all: () => true,
 };
 
-export function createDeskServices({ jira, config, log, repos, screening, settings, review, gate }) {
+const EXPORT_CHUNK = 1_000_000; // chars per download chunk (≤ ~3 MB UTF-8; responses are limited to 5 MB)
+const UPLOAD_CHUNK = 100_000; // chars per upload chunk (≤ ~300 KB UTF-8; requests are limited to 500 KB)
+const MAX_CHUNKS = 200;
+const TRANSFER_ID = /^[0-9a-f]{32}$/;
+
+export function createDeskServices({ jira, config, log, repos, screening, settings, review, gate, ledger }) {
   async function safeIsAdmin() {
     try {
       return await jira.isJiraAdmin();
@@ -31,7 +37,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return false; // fail closed
     }
   }
-  const aiActive = () => settings.aiEnabled && screening.aiAvailable === true;
+  // AI is only ever called with a spending limit configured (screening.extract), so without one it is off.
+  const aiActive = () => settings.aiEnabled && settings.aiSpendCapMicros > 0 && screening.aiAvailable === true;
 
   /** As-user read and the stored screening in parallel; SQL data is only used after the read succeeds. */
   async function readWithScreening(idOrKey, storedIssueId) {
@@ -52,8 +59,11 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   }
   const person = (people, id, withId) => (id ? { ...(withId ? { id } : {}), name: people.get(id)?.displayName || 'Unknown user', active: people.get(id)?.active ?? null } : null);
 
-  function presentDecision(d, people, withId) {
+  function presentDecision(d, people, withId, anchors = new Map()) {
+    const a = anchors.get(d.decision_id);
     return {
+      // Signature status of this decision's record (no key material; kid is a public key id).
+      record: a ? { seq: a.seq, format: a.record?.v === 3 ? 'ed25519' : a.record?.v === 2 ? 'legacy' : 'unknown', kid: a.record?.kid ?? null } : null,
       seq: d.seq,
       kind: d.kind,
       decision: d.decision,
@@ -64,7 +74,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       decidedAt: d.decided_at,
       outcome: d.outcome,
       contentRef: String(d.fp).slice(0, 8), // short evidence-binding reference (not personal data)
-      detail: d.detail ? { carried: d.detail.carried ?? null, added: d.detail.added ?? {}, escalated: d.detail.escalated ?? false, from: d.detail.from ?? null, to: d.detail.to ?? null } : null,
+      detail: d.detail ? { carried: d.detail.carried ?? null, added: d.detail.added ?? {}, escalated: d.detail.escalated ?? false, from: d.detail.from ?? null, to: d.detail.to ?? null, reason: d.detail.reason ?? null, recheck: d.detail.recheck ?? null } : null,
     };
   }
 
@@ -72,23 +82,29 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     const [isReviewer, sodOn] = await Promise.all([review.isReviewer(actorId), review.separationOfDutiesOn()]);
     const currentFp = buildScreeningText(doc).fingerprint;
     const r = await review.reviewOf(doc.id, { item: stored.row, currentFp });
-    const people = await peopleMap([...r.decisions.map((d) => d.decided_by), ...r.assignments.flatMap((a) => [a.assignee, a.assigned_by])]);
+    const [people, anchorRows] = await Promise.all([
+      peopleMap([...r.decisions.map((d) => d.decided_by), ...r.assignments.flatMap((a) => [a.assignee, a.assigned_by])]),
+      repos.chain.forDecisions(r.decisions.map((d) => d.decision_id)).catch(() => []),
+    ]);
+    const anchors = new Map(anchorRows.map((x) => [x.decisionId, x]));
     const sameContent = Boolean(stored.row && stored.row.state === 'SCREENED' && stored.row.screened_fp === currentFp && view.result);
     let decideReason = null;
     if (!isReviewer) decideReason = 'NOT_REVIEWER';
-    else if (!settings.signingKey) decideReason = 'NOT_CONFIGURED';
+    else if (ledger.mode === 'none') decideReason = 'NOT_CONFIGURED';
     else if (sodOn && (doc.reporterId === actorId || doc.assigneeId === actorId)) decideReason = 'SOD';
     else if (!sameContent) decideReason = view.state === 'SCREENING' ? 'CHECKING' : 'STALE_EVIDENCE';
+    // Only the caller's OWN relation is returned (never who else reported or is assigned).
+    const youAre = decideReason === 'SOD' ? (doc.reporterId === actorId && doc.assigneeId === actorId ? 'reporter_assignee' : doc.reporterId === actorId ? 'reporter' : 'assignee') : null;
     return {
       status: r.status.status,
       approvedForContent: r.status.approvedForContent,
       latestSeq: r.latestSeq,
       assignmentSeq: r.assignmentSeq,
       assignee: person(people, r.assignee, isReviewer),
-      decisions: r.decisions.map((d) => presentDecision(d, people, isReviewer)).reverse(),
+      decisions: r.decisions.map((d) => presentDecision(d, people, isReviewer, anchors)).reverse(),
       assignments: r.assignments.map((a) => ({ seq: a.seq, assignee: person(people, a.assignee, isReviewer), assignedBy: person(people, a.assigned_by, isReviewer), assignedAt: a.assigned_at })).reverse(),
       binding: sameContent ? { screeningId: stored.row.screening_id, fp: stored.row.screened_fp } : null,
-      permissions: { isReviewer, canDecide: decideReason === null, decideReason, canAssign: isReviewer },
+      permissions: { isReviewer, canDecide: decideReason === null, decideReason, youAre, canAssign: isReviewer },
     };
   }
 
@@ -122,6 +138,22 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     }
   }
 
+  /** Reassemble an upload this admin created (exactly `chunks` parts, 0..n-1) and parse it. */
+  async function assembleUpload(payload, actorId) {
+    const transferId = String(payload?.transferId ?? '');
+    const n = Number(payload?.chunks);
+    if (!TRANSFER_ID.test(transferId) || !Number.isInteger(n) || n < 1 || n > MAX_CHUNKS) throw new AppError(ErrorCode.INVALID_INPUT);
+    const meta = await repos.transfers.meta(transferId);
+    if (Number(meta?.n ?? 0) !== n || meta.actor !== actorId || meta.actor2 !== actorId || meta.kind !== 'upload') throw new AppError(ErrorCode.INVALID_INPUT, 'The upload is incomplete. Upload the archive again.');
+    const parts = await repos.transfers.all(transferId);
+    if (parts.some((p, i) => Number(p.idx) !== i)) throw new AppError(ErrorCode.INVALID_INPUT, 'The upload is incomplete. Upload the archive again.');
+    try {
+      return JSON.parse(parts.map((p) => p.data).join(''));
+    } catch {
+      throw new AppError(ErrorCode.INVALID_INPUT, 'That file is not an Article25 archive.');
+    }
+  }
+
   async function requireAdmin() {
     if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Only Jira administrators can do this.');
   }
@@ -129,7 +161,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   return {
     async appContext(actorId) {
       const [jiraAdmin, reviewer, gateMode] = await Promise.all([safeIsAdmin(), review.isReviewer(actorId), gate.currentMode().then((m) => m.mode).catch(() => 'unknown')]);
-      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer }, reviewerGroup: settings.reviewerGroup, gate: { mode: gateMode } };
+      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer }, reviewerGroup: settings.reviewerGroup, gate: { mode: gateMode }, record: { signing: ledger.mode } };
     },
 
     /** Issue panel: screening + a compact review summary, after an as-user read. */
@@ -148,7 +180,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const view = presentScreening(stored.row, stored.screening, buildScreeningText(doc).fingerprint);
       // The gate preview reads as the app, but only after the as-user read above succeeded.
       const [rb, gatePreview] = await Promise.all([reviewBlock(doc, stored, view, actorId), gate.preview(doc.key)]);
-      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null }, gate: gatePreview, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
+      const you = { isReviewer: rb.permissions.isReviewer, decideReason: rb.permissions.decideReason, youAre: rb.permissions.youAre };
+      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null, you }, gate: gatePreview, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
     },
 
     /** Review workspace (Margin): current text, latest screening, and the review. */
@@ -252,6 +285,154 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return { status: r.status };
     },
 
+    // ---- M5: decision record & recovery ---------------------------------------------------------
+    /** Record status (admins): signing keys (fingerprints only), head, last export/verify/restore. */
+    async recordStatus() {
+      await requireAdmin();
+      const [st, events] = await Promise.all([ledger.status(), repos.ledgerEvents.recent(10).catch(() => [])]);
+      const people = await peopleMap(events.map((e) => e.actor));
+      return {
+        ...st,
+        events: events.map((e) => ({ at: e.at, type: e.type, outcome: e.outcome, headSeq: e.head_seq, by: e.actor ? people.get(e.actor)?.displayName || 'Unknown user' : 'Article25', digest: e.digest ? e.digest.slice(0, 12) : null })),
+        // Decided at the final audit: the record stays in Article25 and in signed archives the customer
+        // keeps; no Confluence publishing (it would need new scopes and preview multi-app storage).
+        externalRegister: { status: 'archive_only' },
+      };
+    },
+
+    /** Verify the whole ledger and every decision (admins); the result is recorded. */
+    async verifyLedger(actorId) {
+      await requireAdmin();
+      return ledger.verify({ record: true, actor: actorId });
+    },
+
+    /** Signed archive export (admins), delivered in chunks. */
+    async exportArchive(actorId) {
+      await requireAdmin();
+      const archive = await ledger.exportArchive({ actor: actorId });
+      const text = JSON.stringify(archive);
+      const chunks = Math.ceil(text.length / EXPORT_CHUNK);
+      if (chunks > MAX_CHUNKS) throw new AppError(ErrorCode.INTERNAL, 'The archive is too large to export in one transfer.');
+      const transferId = randomBytes(16).toString('hex');
+      const now = Date.now();
+      for (let i = 0; i < chunks; i++) await repos.transfers.put({ transferId, idx: i, kind: 'export', actor: actorId, data: text.slice(i * EXPORT_CHUNK, (i + 1) * EXPORT_CHUNK), createdAt: now });
+      return { transferId, chunks, bytes: Buffer.byteLength(text), digest: archive.digest, head: archive.head, counts: archive.counts, createdAt: archive.createdAt };
+    },
+
+    /** One chunk of an export this admin created. */
+    async transferChunk(payload, actorId) {
+      await requireAdmin();
+      const transferId = String(payload?.transferId ?? '');
+      const idx = Number(payload?.idx);
+      if (!TRANSFER_ID.test(transferId) || !Number.isInteger(idx) || idx < 0 || idx >= MAX_CHUNKS) throw new AppError(ErrorCode.INVALID_INPUT);
+      const row = await repos.transfers.get(transferId, idx);
+      if (!row || row.kind !== 'export' || row.actor !== actorId) throw new AppError(ErrorCode.NOT_FOUND, 'This export is not available. Export again.');
+      return { idx, data: row.data };
+    },
+
+    /** Upload one chunk of an archive to restore (admins). Chunks are immutable once written. */
+    async uploadChunk(payload, actorId) {
+      await requireAdmin();
+      const transferId = String(payload?.transferId ?? '');
+      const idx = Number(payload?.idx);
+      const data = payload?.data;
+      if (!TRANSFER_ID.test(transferId) || !Number.isInteger(idx) || idx < 0 || idx >= MAX_CHUNKS || typeof data !== 'string' || data.length === 0 || data.length > UPLOAD_CHUNK) throw new AppError(ErrorCode.INVALID_INPUT);
+      const meta = await repos.transfers.meta(transferId);
+      if (Number(meta?.n ?? 0) > 0 && (meta.actor !== actorId || meta.actor2 !== actorId || meta.kind !== 'upload')) throw new AppError(ErrorCode.NOT_AUTHORISED);
+      const inserted = await repos.transfers.put({ transferId, idx, kind: 'upload', actor: actorId, data, createdAt: Date.now() });
+      if (!inserted) {
+        const existing = await repos.transfers.get(transferId, idx);
+        if (existing?.data !== data) throw new AppError(ErrorCode.CONFLICT, 'This part of the upload was already received with different content. Start the upload again.');
+      }
+      return { idx, received: true };
+    },
+
+    /** Step 1 of restore: verify the uploaded archive (admins). */
+    async beginRestore(payload, actorId) {
+      await requireAdmin();
+      const archive = await assembleUpload(payload, actorId);
+      const r = await ledger.beginRestore({ actor: actorId, archive });
+      return { report: r.report, token: r.token, resume: r.resume ?? false };
+    },
+
+    /** Step 2 of restore: confirm with the single-use token (admins). */
+    async confirmRestore(payload, actorId) {
+      await requireAdmin();
+      const archive = await assembleUpload(payload, actorId);
+      return ledger.confirmRestore({ actor: actorId, token: payload?.token, archive });
+    },
+
+    /** After a key LOSS: adopt a previous key as predecessor, bound to its typed fingerprint (admins). */
+    async adoptPreviousKey(payload, actorId) {
+      await requireAdmin();
+      const kid = String(payload?.kid ?? '');
+      if (!/^k[0-9a-f]{16}$/.test(kid)) throw new AppError(ErrorCode.INVALID_INPUT);
+      return ledger.adoptPredecessor({ kid, fingerprint: payload?.fingerprint, actor: actorId });
+    },
+
+    /** One decision's signed record, for independent verification (reviewers who can see the issue). */
+    async decisionRecord(payload, actorId) {
+      if (!(await review.isReviewer(actorId))) throw new AppError(ErrorCode.NOT_AUTHORISED);
+      const doc = await jira.getIssueDocument(validate.issueKey(payload?.issueKey)); // as-user browse check
+      const seq = Number(payload?.seq);
+      if (!Number.isInteger(seq) || seq < 1) throw new AppError(ErrorCode.INVALID_INPUT);
+      const row = (await repos.decisions.list(doc.id)).find((d) => Number(d.seq) === seq);
+      if (!row) throw new AppError(ErrorCode.NOT_FOUND, 'That decision does not exist.');
+      return ledger.recordBundle(row);
+    },
+
+    /** The decision register: every decision on work items the caller can see, newest first. */
+    async register(raw, actorId) {
+      const page = Number(raw?.page ?? 1);
+      if (!Number.isInteger(page) || page < 1 || page > 1000) throw new AppError(ErrorCode.INVALID_INPUT);
+      const [rows, st, isReviewer] = await Promise.all([repos.registerRows(500), ledger.status().catch(() => null), review.isReviewer(actorId)]);
+      const visible = rows.length ? await jira.visibleIssues([...new Set(rows.map((r) => r.issue_id))]) : new Map();
+      const mine = rows.filter((r) => visible.has(r.issue_id));
+      const pages = Math.max(1, Math.ceil(mine.length / 25));
+      const p = Math.min(page, pages);
+      const slice = mine.slice((p - 1) * 25, p * 25);
+      const people = await peopleMap(slice.map((r) => r.decided_by));
+      const exportedHead = st?.backedUpSeq ?? st?.lastExport?.headSeq ?? 0;
+      return {
+        items: slice.map((r) => ({
+          key: visible.get(r.issue_id).key, summary: visible.get(r.issue_id).summary, seq: r.seq, kind: r.kind, decision: r.decision,
+          decidedBy: r.kind === 'human' ? person(people, r.decided_by, isReviewer) : null, decidedAt: r.decided_at, outcome: r.outcome, contentRef: String(r.fp).slice(0, 8),
+          record: r.chainSeq ? { seq: r.chainSeq, format: r.recordVersion === 3 ? 'ed25519' : r.recordVersion === 2 ? 'legacy' : 'unknown', kid: r.kid } : null,
+          inLastExport: Boolean(r.chainSeq && r.chainSeq <= exportedHead),
+        })),
+        total: mine.length, page: p, pages,
+        signing: st?.signing ?? 'none', lastExport: st?.lastExport ? { at: st.lastExport.at, headSeq: st.lastExport.headSeq } : null, isReviewer,
+      };
+    },
+
+    /**
+     * Get started (Jira admins only): every line is a server-side fact, never an assumption.
+     * Coverage comes from the same workflow scan as the gate health check, so installing the app is
+     * never presented as protection. Nothing here is cached: it is read fresh on every call.
+     */
+    async setupStatus(actorId) {
+      await requireAdmin();
+      const [health, st, youAreMember, sodOn] = await Promise.all([
+        gate.health(),
+        ledger.status().catch(() => null),
+        review.isReviewer(actorId).catch(() => null),
+        review.separationOfDutiesOn().catch(() => null),
+      ]);
+      const wf = health.coverage.workflows ?? [];
+      const ran = health.activity ? Object.values(health.activity).reduce((a, b) => a + Number(b || 0), 0) : null;
+      return {
+        reviewers: { group: settings.reviewerGroup, youAreMember },
+        signing: ledger.mode,
+        screening: { ai: aiActive() ? 'on' : 'off', scope: settings.scopeProjects.length ? 'projects' : 'all', projects: settings.scopeProjects },
+        gate: {
+          overall: health.overall, mode: health.mode.mode, database: health.checks.database, coverage: health.coverage.status, coverageError: health.coverage.error ?? null,
+          protectedWorkflows: wf.filter((w) => w.coverage === 'complete').length, gapWorkflows: wf.filter((w) => w.coverage !== 'complete').length, checksLast7Days: ran,
+        },
+        separationOfDuties: sodOn === null ? 'unknown' : sodOn ? 'on' : 'off',
+        record: st ? { decisions: st.counts.decisions, lastExportAt: st.lastExport?.at ?? null, notBackedUp: st.notInLastExport } : null,
+      };
+    },
+
     /** Workflow gate overview (Jira admins only): health, coverage, mode, recent checks, settings history. */
     async gateOverview() {
       await requireAdmin();
@@ -292,7 +473,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     async settingsOverview(actorId) {
       if (!(await safeIsAdmin())) throw new AppError(ErrorCode.NOT_AUTHORISED, 'Settings are available to Jira administrators.');
       const counts = Object.fromEntries((await repos.workItems.countByState()).map((r) => [r.state, Number(r.n)]));
-      const usage = await repos.usage.get(new Date().toISOString().slice(0, 10));
+      const [usage, spent] = await Promise.all([repos.usage.get(new Date().toISOString().slice(0, 10)), repos.spend ? repos.spend.get().catch(() => null) : null]);
       // Group membership is checked per person (read:jira-user); listing all members would need an
       // admin-level scope, so the overview reports whether the caller is a reviewer instead of a count.
       const youAreReviewer = await review.isReviewer(actorId);
@@ -302,15 +483,15 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         sections: [
           { key: 'scope', status: settings.scopeProjects.length ? 'configured' : 'all-projects' },
           { key: 'people', status: youAreReviewer ? 'configured' : 'not-verified' },
-          { key: 'inventory', status: 'not-configured' },
           { key: 'ai', status: aiActive() ? 'on' : 'off' },
-          { key: 'register', status: 'not-connected' },
+          { key: 'record', status: ledger.mode === 'none' ? 'not-configured' : 'configured' },
           { key: 'gate', status: await gate.currentMode().then((m) => m.mode).catch(() => 'unknown') },
         ],
         screening: {
           ai: aiActive() ? 'on' : 'off',
           aiModel: aiActive() ? settings.aiModel : null,
           dailyAiBudget: settings.dailyAiBudget,
+          aiSpend: { usedMicros: Number(spent?.micros ?? 0), capMicros: settings.aiSpendCapMicros },
           scopeProjects: settings.scopeProjects,
           countsByState: counts,
           today: { screenings: Number(usage?.screenings ?? 0), aiCalls: Number(usage?.llm_calls ?? 0), ruleBased: Number(usage?.fallbacks ?? 0) },
@@ -320,7 +501,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
           youAreReviewer,
           separationOfDuties: await review.separationOfDutiesOn(),
           separationOfDutiesSetting: await review.separationOfDutiesSetting().then((x) => ({ value: x.value ?? 'on', seq: x.seq, isDefault: x.isDefault })).catch(() => null),
-          recordSigning: settings.signingKey ? 'configured' : 'missing',
+          recordSigning: ledger.mode === 'none' ? 'missing' : 'configured',
+          recordFormat: ledger.mode,
         },
       };
     },

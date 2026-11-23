@@ -5,23 +5,22 @@
   "type": "module",
   "scripts": {
     "build": "A25_ENTRY=panel vite build && A25_ENTRY=desk vite build && node ../scripts/bundle-report.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:contrast": "vitest run --config vitest.browser.config.js"
   },
   "dependencies": {
-    "@atlaskit/button": "25.8.3",
-    "@atlaskit/heading": "8.0.0",
-    "@atlaskit/lozenge": "17.0.9",
-    "@atlaskit/section-message": "10.3.0",
-    "@atlaskit/tokens": "20.14.0",
     "@forge/bridge": "7.3.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@atlaskit/tokens": "20.14.0",
     "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^6.3.0",
+    "@vitest/browser-playwright": "^5.1.1",
     "axe-core": "^4.11.0",
     "jsdom": "^26.1.0",
+    "playwright": "^1.65.1",
     "vite": "^8.3.8",
     "vitest": "^5.1.1"
   }

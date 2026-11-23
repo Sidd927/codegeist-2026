@@ -3,14 +3,12 @@
 // health, the mode (monitoring never looks like enforcement), recent gate checks and the audited
 // change history. Switching modes is a deliberate, confirmed, audited action.
 import { useState } from 'react';
-import Button from '@atlaskit/button/new';
-import Lozenge from '@atlaskit/lozenge';
-import SectionMessage from '@atlaskit/section-message';
 import { api, newRequestId } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState } from '../../shared/components/States.jsx';
 import { relativeTime } from '../../shared/findings.js';
 import { copy } from '../../shared/copy/en.js';
+import { Button, Lozenge, SectionMessage } from '../../shared/components/ui.jsx';
 
 const G = copy.gate;
 const OVERALL_APPEARANCE = { enforcing: 'success', monitoring: 'inprogress', gaps: 'moved', not_protected: 'default', unknown: 'default', not_ready: 'removed' };
