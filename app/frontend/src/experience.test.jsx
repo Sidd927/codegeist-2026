@@ -76,6 +76,9 @@ describe('Get started: steps reflect what the server found, never assumptions', 
     expect(screen.getByRole('heading', { level: 2, name: 'Article25 is set up' })).toBeTruthy();
     expect(container.querySelector('details')).toBeTruthy();
     expect(screen.getByText('Show setup details')).toBeTruthy();
+    // Separation of duties is a switch: its link stays even when the step is done (solo trials).
+    expect(screen.getByRole('button', { name: 'Open review settings' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Open workflow gate' })).toBeTruthy(); // the mode is a choice
     expect(await axeViolations(container)).toEqual([]);
   });
 

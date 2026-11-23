@@ -83,3 +83,33 @@ test('separation of duties: the workspace and panel say which relation applies t
   assert.equal((await w.desk(REPORTER).workspace('SHOP-1', REPORTER)).review.permissions.youAre, 'reporter_assignee');
   void nextRid;
 });
+
+test('workflow pages: parallel after the first when total is known, sequential otherwise, bounded', async () => {
+  const { collectPages } = await import('../src/backend/lib/paging.js');
+  const page = (startAt, total, size = 50) => ({ startAt, total, isLast: startAt + size >= total, values: Array.from({ length: Math.min(size, total - startAt) }, (_, i) => ({ id: startAt + i })) });
+  // 105 workflows: page 0, then pages 50 and 100 requested together.
+  const calls = [];
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchPage = async (s) => {
+    calls.push(s);
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((r) => setTimeout(r, 5));
+    inFlight--;
+    return page(s, 105);
+  };
+  const r = await collectPages(fetchPage, { pageSize: 50 });
+  assert.deepEqual(calls, [0, 50, 100]);
+  assert.equal(maxInFlight, 2);
+  assert.deepEqual([r.pages.flatMap((p) => p.values).length, r.truncated], [105, false]);
+  // No total reported: sequential until isLast.
+  const seq = [];
+  const noTotal = async (s) => (seq.push(s), { isLast: s >= 100, values: [{ id: s }] });
+  assert.deepEqual([(await collectPages(noTotal, { pageSize: 50 })).pages.length, seq], [3, [0, 50, 100]]);
+  // Bounded: never more than maxPages, and says so.
+  const big = await collectPages(async (s) => page(s, 5000), { pageSize: 50, maxPages: 3 });
+  assert.deepEqual([big.pages.length, big.truncated], [3, true]);
+  // A single page.
+  assert.deepEqual((await collectPages(async (s) => page(s, 7))).pages.length, 1);
+});

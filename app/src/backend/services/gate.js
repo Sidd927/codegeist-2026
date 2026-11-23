@@ -128,43 +128,36 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
 
   async function health() {
     const checks = {};
-    // Dependencies (never claim "protected" when the validator could not work).
-    try {
-      await repos.gateTablesReachable();
-      checks.database = 'ok';
-    } catch (e) {
-      checks.database = /doesn'?t exist|no such table|unknown table/i.test(String(e?.message)) ? 'migration_missing' : 'unavailable';
-    }
     checks.signing = siteId && ledger.mode !== 'none' ? 'configured' : 'missing';
-    let mode = { mode: 'unknown', seq: 0, isDefault: false, changedAt: null };
-    try {
-      const m = await currentMode();
-      mode = { mode: m.mode, seq: m.seq, isDefault: m.isDefault, changedAt: m.changedAt }; // no account ids in responses
-    } catch {
-      /* reported as unknown */
-    }
-    // Coverage: read workflows (read:workflow:jira) and find transitions carrying our validator.
-    let coverage = { status: 'unknown', workflows: [], ruleKeysSeen: 0 };
-    try {
-      const { workflows, statuses } = await jira.searchWorkflowsWithTransitions();
-      const analysed = analyseCoverage(workflows, statuses, isGateRule);
-      coverage = {
-        status: analysed.length === 0 ? 'none' : analysed.some((w) => w.coverage === 'partial') ? 'partial' : 'complete',
-        workflows: analysed,
-        workflowsScanned: workflows.length,
-      };
-    } catch (e) {
-      log.warn({ evt: 'gate.health.coverage_failed', code: e?.code ?? 'INTERNAL', status: e?.status });
-      coverage = { status: 'unknown', workflows: [], error: e?.code === ErrorCode.NOT_AUTHORISED || e?.status === 403 ? 'not_permitted' : 'unavailable' };
-    }
     const since = clock() - 7 * 24 * 3600 * 1000;
-    let activity = null;
-    try {
-      const rows = await repos.gateEvents.summary(since);
-      activity = Object.fromEntries(rows.map((r) => [r.verdict, Number(r.n)]));
-    } catch {
-      activity = null;
-    }
+    // P1 performance: the four reads are independent, so they run together (the workflow scan dominates).
+    const [database, mode, coverage, activity] = await Promise.all([
+      // Dependencies (never claim "protected" when the validator could not work).
+      repos.gateTablesReachable().then(
+        () => 'ok',
+        (e) => (/doesn'?t exist|no such table|unknown table/i.test(String(e?.message)) ? 'migration_missing' : 'unavailable'),
+      ),
+      currentMode().then(
+        (m) => ({ mode: m.mode, seq: m.seq, isDefault: m.isDefault, changedAt: m.changedAt }), // no account ids in responses
+        () => ({ mode: 'unknown', seq: 0, isDefault: false, changedAt: null }),
+      ),
+      // Coverage: read workflows (read:workflow:jira) and find transitions carrying our validator.
+      jira.searchWorkflowsWithTransitions().then(
+        ({ workflows, statuses }) => {
+          const analysed = analyseCoverage(workflows, statuses, isGateRule);
+          return { status: analysed.length === 0 ? 'none' : analysed.some((w) => w.coverage === 'partial') ? 'partial' : 'complete', workflows: analysed, workflowsScanned: workflows.length };
+        },
+        (e) => {
+          log.warn({ evt: 'gate.health.coverage_failed', code: e?.code ?? 'INTERNAL', status: e?.status });
+          return { status: 'unknown', workflows: [], error: e?.code === ErrorCode.NOT_AUTHORISED || e?.status === 403 ? 'not_permitted' : 'unavailable' };
+        },
+      ),
+      repos.gateEvents.summary(since).then(
+        (rows) => Object.fromEntries(rows.map((r) => [r.verdict, Number(r.n)])),
+        () => null,
+      ),
+    ]);
+    checks.database = database;
     const ready = checks.database === 'ok' && checks.signing === 'configured';
     const overall = !ready ? 'not_ready' : coverage.status === 'unknown' ? 'unknown' : coverage.status === 'none' ? 'not_protected' : coverage.status === 'partial' ? 'gaps' : mode.mode === 'enforce' ? 'enforcing' : 'monitoring';
     return { overall, mode, checks, coverage, activity, policyVersion: GATE_POLICY_VERSION, checkedAt: clock() };

@@ -43,7 +43,7 @@ export function buildSteps(s) {
     { key: 'mode', title: G.mode.title, ...mode, to: '/settings/gate', action: G.protect.action },
   ];
   const recommended = [
-    { key: 'sod', title: G.sod.title, ...sod, to: '/settings/review', action: G.sod.action },
+    { key: 'sod', title: G.sod.title, ...sod, to: '/settings/review', action: G.sod.action, alwaysAction: true }, // a switch, useful even when on
     { key: 'ai', title: G.ai.title, ...ai },
     { key: 'backup', title: G.backup.title, ...backup, to: '/settings/record', action: G.backup.action },
   ];
@@ -73,7 +73,7 @@ function Steps({ steps, navigate }) {
               <Lozenge appearance={TONE[x.state]}>{x.label}</Lozenge>
             </div>
             <p className="a25-step__text a25-subtle">{x.body}</p>
-            {x.to && x.state !== 'done' ? (
+            {x.to && (x.state !== 'done' || x.alwaysAction) ? (
               <span>
                 <Button appearance="subtle" onClick={() => navigate(x.to)}>
                   {x.action}
