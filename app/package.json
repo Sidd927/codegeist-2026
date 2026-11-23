@@ -8,7 +8,7 @@
     "build:ui": "npm --prefix frontend run build",
     "test": "node --test \"test/**/*.test.mjs\"",
     "test:ui": "npm --prefix frontend test",
-    "lint": "eslint src test eval frontend/src scripts && node scripts/copy-lint.mjs",
+    "lint": "eslint src test eval frontend/src scripts && node scripts/copy-lint.mjs && node scripts/check-permissions.mjs",
     "check": "npm run lint && npm test && npm run test:ui && npm run test:contrast && npm run build:ui",
     "eval": "node eval/evaluate.mjs",
     "bench": "node scripts/bench-ledger.mjs",
