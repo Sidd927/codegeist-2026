@@ -18,7 +18,7 @@
 | Bundles (gzip, initial) | ✅ Panel 81.6 KB (budget 200); desk 101.5 KB (budget 400) |
 | `forge lint` | ✅ No issues |
 | `npm audit` | ⚠️ 7 moderate, all `glob`/`minimatch` pulled in by `@forge/manifest` (build-time tooling, not reachable with user input). The offered fix downgrades `@forge/sql` (breaking), so not applied. **Accepted risk** |
-| GitHub Actions on the pushed head `ec577dc` | ✅ Both runs succeeded (§8) |
+| GitHub Actions on the latest head `f22baaf` (24 Nov) | ✅ Both runs succeeded (§8): 204 backend, 89 UI, 24 contrast |
 
 ## 2. AI safeguards (verified in code and tests)
 | Safeguard | Where | Evidence | Status |
@@ -100,11 +100,14 @@ The full table is in [`docs/CLEAN_SITE_REHEARSAL.md`](../docs/CLEAN_SITE_REHEARS
 | `821b277` | video: captions, YouTube kit, thumbnail, licence record |
 | `e4fb097` | docs(devpost): every field, and the checklist |
 | `ec577dc` | docs(release): readiness and README; the guard made lint-clean |
+| `ef87c66` | docs(release): final verification report, handover, progress checklist |
+| `5a3dc54` | fix(review): never carry an AI-assisted approval over on a rule-based re-check (24 Nov) |
+| `f22baaf` | docs: approval-validity investigation; reports and counts updated (24 Nov) |
 
-**Push:** `ff8c2e5..ec577dc` to `milestone-m5-record` (normal push).
+**Push:** `ff8c2e5..f22baaf` to `milestone-m5-record` (normal pushes).
 
-**CI** (read from GitHub after the runs finished): both runs on `ec577dc` concluded **success**.
-- push run `45231983712`;
-- PR #7 run `45231997072`.
+**CI** (read from GitHub after the runs finished): both runs on the latest head `f22baaf` concluded **success**.
+- push run `45252793765`;
+- PR #7 run `45252805791`.
 
-Every step executed: checkout, `npm ci`, lint (the log shows *Permission freeze: 3 scopes and 9 module types match the frozen set.*), tests (*pass 187, fail 0*), test:ui, the Chromium install, test:contrast and build:ui.
+Every step executed: checkout, `npm ci`, lint (incl. *Permission freeze: 3 scopes and 9 module types match the frozen set.*), tests (*pass 204, fail 0*), test:ui (89 passed), the Chromium install, test:contrast (24 passed) and build:ui. (Earlier heads `ec577dc` and `ef87c66` were also green.)

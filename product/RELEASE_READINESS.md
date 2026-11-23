@@ -47,6 +47,8 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 12. Approvals: §4
 
 ## 4. Decisions and actions that need you (in order)
+
+> **Superseded (24 Nov):** follow [`submission/RELEASE_CHECKLIST.md`](../submission/RELEASE_CHECKLIST.md) §10 for the current order and dates.
 | # | Decision or action | Why it's yours | By |
 |---|---|---|---|
 | 1 | ✅ ~~AI in production~~: **hybrid, $5 cap per installation** (decided 23 Nov) | — | Done |

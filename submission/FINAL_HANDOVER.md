@@ -1,6 +1,6 @@
 # Article25: final handover (Codegeist 2026)
 
-**Date:** 23 Nov 2026. **Branch:** `milestone-m5-record` at `ec577dc`, plus this handover commit.
+**Date:** 23 Nov 2026. **Branch:** `milestone-m5-record` at `f22baaf` (24 Nov). The step-by-step path to submission is [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 **Read with:**
 - [FINAL_VERIFICATION_REPORT.md](FINAL_VERIFICATION_REPORT.md) (the evidence);
@@ -43,9 +43,9 @@ None of these can be done by the agent under your rules.
 - `forge lint`: ✅.
 - `npm audit`: 7 moderate, build-time and transitive; accepted (report §1).
 
-**CI on `ec577dc`:**
-- push run `45231983712`: ✅ success;
-- PR run `45231997072`: ✅ success.
+**CI on `f22baaf`:**
+- push run `45252793765`: ✅ success;
+- PR run `45252805791`: ✅ success.
 - Every step ran: lint (incl. the freeze guard), test, test:ui, Chromium install, test:contrast, build:ui.
 
 **Evidence status:**
@@ -141,7 +141,7 @@ The repository is public: https://github.com/Sidd927/codegeist-2026. The checkli
 | 4 | #4 M2 Detect | `milestone-m2-detect` → #3's branch | Draft · mergeable | 44 files |
 | 5 | #5 M3 Review | `milestone-m3-review` → #4's branch | Draft · mergeable | 41 files |
 | 6 | #6 M4 Enforce | `milestone-m4-enforce` → #5's branch | Draft · mergeable | 47 files |
-| 7 | #7 M5 Record | `milestone-m5-record` → #6's branch | Draft · mergeable · **CI green on `ec577dc`** | 136 files |
+| 7 | #7 M5 Record | `milestone-m5-record` → #6's branch | Draft · mergeable · **CI green on `f22baaf`** | 143 files |
 
 **How to merge:**
 - Merge in order #1 → #7.
