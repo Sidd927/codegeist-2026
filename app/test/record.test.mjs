@@ -330,7 +330,7 @@ test('status and exports contain no private key material; status shows fingerpri
   assert.equal(JSON.stringify(st).includes('acc-'), false);
   assert.match(st.currentKey.fingerprint, /^([0-9a-f]{4} ){15}[0-9a-f]{4}$/);
   assert.equal(st.notInLastExport, 0);
-  assert.equal(st.externalRegister.status, 'not_enabled');
+  assert.equal(st.externalRegister.status, 'archive_only');
 });
 
 test('retention: gate events older than 30 days and stale transfers are purged; decisions are never purged', async () => {

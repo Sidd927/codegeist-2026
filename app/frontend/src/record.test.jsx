@@ -53,7 +53,7 @@ const STATUS = (over = {}) => ({
   head: 7, counts: { decisions: 7, records: 7, assignments: 2 },
   lastExport: { at: NOW - 3600000, headSeq: 5, digest: 'd' }, lastVerify: { at: NOW - 60000, outcome: 'verified', headSeq: 7 }, lastRestore: null,
   notInLastExport: 2, events: [{ at: NOW - 60000, type: 'verify', outcome: 'verified', headSeq: 7, by: 'Admin One', digest: null }],
-  externalRegister: { status: 'not_enabled', reason: 'needs_confluence_scopes' },
+  externalRegister: { status: 'archive_only' },
   ...over,
 });
 
@@ -65,7 +65,7 @@ describe('Decision record settings', () => {
     expect(screen.getByText('2 records are not in any exported archive.')).toBeTruthy();
     expect(screen.getByText(/Restore is only possible when this site has no decisions/)).toBeTruthy();
     expect(screen.getByText(/soft-deletes app data/)).toBeTruthy();
-    expect(screen.getByText(/needs additional Confluence permissions/)).toBeTruthy();
+    expect(screen.getByText(/does not publish it to other products/)).toBeTruthy(); // archive-only design (final audit)
     expect(screen.getByText(/Admin One/)).toBeTruthy();
     expect(await axeViolations(container)).toEqual([]);
   });
@@ -153,6 +153,11 @@ describe('Decision record settings', () => {
     const { rerender } = render(<RecordSettingsView resource={resource({ status: 'loading' })} client={{}} />);
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     rerender(<RecordSettingsView resource={resource({ status: 'error', error: { message: 'x', retryable: true } })} client={{}} />);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    // First minute after install: an informational "setting up" state, not an error, with retry.
+    rerender(<RecordSettingsView resource={resource({ status: 'error', error: { code: 'SETTING_UP', message: 'Article25 is finishing its setup on this site.', retryable: true } })} client={{}} />);
+    expect(screen.getByText('Article25 is setting up')).toBeTruthy();
+    expect(screen.queryByText("Couldn't load this view")).toBeNull();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 });

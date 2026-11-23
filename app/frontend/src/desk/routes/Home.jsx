@@ -134,8 +134,8 @@ export function Home({ appContext }) {
                 </dd>
               </div>
               <div>
-                <dt>{s.register.label}</dt>
-                <dd>{s.register.value}</dd>
+                <dt>{s.record.label}</dt>
+                <dd>{appContext ? (s.record[appContext.record?.signing] ?? s.record.none) : '–'}</dd>
               </div>
             </dl>
           </section>

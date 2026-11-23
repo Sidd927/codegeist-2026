@@ -187,7 +187,7 @@ function Backup({ status, onChanged, client }) {
         {R.backupTitle}
       </h3>
       <p className="a25-small">
-        {status.lastExport ? R.lastBackup(relativeTime(status.lastExport.at), status.lastExport.headSeq) : R.noBackup}{' '}
+        {status.lastExport ? R.lastBackup(relativeTime(status.lastExport.at), status.lastExport.headSeq) : status.backedUpSeq ? R.restoredBackup(status.backedUpSeq) : R.noBackup}{' '}
         {behind > 0 ? <strong className="a25-record__behind">{R.notInBackup(behind)}</strong> : status.lastExport ? <span className="a25-subtle">{R.backupCurrent}</span> : null}
       </p>
       <span>
@@ -324,7 +324,7 @@ function Restore({ status, onChanged, client }) {
           {verify ? (
             <div className="a25-record__report" role="region" aria-label={R.reportTitle}>
               <p>
-                <Lozenge appearance={verify.report.restorable ? 'success' : 'removed'} isBold>
+                <Lozenge maxWidth="100%" appearance={verify.report.restorable ? 'success' : 'removed'} isBold>
                   {R.reportStatus[verify.report.status] ?? verify.report.status}
                 </Lozenge>
               </p>
@@ -392,9 +392,7 @@ export function RecordSettingsView({ resource, client = api }) {
             <h3 id="a25-rec-ext" className="a25-zone__subtitle">
               {R.externalTitle}
             </h3>
-            <p className="a25-small">
-              <Lozenge>{copy.settings.status['not-connected']}</Lozenge> <span className="a25-subtle">{R.externalBody}</span>
-            </p>
+            <p className="a25-subtle a25-small">{R.externalBody}</p>
           </section>
           {data.events?.length ? (
             <section className="a25-record__section" aria-labelledby="a25-rec-ev">

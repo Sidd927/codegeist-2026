@@ -14,6 +14,7 @@ export const copy = {
     openInDesk: 'Open in review desk',
     environmentBadge: (label) => `${label} environment`,
     errorTitle: "Couldn't load this view",
+    settingUpTitle: 'Article25 is setting up',
   },
 
   states: {
@@ -159,7 +160,7 @@ export const copy = {
       checks: { label: 'Automatic privacy checks', off: 'Off', on: 'On' },
       reviewers: { label: 'Reviewer group', member: 'you are a member', notMember: 'you are not a member' },
       gate: { label: 'Workflow gate', monitor: 'Monitoring (not blocking)', enforce: 'Enforcing', unknown: 'Unknown', coverage: 'Which transitions are protected: Settings (Jira administrators).' },
-      register: { label: 'Decision register', value: 'Not connected' },
+      record: { label: 'Decision record', v3: 'Signed (Ed25519); exportable', v2: 'Signed (older format)', none: 'Signing not configured' },
     },
   },
 
@@ -386,6 +387,7 @@ export const copy = {
       not_configured: 'Record signing is not configured.',
     },
     backupTitle: 'Backup',
+    restoredBackup: (n) => `Records up to ${n} were restored from a signed archive. Download a new archive to back up this site.`,
     notInBackup: (n) => `${n} record${n === 1 ? ' is' : 's are'} not in any exported archive.`,
     backupCurrent: 'The last exported archive includes every record. Article25 cannot see whether you saved the file: keep it somewhere outside Jira.',
     exportButton: 'Download signed archive',
@@ -426,12 +428,12 @@ export const copy = {
     removalBody: [
       'Atlassian soft-deletes app data when an app is uninstalled. Installing again starts with an empty record: earlier decisions are not visible to Article25.',
       'Before removing Article25, download a signed archive here, and remove the Article25 gate from your workflows: Jira blocks gated transitions while the app is missing.',
-      'After installing again, restore the archive here. The record keys are kept by your administrator’s app settings, so restored signatures verify.',
+      'After installing again, restore the archive here. The signing keys belong to the Article25 app, not to this site’s data, so restored signatures still verify.',
     ],
-    externalTitle: 'External register',
-    externalBody: 'Publishing the record to a Confluence space automatically needs additional Confluence permissions, which are not enabled. Until then, download signed archives.',
+    externalTitle: 'Copies outside Jira',
+    externalBody: 'Article25 keeps the record inside Jira and does not publish it to other products. To keep an independent copy, download a signed archive regularly and store it where your organisation keeps audit records.',
     eventsTitle: 'Recent record activity',
-    eventType: { export: 'Archive downloaded', verify: 'Record verified', restore: 'Restore', restore_check: 'Archive checked' },
+    eventType: { export: 'Archive downloaded', verify: 'Record verified', restore: 'Restore', restore_check: 'Archive checked', restore_rejected: 'Restore refused' },
   },
 
   gate: {
@@ -540,13 +542,12 @@ export const copy = {
     sections: {
       scope: { title: 'Scope and policy', body: 'Which projects are checked and which outcomes need a human decision.' },
       people: { title: 'People', body: 'Reviewer group and separation of duties. Restoring the decision record is limited to Jira administrators.' },
-      inventory: { title: 'What is already approved', body: 'Approved vendors and the data categories each project already processes.' },
       ai: { title: 'AI', body: 'Whether AI-assisted checks are used, which model, and a daily budget.' },
-      register: { title: 'Decision register', body: 'Where the customer-owned record of decisions is published in Confluence.' },
+      record: { title: 'Decision record', body: 'Every decision is signed. Verify the record and download signed archives below.' },
       gate: { title: 'Workflow gate', body: 'Where the Article25 gate is active, and monitor mode.' },
     },
     status: { 'not-configured': 'Not configured', off: 'Off', on: 'On', 'not-connected': 'Not connected', 'not-added': 'Not added', 'all-projects': 'All projects', configured: 'Configured', 'not-verified': 'Not verified', monitor: 'Monitoring', enforce: 'Enforcing', unknown: 'Unknown' },
-    availableLater: 'Configuration for this section is not available in this version.',
+    availableLater: 'Scope, reviewer group and AI are set in the app’s configuration in this version; their current values are shown below. The workflow gate and the decision record are managed on this page.',
     environment: 'Environment',
     production: 'Production',
     screeningTitle: 'Privacy checks',

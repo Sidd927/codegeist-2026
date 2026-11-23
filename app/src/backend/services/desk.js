@@ -158,7 +158,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   return {
     async appContext(actorId) {
       const [jiraAdmin, reviewer, gateMode] = await Promise.all([safeIsAdmin(), review.isReviewer(actorId), gate.currentMode().then((m) => m.mode).catch(() => 'unknown')]);
-      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer }, reviewerGroup: settings.reviewerGroup, gate: { mode: gateMode } };
+      return { product: 'Article25', version: APP_VERSION, environment: { name: config.name, label: config.label }, features: FEATURES, screening: { ai: aiActive() ? 'on' : 'off' }, roles: { jiraAdmin, reviewer }, reviewerGroup: settings.reviewerGroup, gate: { mode: gateMode }, record: { signing: ledger.mode } };
     },
 
     /** Issue panel: screening + a compact review summary, after an as-user read. */
@@ -290,7 +290,9 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return {
         ...st,
         events: events.map((e) => ({ at: e.at, type: e.type, outcome: e.outcome, headSeq: e.head_seq, by: e.actor ? people.get(e.actor)?.displayName || 'Unknown user' : 'Article25', digest: e.digest ? e.digest.slice(0, 12) : null })),
-        externalRegister: { status: 'not_enabled', reason: 'needs_confluence_scopes' },
+        // Decided at the final audit: the record stays in Article25 and in signed archives the customer
+        // keeps; no Confluence publishing (it would need new scopes and preview multi-app storage).
+        externalRegister: { status: 'archive_only' },
       };
     },
 
@@ -386,7 +388,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const p = Math.min(page, pages);
       const slice = mine.slice((p - 1) * 25, p * 25);
       const people = await peopleMap(slice.map((r) => r.decided_by));
-      const exportedHead = st?.lastExport?.headSeq ?? 0;
+      const exportedHead = st?.backedUpSeq ?? st?.lastExport?.headSeq ?? 0;
       return {
         items: slice.map((r) => ({
           key: visible.get(r.issue_id).key, summary: visible.get(r.issue_id).summary, seq: r.seq, kind: r.kind, decision: r.decision,
@@ -449,9 +451,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         sections: [
           { key: 'scope', status: settings.scopeProjects.length ? 'configured' : 'all-projects' },
           { key: 'people', status: youAreReviewer ? 'configured' : 'not-verified' },
-          { key: 'inventory', status: 'not-configured' },
           { key: 'ai', status: aiActive() ? 'on' : 'off' },
-          { key: 'register', status: 'not-connected' },
+          { key: 'record', status: ledger.mode === 'none' ? 'not-configured' : 'configured' },
           { key: 'gate', status: await gate.currentMode().then((m) => m.mode).catch(() => 'unknown') },
         ],
         screening: {

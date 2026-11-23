@@ -284,6 +284,8 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
       trust(), repos.ledgerEvents.latest('export'), repos.ledgerEvents.latest('verify'), repos.ledgerEvents.latest('restore'), repos.storeCounts(),
     ]);
     const head = await repos.chain.head();
+    const restoredHead = /^restored_(verified|with_pending)$/.test(lastRestore?.outcome ?? '') ? Number(lastRestore.head_seq ?? 0) : 0;
+    const backedUpSeq = Math.max(Number(lastExport?.head_seq ?? 0), restoredHead);
     return {
       signing: mode,
       currentKey: signer ? { kid: signer.kid, fingerprint: fingerprintOf(signer.publicKeyB64) } : null,
@@ -296,7 +298,9 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
       lastRestore: lastRestore ? { at: lastRestore.at, outcome: lastRestore.outcome, headSeq: lastRestore.head_seq } : null,
       restoreIncomplete: Boolean(lastRestore && RESTORE_INCOMPLETE_OUTCOMES.includes(lastRestore.outcome)),
       retiredKeys: retired.map((k) => ({ kid: k.kid, fingerprint: fingerprintOf(k.publicKey) })),
-      notInLastExport: head ? Math.max(0, Number(head.seq) - (lastExport?.head_seq ?? 0)) : 0,
+      // Records that came FROM a verified archive are in that archive: they are not "never backed up".
+      backedUpSeq,
+      notInLastExport: head ? Math.max(0, Number(head.seq) - backedUpSeq) : 0,
     };
   }
 

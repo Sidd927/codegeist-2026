@@ -67,6 +67,9 @@ test('after a key rotation AND a reinstall, an archive signed by the retired key
   await w.screen(10001);
   await w.screen(10002);
   assert.equal(await gateReason(w, 'SHOP-1', { settings: withRetired }), 'ALLOW_APPROVED');
+  // Restored records came from a signed archive: they are not reported as "never backed up".
+  const st0 = await w.desk(ADMIN, { settings: withRetired }).recordStatus(ADMIN);
+  assert.deepEqual([st0.backedUpSeq, st0.notInLastExport], [3, 0]);
   assert.equal(await gateReason(w, 'HR-7', { settings: withRetired }), 'REJECTED');
   const st = await w.desk(ADMIN, { settings: withRetired }).recordStatus(ADMIN);
   assert.deepEqual(st.retiredKeys.map((k) => k.kid), [loadSigner(RECORD_KEY).kid]);

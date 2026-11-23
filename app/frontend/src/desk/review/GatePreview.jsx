@@ -20,7 +20,7 @@ export function GatePreview({ gate }) {
         <ModeBadge mode={gate.mode} />
       </div>
       <p className="a25-gatepreview__verdict">
-        <Lozenge appearance={gate.allow ? 'success' : monitoring ? 'moved' : 'removed'} isBold={!gate.allow && !monitoring}>
+        <Lozenge maxWidth="100%" appearance={gate.allow ? 'success' : monitoring ? 'moved' : 'removed'} isBold={!gate.allow && !monitoring}>
           {monitoring ? G.previewMonitor[state] : gate.mode === 'enforce' ? G.previewNow[state] : G.previewNow.block}
         </Lozenge>
       </p>
