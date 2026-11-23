@@ -17,7 +17,7 @@ export const FEATURES = Object.freeze({
   record: true, // M5: Ed25519-signed record, signed archive export, verified restore
 });
 
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '1.0.0'; // Codegeist 2026 release
 
 export function configFor(environmentType) {
   return ENVIRONMENTS[String(environmentType ?? '').toUpperCase()] ?? ENVIRONMENTS.PRODUCTION;

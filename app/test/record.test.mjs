@@ -2,6 +2,7 @@
 // in-memory repositories (INSERT IGNORE semantics). Synthetic data; keys generated in memory. Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { APP_VERSION } from '../src/backend/lib/config.js';
 import { randomBytes } from 'node:crypto';
 import { fingerprintOf, loadSigner } from '../src/core/ledger.js';
 import { verifyArchiveText } from '../scripts/verify-archive.mjs';
@@ -183,7 +184,9 @@ test('restore sessions are single-use, short-lived and bound to the verifying ad
   await assert.rejects(w.desk(ADMIN).confirmRestore({ ...up, token: begin.token }, ADMIN), codeOf('CONFLICT'));
   // Verify again, then swap in a different (valid-looking) upload before confirming.
   const b2 = await w.desk(ADMIN).beginRestore(up, ADMIN);
-  const other = await upload(w, text.replace('"appVersion":"0.5.0"', '"appVersion":"0.5.1"'));
+  const swapped = text.replace(`"appVersion":"${APP_VERSION}"`, '"appVersion":"0.0.0-other"');
+  assert.notEqual(swapped, text); // the swap must really change the archive
+  const other = await upload(w, swapped);
   await assert.rejects(w.desk(ADMIN).confirmRestore({ ...other, token: b2.token }, ADMIN), codeOf('STALE_EVIDENCE'));
   // The token was consumed by that attempt: it cannot be replayed with the right archive.
   await assert.rejects(w.desk(ADMIN).confirmRestore({ ...up, token: b2.token }, ADMIN), codeOf('CONFLICT'));

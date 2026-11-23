@@ -56,7 +56,7 @@
 | 10 | Devpost: every field | [~] | `e4fb097`. **You: link, video URL, policy URL, submit** |
 | 11 | Docs consistency and the final verification report | [x] | `submission/FINAL_VERIFICATION_REPORT.md` |
 | 12 | `npm run check`, `forge lint`, `npm audit` | [x] | All pass; audit: 7 moderate, transitive, accepted |
-| 13 | Commit, push, verify CI, merge-readiness report | [x] | Latest head `f22baaf`; CI success (runs 45252793765, 45252805791); handover §H; path to submission in `RELEASE_CHECKLIST.md`. **Merge is yours** |
+| 13 | Commit, push, verify CI, merge-readiness report; **stack merged into `main` on 24 Nov (`2a40efe`, CI ✅)** | [x] | Latest head `f22baaf`; CI success (runs 45252793765, 45252805791); handover §H; path to submission in `RELEASE_CHECKLIST.md`. **Merge is yours** |
 | 14 | Final handover (A–I, with a verdict) | [x] | `submission/FINAL_HANDOVER.md`: **READY FOR FINAL HUMAN APPROVAL** |
 
 ## 2. Human-only steps (not authorised for the agent)

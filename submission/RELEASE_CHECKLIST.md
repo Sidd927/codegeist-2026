@@ -1,6 +1,6 @@
 # Article25 release checklist: from the repository to a submitted Codegeist 2026 entry
 
-**State as of:** 24 Nov 2026. **Deadline:** 22 Dec 2026, 12:00 PT. **Permission freeze:** 4 Dec 2026.
+**State as of:** 24 Nov 2026, after the merge to `main`. **Deadline:** 22 Dec 2026, 12:00 PT. **Permission freeze:** 4 Dec 2026.
 
 This is the one list to follow. Every step says:
 - **What** needs to happen;
@@ -22,74 +22,68 @@ cd app && export PATH=/opt/homebrew/opt/node@24/bin:$PATH
 
 ---
 
-## 1. Git: the real state, and the merge order
-**Current state (verified 24 Nov):**
-- Branch: `milestone-m5-record`, clean, in sync with origin.
-- **Last code change:** `f22baaf` (the approval-validity fix and its docs). CI on it: push run `45252793765` ✅ and PR run `45252805791` ✅. All steps executed: 204 backend, 89 UI, 24 contrast, lint with the freeze guard, build.
-- **Later commits are documentation and housekeeping only:**
-  - `cf22627`, this checklist;
-  - `5a522ee`, which stops tracking `.DS_Store` (CI ✅ on push run `45254776057` and PR run `45254790367`);
-  - the commit that added this paragraph.
-- Check the live head with `git log -1 --oneline origin/milestone-m5-record` and `gh pr checks 7`.
-- Repository: public, default branch `main` (still only the "Initial commit" `f45568b`). Merge commits are allowed. **Delete-branch-on-merge is off**, so GitHub will *not* retarget the next PR by itself.
+## 1. Git and GitHub
+**State (verified 24 Nov, after the merge):**
+- `main` = `2a40efe` "Merge pull request #7 from Sidd927/milestone-m5-record". CI ✅ on it (push run `45259908481`).
+- On `main`: `npm run check` passes (204 backend, 89 UI, 24 contrast, lint, copy lint, permission guard, build, budgets), and `forge lint` reports no issues.
+- No tracked `.DS_Store`, `node_modules`, `dist`, `.env`, `.pem` or `.key` files. A history scan found no credentials or keys.
+- The 11 committed evidence screenshots were checked by text recognition: no name, email or site is visible.
+- Repository: public, default branch `main`, no branch protection, merge commits allowed, delete-branch-on-merge off. Branches are kept as history.
 
-**Recent history on the release branch:**
+### G1. Merge the seven-PR stack ✅ Done (24 Nov)
+- Merged in order with **merge commits**, one at a time.
+- Before each merge: retargeted to `main`, confirmed that the changed-file count equals the PR's own work, and confirmed mergeable (#6 and #7 also CI-green).
+- After each merge: confirmed the head is in `main` and the tree of `main` equals the merged branch.
 
-| Commit | Change |
+| PR | Merge commit on `main` |
 |---|---|
-| `5a522ee` | chore: untrack `.DS_Store` |
-| `cf22627` | docs: this release checklist |
-| `f22baaf` | docs: approval-validity investigation |
-| `5a3dc54` | fix(review): no AI → rules carry-over |
-| `ef87c66` | docs: final reports |
-| `ec577dc` | docs: readiness, README |
-| `e4fb097` | Devpost copy |
-| `821b277` | video kit |
-| `0f600f5` | release docs |
-| `62e8421` | permission guard |
-| `c66aab8` | key-adoption audit |
-| `78f638e` | AI spend fixes |
-| `ff8c2e5` | $5 cap decision |
+| #1 Stage 1 & 1.5 | `f8dc58c` |
+| #2 Stage 2 | `8cb0f50` |
+| #3 Stage 3 | `1e6ef1c` |
+| #4 M2 Detect | `1243a80` |
+| #5 M3 Review | `ac681a7` |
+| #6 M4 Enforce | `0b6ee83` |
+| #7 M5 Record | `2a40efe` |
 
-**The PR stack** (all open drafts, mergeable, no reviews or comments). Each branch contains the previous one (verified with `git merge-base --is-ancestor`):
+**Verify:** `gh pr list --state merged` lists #1–#7, and `git log --merges --oneline origin/main` shows the seven merges.
 
-| Order | PR | Head (commit) → base | Adds |
-|---|---|---|---|
-| 1 | [#1](https://github.com/Sidd927/codegeist-2026/pull/1) Stage 1 & 1.5 | `stage1-research-and-spikes` (9db3f25) → `main` | 3 commits |
-| 2 | [#2](https://github.com/Sidd927/codegeist-2026/pull/2) Stage 2 | `stage2-product-blueprint` (c98cb5d) → `stage1-…` | 7 |
-| 3 | [#3](https://github.com/Sidd927/codegeist-2026/pull/3) Stage 3 | `stage3-product-foundation` (c405a83) → `stage2-…` | 6 |
-| 4 | [#4](https://github.com/Sidd927/codegeist-2026/pull/4) M2 Detect | `milestone-m2-detect` (0f8e579) → `stage3-…` | 10 |
-| 5 | [#5](https://github.com/Sidd927/codegeist-2026/pull/5) M3 Review | `milestone-m3-review` (0852246) → `milestone-m2-detect` | 9 |
-| 6 | [#6](https://github.com/Sidd927/codegeist-2026/pull/6) M4 Enforce | `milestone-m4-enforce` (7254fbb) → `milestone-m3-review` | 9 |
-| 7 | [#7](https://github.com/Sidd927/codegeist-2026/pull/7) M5 Record | `milestone-m5-record` (latest head) → `milestone-m4-enforce` | 40 at `f22baaf`, plus the docs commits above |
+**From now on:** every change goes on a new branch with a PR to `main`. The code freeze is 17 Dec.
 
-### G1. Merge the stack into `main` (recommended by 1 Dec, before the freeze and the deploy)
-**What:** merge #1 → #7 in order, each with a **merge commit**. Never squash or rebase: that rewrites the commits the next PR is built on. Never force-push.
+### G2. Merge [PR #8](https://github.com/Sidd927/codegeist-2026/pull/8): redact development-site identifiers ⏳ needs your approval
+- **What:** removes the development site name, your email, and account and installation IDs from the current Stage 1 research notes (8 docs files, no code). Earlier history keeps them; it is not rewritten. They were never credentials.
+- **How:**
+  ```bash
+  gh pr ready 8 && gh pr merge 8 --merge
+  ```
+- **Needs:** CI ✅ (passed).
+- **Who:** You, or the Agent after you write "merge PR 8".
+- **Approval:** **yes**: merges beyond PRs #1–#7 were not covered by the stack authorisation.
+- **Done when:** `git grep -c one-atlas-psvy origin/main` prints nothing.
 
-**How:**
-```bash
-gh pr ready 1 && gh pr merge 1 --merge
-```
-```bash
-for n in 2 3 4 5 6 7; do gh pr edit $n --base main && gh pr ready $n && gh pr merge $n --merge || break; done
-```
+### G3. Merge the release [PR #10](https://github.com/Sidd927/codegeist-2026/pull/10) (`release/v1.0.0`) ⏳ needs your approval
+- **What:**
+  - app version 1.0.0 (Settings shows "Version 1.0.0");
+  - README "For judges" section and current status;
+  - `docs/RELEASE_NOTES.md`;
+  - this checklist's updates.
+- **How:**
+  ```bash
+  gh pr ready 10 && gh pr merge 10 --merge
+  ```
+- **Needs:** its CI ✅.
+- **Who:** You, or the Agent on "merge the release PR".
+- **Approval:** **yes**.
+- **Done when:** `main` contains `docs/RELEASE_NOTES.md` and CI on `main` is ✅.
 
-**Needs:** CI green on #7 (✅ now).
-
-**Who:** You, or the Agent if you write "merge the stack".
-
-**Approval:** **Yes, explicit.**
-
-**Done when:**
-- `gh pr list --state merged` shows #1–#7;
-- `git log origin/main -1` is the merge of #7;
-- the Actions run on `main` is green.
-
-**Why before the deploy:** production is then deployed from `main`, the freeze tag sits on `main`, and the repository link and privacy-policy URL point at the final files.
-
-**After G1:** any later fix goes on a new branch with its own PR to `main`. The code freeze is 17 Dec.
-
----
+### G4. GitHub Release `v1.0.0` (after P5, the production deploy)
+- **Decision:** a release is worthwhile, but only on the commit that is actually deployed to production, so the tag, the deployed build and the judges' install match. Creating it earlier would describe a build judges can't install.
+- **How:**
+  ```bash
+  gh release create v1.0.0 --target <deployed main commit> --title "Article25 1.0.0 (Codegeist 2026)" --notes-file docs/RELEASE_NOTES.md
+  ```
+- **Needs:** P5.
+- **Who:** the Agent, on "create the release". **Approval:** yes (a public release).
+- **Done when:** `gh release view v1.0.0` shows the tag on the deployed commit.
 
 ## 2. Release documents match the implementation (verified 24 Nov)
 | Document | Reflects | Status |
@@ -113,42 +107,53 @@ for n in 2 3 4 5 6 7; do gh pr edit $n --base main && gh pr ready $n && gh pr me
 ---
 
 ## 3. Privacy policy (`docs/privacy-policy.md`)
-**Missing information** (exact markers in the file):
+**Status:** the final text is in draft [PR #9](https://github.com/Sidd927/codegeist-2026/pull/9) (branch `docs/privacy-policy-final`).
+- The draft banner and every `[CONFIRM]`/`[REVIEW]` marker are resolved, conservatively, from the implementation and your recorded decisions:
+  - no legal-role claim;
+  - no data-residency claim (it is determined by Atlassian's platform);
+  - AI limits stated as 300 checks a day and USD 5 per installation;
+  - Atlassian's Forge LLM terms referenced by a verified link, not paraphrased;
+  - plain wording for rights and deletion;
+  - neutral wording on log access.
+- Every data statement still matches the code. The approval-validity fix adds no personal data.
 
-| Line | Marker | What you supply |
-|---|---|---|
-| 1–5 | Draft banner | Remove when publishing |
-| 9 | `[DATE OF PUBLICATION] [CONFIRM]` | The publication date |
-| 16 | `[PRIVATE CONTACT EMAIL] [CONFIRM]` | An email address you are willing to publish for privacy and deletion requests |
-| 18 | `[REVIEW: the developer's role (controller, processor or neither)…]` | A professional's wording, or delete the sentence |
-| 55 | `[REVIEW]` on data residency | Keep "no claim", or a reviewed statement |
-| 62 | `[CONFIRM: the published limits, currently 300 checks a day and USD 5 per installation]` | Confirm that these are the values you will set |
-| 68 | `[REVIEW: confirm Atlassian's published Forge LLM terms…]` | Check Atlassian's current Forge LLM terms; keep the sentence general unless they say more |
-| 101 | `[REVIEW: the rights and requests wording, jurisdiction]` | A reviewed sentence, or keep the general wording |
+**Only two inputs remain, both yours:**
+
+| Placeholder in PR #9 | What you supply |
+|---|---|
+| `{{CONTACT_EMAIL}}` | An email address you are willing to publish for privacy questions and deletion requests |
+| `{{PUBLICATION_DATE}}` | The date you publish (normally the day PR #9 is merged) |
+
+**Also confirm:**
+- that the policy may name you ("built by an individual developer, Siddhant Patil");
+- whether you want a privacy professional to review the wording. It's optional; nothing here is legal certification.
 
 **Publication requirements:**
 - a URL anyone can open without signing in, stable until after judging (3 Feb 2027);
 - content that matches the deployed build;
-- no `[CONFIRM]` or `[REVIEW]` markers left.
+- no `{{` placeholders left.
 
 ### PP1. Provide the inputs
-- **How:** reply in chat with the email, the date, and your decision on each [REVIEW] line. Or edit the file yourself.
-- **Needs:** for the [REVIEW] lines, a lawyer or privacy professional if you want one.
-- **Who:** You. **Approval:** yes (legal declarations are yours).
-- **Done when:** `grep -c "\[CONFIRM\|\[REVIEW\|\[PRIVATE\|\[DATE" docs/privacy-policy.md` prints `0`.
+- **How:** reply in chat with the email and the date (and any wording changes), or edit PR #9 yourself.
+- **Needs:** none.
+- **Who:** You. **Approval:** yes (publishing your contact details).
+- **Done when:** you have replied.
 
-### PP2. Apply the inputs and remove the draft banner
-- **How:** the Agent edits `docs/privacy-policy.md` on a branch and opens a PR to `main`.
-- **Needs:** PP1 and G1.
-- **Who:** Agent. **Approval:** yes (to publish your contact details).
-- **Done when:** the PR is merged; the grep above prints `0`.
+### PP2. Fill the placeholders and merge PR #9
+- **How:** the Agent fills both placeholders on `docs/privacy-policy-final`, marks PR #9 ready, waits for CI, then runs `gh pr merge 9 --merge` on your word.
+- **Needs:** PP1, G1 ✅.
+- **Who:** Agent. **Approval:** **yes** ("merge the privacy policy").
+- **Done when:**
+  - `grep -c "{{" docs/privacy-policy.md` on `main` prints `0`;
+  - PR #9 shows as merged.
 
 ### PP3. Publish it
 - **Recommended:** the public repository file. No new service is needed.
   - **URL:** `https://github.com/Sidd927/codegeist-2026/blob/main/docs/privacy-policy.md`
   - **Alternative:** GitHub Pages, via repository *Settings → Pages*.
 - **Needs:** PP2.
-- **Who:** You (choose the location). **Approval:** yes (publishing).
+- **Recommendation:** the repository URL above. It is public as soon as PR #9 is merged, needs no new service, and is versioned.
+- **Who:** You (confirm the location). **Approval:** yes (publishing).
 - **Done when:** the URL opens in a private/incognito window, signed out, and shows the final text.
 
 ### PP4. Put the policy URL in the documents
@@ -181,7 +186,7 @@ permissions:
 
 **Guard:** `app/scripts/check-permissions.mjs` runs in `npm run lint` and CI, and fails the build on any added scope, egress, content permission or module type.
 
-### F1. Confirm the frozen set
+### F1. Confirm the frozen set ✅ Done on `main` `2a40efe` (24 Nov): "No issues found"; "3 scopes and 9 module types match the frozen set"
 - **How:** `cd app && forge lint && node scripts/check-permissions.mjs` (expect "No issues found" and "3 scopes and 9 module types match the frozen set").
 - **Needs:** G1 (so this runs on `main`).
 - **Who:** Agent. **Approval:** no.
@@ -219,7 +224,14 @@ permissions:
 
 **Note:** variables take effect on the **next deploy**, so set P1–P3 before P5.
 
-### P0. Check you are in the right app and account
+### P0. Check you are in the right app and account ✅ Read-only check done (24 Nov)
+**Found:**
+- the Forge CLI is signed in to your developer account;
+- the `production` environment exists, last deployed 22 Nov (an early build, so P5 is still needed);
+- **no production variables**;
+- **no production installations**: the only installation is development, version 6, on the development site.
+- The Forge CLI is 15.1.0 (16.0.0 is available). **Stay on 15.1.0 for the release:** every deploy and test so far used it, and a major CLI upgrade right before production adds risk for no benefit. Re-run P0 yourself just before P1 to confirm nothing has changed.
+
 - **How:**
   ```bash
   forge whoami
@@ -267,6 +279,13 @@ Generated locally and stored encrypted. Never printed, never in a file.
 - **Who:** You, or the Agent if you write "configure production AI".
 - **Approval:** **yes** (it enables paid Forge LLM usage in production, up to $5 per installation).
 - **Done when:** `forge variables list -e production` shows exactly these four values.
+- **Billing implications** (read before approving):
+  - **Per check:** about **$0.0026** per AI-assisted check, measured live in M2 with Haiku. Re-checking identical text reuses the earlier result and costs nothing.
+  - **Per installation:** at most 300 AI checks a day (about $0.78 at that rate). The **lifetime cap is $5** (roughly 1,900 checks). After that, checks continue rule-based and labelled, at no AI cost.
+  - **Total exposure:** **$5 × the number of production installations**. The cap is per installation, not global. With about 20 judge installations the theoretical maximum is about $100. Realistic judge use (5–20 checks each) is cents.
+  - **Article25's own accounting:** the cap is enforced against the Forge LLM price list read at runtime, with worst-case reservations. Atlassian's invoice is authoritative and can differ slightly.
+  - **Other Forge usage:** compute and SQL are billed by Atlassian only above its free allowances, which you accepted in the Developer Terms. That is not expected at judging scale, but it can't be promised.
+  - **Free alternative:** set `A25_AI_ENABLED false` (rule-based only, no LLM cost). This lowers detection quality: rules alone missed 4 sensitive items on the M2 held-out set.
 
 ### P3. Leave unset
 `A25_REVIEWER_GROUP` (default `article25-reviewers`), `A25_SCOPE_PROJECTS` (all projects) and `A25_RECORD_TRUSTED_KEYS`.
@@ -414,7 +433,7 @@ If `build/` is missing, rebuild with `submission/video/VIDEO_PRODUCTION_NOTES.md
 
 **Metadata:** title, description with chapters, tags and settings are copy-ready in `submission/video/YOUTUBE_UPLOAD_KIT.md`.
 
-### Y1. Listen and watch, all of it
+### Y1. Listen and watch, all of it ✅ Done: you watched and approved the film (24 Nov). No regeneration.
 - **How:** play the film once on headphones and once on speakers, and check:
 
 | # | Check |
@@ -514,28 +533,38 @@ All must be true:
 ---
 
 ## 10. Your manual actions and approvals, in order
+**Done:**
+- ✅ the film was approved by you (Y1);
+- ✅ PRs #1–#7 were merged (G1);
+- ✅ the freeze checks passed on `main` (F1);
+- ✅ the read-only production check was run (P0);
+- ✅ the privacy policy is prepared in PR #9.
+
+**Remaining, in order:**
+
 | # | Action | Step | Approval you give | Target date |
 |---|---|---|---|---|
-| 1 | **Listen** to and watch the film; reply "film approved" or list fixes | Y1 | Audio and content | 27 Nov |
-| 2 | Provide the privacy-policy email, date, limits confirmation and [REVIEW] decisions | PP1 | Legal content | 28 Nov |
-| 3 | **Approve the merge** of PRs #1–#7 into `main` ("merge the stack") | G1 | Merge | 1 Dec |
-| 4 | Approve the privacy-policy PR, and choose where to publish | PP2, PP3 | Publishing your contact details | 2 Dec |
-| 5 | **Approve the permission freeze** ("freeze permissions") | F2 | Freeze | **4 Dec** |
-| 6 | `forge login`; run the **production signing-key command** yourself | P0, P1 | Key generation (yours only) | 5 Dec |
-| 7 | **Approve production AI** ("configure production AI": on, 300/day, $5) | P2 | Paid usage up to $5 per installation | 5 Dec |
-| 8 | **Approve the production deploy** ("approve the production deploy") | P5 | Deploy | 6 Dec |
-| 9 | Turn on **Sharing** and copy the install link | S1 | Public install link | 7 Dec |
-| 10 | Create the **clean site** and a **second user** | §7 | Account creation | 8 Dec |
-| 11 | Install from the link; run the rehearsal; pin the fingerprint | R1, R2, P7 | Install on your site | 12 Dec |
-| 12 | Approve fixes from the rehearsal, if any (PRs) | R3 | Merges | 17 Dec (code freeze) |
-| 13 | Upload to YouTube Unlisted, check, then **Public** | Y2, Y3 | Publishing | 15 Dec |
+| 1 | Approve merging [PR #8](https://github.com/Sidd927/codegeist-2026/pull/8) (redaction) and [PR #10](https://github.com/Sidd927/codegeist-2026/pull/10) (version 1.0.0, README, notes, this checklist) | G2, G3 | Merges | 26 Nov |
+| 2 | Give the privacy contact email and publication date; confirm your name may appear | PP1 | Publishing your contact details | 28 Nov |
+| 3 | Approve merging [PR #9](https://github.com/Sidd927/codegeist-2026/pull/9) (policy) and confirm the repository URL as the public location | PP2, PP3 | Publishing | 30 Nov |
+| 4 | **Approve the permission freeze** ("freeze permissions") | F2 | Freeze | **4 Dec** |
+| 5 | Run the **production signing-key command** yourself (P1), after re-checking P0 | P0, P1 | Key generation (yours only) | 5 Dec |
+| 6 | **Approve production AI** ("configure production AI": on, Haiku, 300/day, $5); billing in P2 | P2 | Paid usage, at most $5 per installation | 5 Dec |
+| 7 | **Approve the production deploy** ("approve the production deploy") | P4, P5 | Deploy | 6 Dec |
+| 8 | Turn on **Sharing** and copy the install link | S1 | Public install link | 7 Dec |
+| 9 | Create the **clean site** and invite a **second user** | §7 | Account creation | 8 Dec |
+| 10 | Install from the link; run the rehearsal with the Agent; pin the fingerprint | R1, R2, P7 | Install on your site | 12 Dec |
+| 11 | Upload to YouTube Unlisted, check signed out, then **Public**; send the URL | Y2, Y3 | Publishing | 15 Dec |
+| 12 | Approve the PRs that add the link, URLs and rehearsal results; approve the GitHub Release | S2, PP4, Y4, R3, G4 | Merges, release | 16 Dec |
+| 13 | Approve fixes from the rehearsal, if any | R3 | Merges | 17 Dec (code freeze) |
 | 14 | Optional: decide on a Marketplace listing (bonus) | §9 | Vendor account | 14 Dec |
 | 15 | Fill in Devpost; run DV1; **Submit** | DV1, DV2 | Legal submission | **21 Dec** |
 
 **The Agent can do these on your word:**
-- G1 merges, F2 tag, P2 variables, P5 deploy;
-- the PRs for PP2, PP4, S2 and Y4;
-- the checks in D1, F1, F3, P4 and P6;
-- R3, and the DV1 grep.
+- merges (G2, G3, PP2, S2, PP4, Y4, R3);
+- the F2 tag, P2 variables and the P5 deploy;
+- the G4 release.
+
+**The Agent does these without asking:** the checks in D1, F3, P4 and P6, and the DV1 grep.
 
 **Never done by the Agent:** generating the production key (P1), Sharing (S1), YouTube (Y2–Y3), Devpost (DV2), or legal content (PP1).

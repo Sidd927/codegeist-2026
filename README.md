@@ -1,13 +1,24 @@
 # Article25
 
+**Privacy review that actually enforces the decision.**
+
 **The privacy review desk that lives inside Jira.** Article25 is an Atlassian Forge app built for Codegeist 2026. It checks new and changed Jira work items for planned processing of personal data. It routes the items that need a decision to privacy reviewers. It can stop a protected workflow transition until a reviewer has approved the *current* text. And it keeps a signed record of every decision, which anyone can verify independently.
 
-The loop is **DETECT → REVIEW → DECIDE → ENFORCE → RECORD**.
+The loop is **DETECT → REVIEW → DECIDE → ENFORCE → RECORD → VERIFY / RECOVER**.
 
-> **Status (23 Nov 2026):**
-> - Milestones M1–M5 are done on a **development** environment and open as stacked **draft** pull requests #1–#7. None is merged.
-> - Not released: no production installation and no sharing link yet.
-> - What works, what was tested live and what is still open: [`product/FINAL_READINESS_AUDIT.md`](product/FINAL_READINESS_AUDIT.md).
+> **Status (24 Nov 2026): version 1.0.0 is on `main`, which is CI-green. Production release pending.**
+> - All milestones (M1–M5) are merged into `main` (PRs #1–#7).
+> - The production deploy, the judges' installation link and the public demo video are the remaining release steps: [`submission/RELEASE_CHECKLIST.md`](submission/RELEASE_CHECKLIST.md).
+> - What was tested live and what was only tested automatically: [`submission/FINAL_VERIFICATION_REPORT.md`](submission/FINAL_VERIFICATION_REPORT.md).
+
+## For judges
+| | |
+|---|---|
+| **Install and try it (about 10 minutes)** | [`docs/JUDGE_INSTALL.md`](docs/JUDGE_INSTALL.md). Installation link: *added when the production release is shared* |
+| **Demo video (3:59)** | *Link added when published* |
+| **What it is, in one page** | *What it does* and *Architecture in one page*, below |
+| **Check the claims yourself** | *Verify the claims yourself*, below: tests, the offline record verifier |
+| **Privacy policy** | [`docs/privacy-policy.md`](docs/privacy-policy.md) (draft until published) |
 
 ---
 
@@ -15,10 +26,10 @@ The loop is **DETECT → REVIEW → DECIDE → ENFORCE → RECORD**.
 
 | Step | What happens | Where |
 |---|---|---|
-| **Detect** | Every created or edited work item is screened in the background. Rule-based extraction always runs. AI extraction (Forge LLM) runs only when an operator switches it on. Every finding quotes the exact words it is based on. A deterministic, versioned rules engine sets the outcome; the AI never does. | Issue panel *Article25 privacy*; desk *Inbox* |
+| **Detect** | Every created or edited work item is screened in the background. Rule-based extraction always runs. AI-assisted extraction (Forge LLM) runs when it is switched on and a spending cap is set (the judging build: on, 300 checks a day, $5 per installation); otherwise checks are rule-based, and each result says which. Every finding quotes the exact words it is based on. A deterministic, versioned rules engine sets the outcome; the AI never does. | Issue panel *Article25 privacy*; desk *Inbox* |
 | **Review** | Reviewers (members of a Jira group) see the text with highlighted evidence, findings and what is new. They can assign the work item to a reviewer. | Desk → review workspace |
 | **Decide** | Approve, approve with conditions, request more information, or reject. A decision is bound to the exact text the reviewer saw. Separation of duties stops reporters and assignees deciding on their own work items. | Review workspace |
-| **Enforce** | A Jira workflow validator, the *Article25 privacy gate*, lets a protected transition through only when a reviewer's approval covers the current text. Edits that add new privacy signals invalidate the approval. The gate runs in **Monitoring** mode (records what it would block) until an admin chooses **Enforcing**. | Jira workflow editor; desk *Settings* |
+| **Enforce** | A Jira workflow validator, the *Article25 privacy gate*, lets a protected transition through only when a reviewer's approval covers the current text. Edits that add new privacy signals invalidate the approval, and so does an edit that could only be checked rule-based after an AI-assisted approval. The gate runs in **Monitoring** mode (records what it would block) until an admin chooses **Enforcing**. | Jira workflow editor; desk *Settings* |
 | **Record** | Every decision is appended to a hash chain of Ed25519-signed records. Admins can verify the whole record, export a signed archive, check that archive offline with only a public key, and restore it after a reinstall. | Desk *Record* and *Settings* |
 
 ## Architecture in one page
@@ -32,7 +43,7 @@ Jira workflow transition ──► gate-fn (validator) ──► one SQL snapsho
 Scheduled reconciler (5 min): re-queues stuck checks, signs pending decisions, purges expired data
 ```
 
-- **Runtime:** Forge, Node.js 24. Custom UI (React 18, Atlaskit) for the panel and the global page.
+- **Runtime:** Forge, Node.js 24. Custom UI (React 18, styled with Atlassian Design System tokens, light and dark) for the panel and the global page.
 - **Storage:** Forge SQL only, via additive migrations applied by the maintenance queue. Article25 writes nothing to Jira.
 - **Permissions:** `read:jira-work`, `read:jira-user` (reviewer-group membership, names) and `read:workflow:jira` (read-only: which transitions carry the gate), plus the Forge LLM module. There is no egress and no Confluence access.
 - **Trust:** decisions are signed with a key held in an encrypted Forge environment variable.
@@ -51,7 +62,8 @@ Design documents: [`product/SYSTEM_ARCHITECTURE.md`](product/SYSTEM_ARCHITECTURE
 | `app/scripts/verify-archive.mjs` | Independent offline verifier for exported archives (Node crypto only) |
 | `product/` | Product requirements, architecture, UX, roadmap and per-milestone results with live evidence |
 | `research/`, `spikes/` | Stage 1 research and Forge spikes (historical) |
-| `docs/` | Judge install guide (draft), privacy policy (draft) |
+| `docs/` | Judge install guide, clean-site rehearsal, privacy policy (draft), release notes |
+| `submission/` | Release checklist, verification report, Devpost copy, demo film sources |
 
 ## Develop and run
 
@@ -126,7 +138,7 @@ Forge environment variables belong to the app **environment**, not to a site. In
 | All tests pass, including colour contrast in real Chromium (light and dark ADS themes); bundles are within budget (panel ≤ 200 KB gzip, desk ≤ 400 KB) | `cd app && npm run check` (CI runs the same on every push; the contrast step needs `npx playwright install chromium` once locally) |
 | Ledger performance | `cd app && npm run bench -- 1000 5000 10000` |
 | An exported archive is genuine and complete | `node scripts/verify-archive.mjs <file> --fingerprint "<pinned>"` |
-| What was tested live, and what was only tested automatically | [`product/FINAL_READINESS_AUDIT.md`](product/FINAL_READINESS_AUDIT.md) §3 |
+| What was tested live, and what was only tested automatically | [`submission/FINAL_VERIFICATION_REPORT.md`](submission/FINAL_VERIFICATION_REPORT.md) §6 and [`docs/CLEAN_SITE_REHEARSAL.md`](docs/CLEAN_SITE_REHEARSAL.md) Part 0 |
 
 ## Documentation index
 
@@ -141,7 +153,7 @@ Forge environment variables belong to the app **environment**, not to a site. In
   - [M5 record](product/M5_RECORD_RESULTS.md)
   - [**final readiness audit**](product/FINAL_READINESS_AUDIT.md)
 - Judges: [install guide](docs/JUDGE_INSTALL.md) · [clean-site rehearsal](docs/CLEAN_SITE_REHEARSAL.md)
-- Release: [**release checklist**](submission/RELEASE_CHECKLIST.md) · [final handover](submission/FINAL_HANDOVER.md) · [final verification](submission/FINAL_VERIFICATION_REPORT.md) · [readiness and approvals](product/RELEASE_READINESS.md) · [production runbook](product/PRODUCTION_RUNBOOK.md) · [permissions matrix](product/PERMISSIONS_MATRIX.md) · [AI decision memo](product/AI_PRODUCTION_DECISION.md) · [privacy policy draft](docs/privacy-policy.md)
+- Release: [**release checklist**](submission/RELEASE_CHECKLIST.md) · [release notes 1.0.0](docs/RELEASE_NOTES.md) · [approval validity](product/APPROVAL_VALIDITY_INVESTIGATION.md) · [final handover](submission/FINAL_HANDOVER.md) · [final verification](submission/FINAL_VERIFICATION_REPORT.md) · [readiness and approvals](product/RELEASE_READINESS.md) · [production runbook](product/PRODUCTION_RUNBOOK.md) · [permissions matrix](product/PERMISSIONS_MATRIX.md) · [AI decision memo](product/AI_PRODUCTION_DECISION.md) · [privacy policy draft](docs/privacy-policy.md)
 - Submission: [Devpost draft](submission/DEVPOST_FINAL_SUBMISSION.md) · [checklist](submission/SUBMISSION_CHECKLIST.md) · [demo film notes](submission/video/VIDEO_PRODUCTION_NOTES.md)
 
 Article25 helps teams run their own privacy reviews. It does not give legal advice, and its findings are prompts for a human decision.

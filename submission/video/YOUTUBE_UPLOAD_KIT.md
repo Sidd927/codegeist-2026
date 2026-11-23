@@ -45,7 +45,7 @@ About this video
 - The narration is a synthetic voice (Kokoro-82M, generated locally).
 - There is no music. The sound effects are used under the Pixabay Content License.
 
-Source code: [REPOSITORY URL, or remove this line if the repository stays private]
+Source code: https://github.com/Sidd927/codegeist-2026
 ```
 
 ## Settings
@@ -63,8 +63,8 @@ Source code: [REPOSITORY URL, or remove this line if the repository stays privat
 | Comments | Your choice |
 
 ## Upload checklist
-- [ ] **Listen to the whole film** with headphones and on speakers: voice pronunciation ("Article twenty-five", "SMS"), levels, any artefacts. *(Not done by a person yet.)*
-- [ ] Watch every frame once at full screen. Confirm no user name, email or avatar is visible (Jira capture at 1:56–2:08).
+- [x] **Listen to the whole film**: done; approved by the owner on 24 Nov.
+- [x] Watch every frame once at full screen (covered by the owner's approval; the Jira capture at 1:56–2:08 was also checked: no name or avatar).
 - [ ] Upload `build/article25-demo-final.mp4` as **Unlisted**.
 - [ ] Paste the title and description; set the thumbnail; upload the SRT.
 - [ ] Answer the synthetic-content disclosure question.
