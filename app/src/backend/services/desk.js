@@ -58,8 +58,11 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
   }
   const person = (people, id, withId) => (id ? { ...(withId ? { id } : {}), name: people.get(id)?.displayName || 'Unknown user', active: people.get(id)?.active ?? null } : null);
 
-  function presentDecision(d, people, withId) {
+  function presentDecision(d, people, withId, anchors = new Map()) {
+    const a = anchors.get(d.decision_id);
     return {
+      // Signature status of this decision's record (no key material; kid is a public key id).
+      record: a ? { seq: a.seq, format: a.record?.v === 3 ? 'ed25519' : a.record?.v === 2 ? 'legacy' : 'unknown', kid: a.record?.kid ?? null } : null,
       seq: d.seq,
       kind: d.kind,
       decision: d.decision,
@@ -78,7 +81,11 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     const [isReviewer, sodOn] = await Promise.all([review.isReviewer(actorId), review.separationOfDutiesOn()]);
     const currentFp = buildScreeningText(doc).fingerprint;
     const r = await review.reviewOf(doc.id, { item: stored.row, currentFp });
-    const people = await peopleMap([...r.decisions.map((d) => d.decided_by), ...r.assignments.flatMap((a) => [a.assignee, a.assigned_by])]);
+    const [people, anchorRows] = await Promise.all([
+      peopleMap([...r.decisions.map((d) => d.decided_by), ...r.assignments.flatMap((a) => [a.assignee, a.assigned_by])]),
+      repos.chain.forDecisions(r.decisions.map((d) => d.decision_id)).catch(() => []),
+    ]);
+    const anchors = new Map(anchorRows.map((x) => [x.decisionId, x]));
     const sameContent = Boolean(stored.row && stored.row.state === 'SCREENED' && stored.row.screened_fp === currentFp && view.result);
     let decideReason = null;
     if (!isReviewer) decideReason = 'NOT_REVIEWER';
@@ -91,7 +98,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       latestSeq: r.latestSeq,
       assignmentSeq: r.assignmentSeq,
       assignee: person(people, r.assignee, isReviewer),
-      decisions: r.decisions.map((d) => presentDecision(d, people, isReviewer)).reverse(),
+      decisions: r.decisions.map((d) => presentDecision(d, people, isReviewer, anchors)).reverse(),
       assignments: r.assignments.map((a) => ({ seq: a.seq, assignee: person(people, a.assignee, isReviewer), assignedBy: person(people, a.assigned_by, isReviewer), assignedAt: a.assigned_at })).reverse(),
       binding: sameContent ? { screeningId: stored.row.screening_id, fp: stored.row.screened_fp } : null,
       permissions: { isReviewer, canDecide: decideReason === null, decideReason, canAssign: isReviewer },

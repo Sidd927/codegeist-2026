@@ -8,6 +8,7 @@ export const ROUTES = [
   { name: 'home', pattern: /^\/?$/ },
   { name: 'inbox', pattern: /^\/inbox\/?$/ },
   { name: 'review', pattern: /^\/review\/([^/]+)\/?$/, params: ['issueKey'] },
+  { name: 'record', pattern: /^\/record\/?$/ },
   { name: 'settings', pattern: /^\/settings\/?$/ },
 ];
 

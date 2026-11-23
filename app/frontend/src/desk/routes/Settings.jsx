@@ -9,6 +9,7 @@ import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
 import { GateSettings } from '../settings/GateSettings.jsx';
+import { RecordSettings } from '../settings/RecordSettings.jsx';
 
 /** Audited admin switch for separation of duties (server re-checks admin rights). */
 function SodControl({ setting, onChanged, client = api }) {
@@ -145,7 +146,7 @@ function ReviewStatus({ r, onChanged }) {
   );
 }
 
-export function SettingsView({ resource, gate = <GateSettings /> }) {
+export function SettingsView({ resource, gate = <GateSettings />, record = <RecordSettings /> }) {
   const { status, data, error, reload, refresh } = resource;
   return (
     <div className="a25-page a25-settings">
@@ -176,6 +177,7 @@ export function SettingsView({ resource, gate = <GateSettings /> }) {
           </ul>
           <p className="a25-subtle a25-small">{copy.settings.availableLater}</p>
           {gate}
+          {record}
           {data.review ? <ReviewStatus r={data.review} onChanged={refresh} /> : null}
           {data.screening ? <ScreeningStatus s={data.screening} /> : null}
           <dl className="a25-settings__meta a25-small">

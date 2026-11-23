@@ -10,11 +10,13 @@ import { Home } from './routes/Home.jsx';
 import { Inbox } from './routes/Inbox.jsx';
 import { Review } from './routes/Review.jsx';
 import { Settings } from './routes/Settings.jsx';
+import { Register } from './routes/Register.jsx';
 import { NotFound } from './routes/NotFound.jsx';
 
 const NAV = [
   { name: 'home', path: '/', label: copy.nav.home },
   { name: 'inbox', path: '/inbox', label: copy.nav.inbox, also: ['review'] },
+  { name: 'record', path: '/record', label: copy.nav.record },
   { name: 'settings', path: '/settings', label: copy.nav.settings, adminOnly: true },
 ];
 
@@ -72,6 +74,9 @@ export function DeskRoutes({ appContext }) {
       break;
     case 'review':
       page = <Review issueKey={route.params.issueKey} />;
+      break;
+    case 'record':
+      page = <Register />;
       break;
     case 'settings':
       page = <Settings />;

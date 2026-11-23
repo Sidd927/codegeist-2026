@@ -249,6 +249,12 @@ export const chain = {
     return r ? { seq: Number(r.seq), record: JSON.parse(r.record) } : null;
   },
   all: async (limit = 5000) => (await many(`SELECT record FROM chain ORDER BY seq ASC LIMIT ${Number(limit) | 0}`)).map((r) => JSON.parse(r.record)),
+  /** Records for a set of decisions (one statement; used by the workspace history). */
+  forDecisions: async (ids) => {
+    const clean = ids.filter((x) => /^[0-9a-f]{64}$/.test(String(x))).slice(0, 200);
+    if (!clean.length) return [];
+    return (await many(`SELECT seq, decision_id, record FROM chain WHERE decision_id IN (${placeholders(clean.length)})`, ...clean)).map((r) => ({ seq: Number(r.seq), decisionId: r.decision_id, record: JSON.parse(r.record) }));
+  },
 };
 
 /** Inbox candidates with their latest decision and assignment (grouped derived tables, one statement). */

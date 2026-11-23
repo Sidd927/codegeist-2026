@@ -165,6 +165,7 @@ export function createFakeRepos() {
       return c ? { seq: c.seq, record: JSON.parse(c.record) } : null;
     },
     all: async () => chn.map((c) => JSON.parse(c.record)),
+    forDecisions: async (ids) => chn.filter((c) => ids.includes(c.decision_id)).map((c) => ({ seq: c.seq, decisionId: c.decision_id, record: JSON.parse(c.record) })),
   };
   async function inboxCandidates({ projectKey = null, outcome = null, limit = 300 }) {
     const out = [];
