@@ -1,0 +1,32 @@
+# Article25: the privacy review desk that lives inside Jira.
+# Product app (Stage 3 foundation). Every scope below has a documented purpose in product/STAGE3_FOUNDATION_RESULTS.md.
+modules:
+  jira:issuePanel:
+    - key: privacy-panel
+      resource: panel
+      resolver:
+        function: resolver
+      title: Privacy
+      icon: resource:panel;icon.svg
+  jira:globalPage:
+    - key: desk
+      resource: desk
+      resolver:
+        function: resolver
+      title: Article25
+      icon: resource:desk;icon.svg
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: panel
+    path: frontend/dist/panel
+  - key: desk
+    path: frontend/dist/desk
+permissions:
+  scopes:
+    - read:jira-work
+app:
+  runtime:
+    name: nodejs24.x
+  id: ari:cloud:ecosystem::app/a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1

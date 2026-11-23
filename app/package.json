@@ -1,0 +1,26 @@
+{
+  "name": "article25",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Article25: the privacy review desk that lives inside Jira (Forge app).",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build:ui": "npm --prefix frontend run build",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:ui": "npm --prefix frontend test",
+    "lint": "eslint src test frontend/src scripts && node scripts/copy-lint.mjs",
+    "check": "npm run lint && npm test && npm run test:ui && npm run build:ui"
+  },
+  "dependencies": {
+    "@forge/api": "8.5.0",
+    "@forge/resolver": "2.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.0.0"
+  }
+}

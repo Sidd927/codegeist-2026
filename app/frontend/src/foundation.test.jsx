@@ -1,0 +1,172 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { locateMarks, segment } from './shared/margin.js';
+import { EvidenceDocument, MarginNotes } from './shared/components/Margin.jsx';
+import { stateDisplay } from './shared/states.js';
+import { PanelView } from './panel/PanelApp.jsx';
+import { ReviewView } from './desk/routes/Review.jsx';
+import { SettingsView } from './desk/routes/Settings.jsx';
+import { Home } from './desk/routes/Home.jsx';
+import { Inbox } from './desk/routes/Inbox.jsx';
+import { DeskHeader } from './desk/DeskApp.jsx';
+import { RouterProvider, createMemoryHistory, matchRoute } from './desk/router.jsx';
+import { axeViolations } from './a11y.js';
+import { invoke } from '@forge/bridge';
+
+const LABELS = { document: 'Work item text', summary: 'Summary', description: 'Description', noDescription: 'No description.' };
+const resource = (over) => ({ status: 'success', data: null, error: null, reload: vi.fn(), ...over });
+const withRouter = (ui, path = '/') => {
+  const history = createMemoryHistory(path);
+  return { history, ...render(<RouterProvider history={history}>{ui}</RouterProvider>) };
+};
+
+describe('Margin evidence helpers', () => {
+  it('locates quotes case-insensitively, skips overlaps and unknown quotes', () => {
+    const blocks = [{ text: 'Add session replay to checkout' }, { text: 'Abandon carts with prescription items' }];
+    const map = locateMarks(blocks, [
+      { id: 'a', quote: 'session replay' },
+      { id: 'b', quote: 'replay to' }, // overlaps 'a' and has no other occurrence -> skipped
+      { id: 'c', quote: 'PRESCRIPTION items' },
+      { id: 'd', quote: 'not in text' },
+    ]);
+    expect(map.get(0)).toEqual([{ start: 4, end: 18, id: 'a' }]);
+    expect(map.get(1)).toEqual([{ start: 19, end: 37, id: 'c' }]);
+  });
+  it('segments text into plain and marked parts that reassemble exactly', () => {
+    const text = 'Add session replay to checkout';
+    const segs = segment(text, [{ start: 4, end: 18, id: 'a' }]);
+    expect(segs.map((s) => s.text).join('')).toBe(text);
+    expect(segs[1]).toEqual({ text: 'session replay', markId: 'a' });
+  });
+});
+
+describe('Margin components', () => {
+  const marks = [{ id: 'm1', index: 1, quote: 'prescription items', tone: 'sensitive' }];
+  const notes = [{ id: 'm1', index: 1, label: 'Health data', detail: 'sensitive', quote: 'prescription items', isNew: true }];
+  it('links each mark to its note and is accessible', async () => {
+    const onActivate = vi.fn();
+    const { container } = render(
+      <div>
+        <EvidenceDocument idPrefix="t" summary="Checkout" blocks={[{ kind: 'paragraph', text: 'Carts with prescription items' }]} marks={marks} activeId={null} labels={LABELS} />
+        <MarginNotes idPrefix="t" notes={notes} activeId={null} onActivate={onActivate} />
+      </div>,
+    );
+    const mark = container.querySelector('mark');
+    expect(mark.getAttribute('aria-describedby')).toBe('t-note-m1');
+    expect(container.querySelector('#t-note-m1').textContent).toContain('Health data');
+    fireEvent.click(screen.getByRole('button', { name: /Health data/ }));
+    expect(onActivate).toHaveBeenCalledWith('m1');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+  it('renders an empty description message', () => {
+    render(<EvidenceDocument idPrefix="t" summary="S" blocks={[]} labels={LABELS} />);
+    expect(screen.getByText('No description.')).toBeTruthy();
+  });
+});
+
+describe('State vocabulary', () => {
+  it('maps known states and falls back safely for unknown ones', () => {
+    expect(stateDisplay('DPIA_LIKELY')).toEqual({ label: 'DPIA likely', appearance: 'removed', bold: true });
+    expect(stateDisplay('SOMETHING_NEW').label).toBe('Not checked yet');
+  });
+});
+
+describe('Issue panel', () => {
+  it('shows a loading skeleton announced to assistive tech', () => {
+    render(<PanelView resource={resource({ status: 'loading' })} />);
+    expect(screen.getByRole('status').textContent).toContain('Loading');
+  });
+  it('shows NOT_SCREENED honestly with checks off, and opens the desk', async () => {
+    const onOpenDesk = vi.fn();
+    const data = { access: 'granted', issue: { key: 'SHOP-42' }, review: { state: 'NOT_SCREENED', findings: [] }, features: { screening: false } };
+    const { container } = render(<PanelView resource={resource({ data })} onOpenDesk={onOpenDesk} />);
+    expect(screen.getByText('Not checked yet')).toBeTruthy();
+    expect(screen.getByText(/not switched on/)).toBeTruthy();
+    expect(screen.queryByText(/Approved/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Open in review desk' }));
+    expect(onOpenDesk).toHaveBeenCalledWith('SHOP-42');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+  it('shows only a permission message when access is denied', () => {
+    render(<PanelView resource={resource({ data: { access: 'denied' } })} />);
+    expect(screen.getByText(/don't have permission/)).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+  it('shows an error with retry', () => {
+    const reload = vi.fn();
+    render(<PanelView resource={resource({ status: 'error', error: { message: 'Jira did not respond in time. Try again.', retryable: true }, reload })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(reload).toHaveBeenCalled();
+  });
+});
+
+describe('Review workspace', () => {
+  const data = {
+    issue: { key: 'SHOP-42', summary: 'Add session replay', projectName: 'Shop', issueType: 'Task', status: 'To Do' },
+    document: { summary: 'Add session replay', blocks: [{ kind: 'paragraph', text: 'Record checkout sessions.' }], truncated: false },
+    review: { state: 'NOT_SCREENED', findings: [] },
+    decision: { available: false, reason: 'CHECKS_NOT_ENABLED' },
+  };
+  it('renders three zones; decisions are disabled with a stated reason', async () => {
+    const { container } = withRouter(<ReviewView resource={resource({ data })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Add session replay' })).toBeTruthy();
+    expect(screen.getByText('Record checkout sessions.')).toBeTruthy();
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(4);
+    radios.forEach((r) => expect(r.disabled).toBe(true));
+    expect(screen.getByRole('button', { name: 'Record decision' }).disabled).toBe(true);
+    expect(screen.getByText(/Decisions become available after a privacy check/)).toBeTruthy();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+  it('shows not-found for missing or inaccessible work items', () => {
+    withRouter(<ReviewView resource={resource({ status: 'error', error: { code: 'NOT_FOUND' } })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Work item not found' })).toBeTruthy();
+  });
+});
+
+describe('Desk navigation and access', () => {
+  it('matches routes, including encoded review keys', () => {
+    expect(matchRoute('/')).toEqual({ name: 'home', params: {} });
+    expect(matchRoute('/review/SHOP-42')).toEqual({ name: 'review', params: { issueKey: 'SHOP-42' } });
+    expect(matchRoute('/nope').name).toBe('not-found');
+  });
+  it('hides Settings from non-admins and marks the current page', async () => {
+    const { container } = withRouter(<DeskHeader appContext={{ roles: { jiraAdmin: false }, environment: { label: 'Development' } }} />, '/inbox');
+    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByText('Development environment')).toBeTruthy();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+  it('shows Settings to admins and navigates', () => {
+    const { history } = withRouter(<DeskHeader appContext={{ roles: { jiraAdmin: true }, environment: { label: null } }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(history.location.pathname).toBe('/settings');
+  });
+  it('settings show a denial message when the server refuses', () => {
+    render(<SettingsView resource={resource({ status: 'error', error: { code: 'NOT_AUTHORISED' } })} />);
+    expect(screen.getByText('Settings are available to Jira administrators')).toBeTruthy();
+  });
+  it('overview labels the example review as fictional and offers no decision controls', async () => {
+    const { container } = withRouter(<Home appContext={{ roles: { jiraAdmin: false }, features: { screening: false } }} />);
+    expect(screen.getByText(/fictional work item, not a real review/)).toBeTruthy();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Record decision|Approve/ })).toBeNull();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe('Inbox', () => {
+  it('shows the checks-off empty state and validates the open-work-item key', async () => {
+    invoke.mockResolvedValueOnce({ ok: true, data: { enabled: false, view: 'pending', items: [], counts: null } });
+    const { history, container } = withRouter(<Inbox />, '/inbox');
+    expect(await screen.findByText('Nothing to review yet')).toBeTruthy();
+    const input = screen.getByLabelText('Work item key');
+    fireEvent.change(input, { target: { value: 'not a key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByRole('alert').textContent).toContain('SHOP-42');
+    fireEvent.change(input, { target: { value: 'shop-42' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open' })));
+    expect(history.location.pathname).toBe('/review/SHOP-42');
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});

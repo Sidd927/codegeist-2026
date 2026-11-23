@@ -1,0 +1,34 @@
+/* Article25 semantic aliases over Atlassian Design System tokens (FRONTEND_ARCHITECTURE §5).
+   Every colour, space and font resolves to an ADS token, so Jira's light/dark theme flows through.
+   Fallback values only apply if theming is unavailable. */
+:root {
+  /* Evidence (Margin) */
+  --a25-mark-bg: var(--ds-background-accent-yellow-subtlest, #fef7c8);
+  --a25-mark-bg-active: var(--ds-background-accent-yellow-subtler, #f8e6a0);
+  --a25-mark-underline-sensitive: var(--ds-border-danger, #e2483d);
+  --a25-mark-underline-vendor: var(--ds-border-discovery, #8270db);
+  --a25-mark-underline-default: var(--ds-border-accent-yellow, #b38600);
+  --a25-margin-rule: var(--ds-border, #0b120e24);
+  --a25-index-fg: var(--ds-text-subtle, #505258);
+
+  /* Delta ("what's new") */
+  --a25-new-bg: var(--ds-background-warning, #fbd779);
+  --a25-new-fg: var(--ds-text-warning, #9e4c00);
+
+  /* Provenance */
+  --a25-ai-fg: var(--ds-text-discovery, #5e4db2);
+  --a25-rules-fg: var(--ds-text-subtlest, #6b6e76);
+
+  /* Gate */
+  --a25-blocked-bg: var(--ds-background-danger, #ffeceb);
+  --a25-blocked-fg: var(--ds-text-danger, #ae2e24);
+  --a25-allowed-fg: var(--ds-text-success, #4c6b1f);
+
+  /* Record */
+  --a25-hash-font: var(--ds-font-family-code, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+
+  /* Layout */
+  --a25-page-max: 1280px;
+  --a25-zone-gap: var(--ds-space-300, 24px);
+  --a25-panel-gap: var(--ds-space-150, 12px);
+}

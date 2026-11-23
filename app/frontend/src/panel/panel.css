@@ -1,0 +1,8 @@
+/* Issue panel: 320–720 px wide, grows with content (UX_DESIGN_SPEC §3.1). */
+html, body { background: transparent; }
+#root { padding: var(--ds-space-050, 4px) var(--ds-space-025, 2px) var(--ds-space-100, 8px); }
+.a25-panel { display: flex; flex-direction: column; gap: var(--a25-panel-gap); }
+.a25-panel__actions { display: flex; gap: var(--ds-space-100, 8px); flex-wrap: wrap; }
+@media (max-width: 479px) {
+  .a25-panel__actions > * { flex: 1 1 100%; }
+}
