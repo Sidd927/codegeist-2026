@@ -46,6 +46,7 @@ function DecisionEntry({ d, issueKey, canDownload, client }) {
       {d.decision === 'APPROVAL_INVALIDATED' ? (
         <div className="a25-small">
           <p>{H.invalidated}</p>
+          {d.detail?.recheck?.approvedWith === 'ai' && d.detail?.recheck?.checkedWith === 'rules' ? <p className="a25-subtle">{H.lessThorough}</p> : null}
           {added.length ? (
             <p className="a25-subtle">
               {H.added}: {added.join(', ')}

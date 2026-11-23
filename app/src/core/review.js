@@ -93,6 +93,25 @@ export function materialChange(approved, current) {
   return { material: escalated || Object.keys(added).length > 0, added, escalated, from: approved?.outcome ?? null, to: current?.outcome ?? null };
 }
 
+/** Was a check AI-assisted? Read from its pipeline version (core/analyse.js `pipelineVersion`):
+ *  AI-assisted versions end in `<extractor>:<model>`, rule-based ones in `.noai`. Unknown → false. */
+export const checkedWithAi = (pipelineVersion) => typeof pipelineVersion === 'string' && pipelineVersion.includes(':') && !pipelineVersion.endsWith('.noai');
+
+/**
+ * What happens to an approval when its work item's text changed and was re-checked.
+ * Carry-over needs BOTH: no material change, AND a re-check at least as thorough as the check the
+ * human approval was based on. An approval granted on AI-assisted evidence is never carried over by
+ * a rule-based re-check (AI unavailable, over its daily limit or spending cap, or invalid output):
+ * rule-based checks have lower recall, so new data written in ways the rules cannot see would
+ * slip through. Such an edit invalidates the approval and needs a human. A rule-based approval is
+ * unaffected (its re-check is as thorough as its basis), and unchanged text never reaches here.
+ */
+export function recheckVerdict({ approvedSignalSet, current, approvedWithAi, recheckedWithAi }) {
+  const m = materialChange(approvedSignalSet, current);
+  const lessThorough = approvedWithAi && !recheckedWithAi;
+  return { ...m, lessThorough, invalidate: m.material || lessThorough };
+}
+
 /**
  * Derived review status. Truth is the append-only decision history plus the current screening;
  * nothing here is stored, so a partially written update cannot leave an inconsistent status.

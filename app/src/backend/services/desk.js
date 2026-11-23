@@ -74,7 +74,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       decidedAt: d.decided_at,
       outcome: d.outcome,
       contentRef: String(d.fp).slice(0, 8), // short evidence-binding reference (not personal data)
-      detail: d.detail ? { carried: d.detail.carried ?? null, added: d.detail.added ?? {}, escalated: d.detail.escalated ?? false, from: d.detail.from ?? null, to: d.detail.to ?? null } : null,
+      detail: d.detail ? { carried: d.detail.carried ?? null, added: d.detail.added ?? {}, escalated: d.detail.escalated ?? false, from: d.detail.from ?? null, to: d.detail.to ?? null, reason: d.detail.reason ?? null, recheck: d.detail.recheck ?? null } : null,
     };
   }
 

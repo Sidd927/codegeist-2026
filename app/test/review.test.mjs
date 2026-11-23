@@ -1,7 +1,8 @@
 // Review core tests: validation, evidence binding, materiality, derived status (synthetic data).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, deriveReviewStatus, STATUS_URGENCY } from '../src/core/review.js';
+import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, deriveReviewStatus, STATUS_URGENCY, checkedWithAi, recheckVerdict } from '../src/core/review.js';
+import { pipelineVersion } from '../src/core/analyse.js';
 
 test('decision validation: each outcome requires its own content; empty or invalid submissions are rejected', () => {
   assert.deepEqual(validateDecisionInput({}).errors, { decision: 'choose_decision', rationale: 'rationale_too_short' });
@@ -65,4 +66,22 @@ test('non-approving decisions: changed content returns the item to review', () =
 });
 test('every derivable status has an urgency rank', () => {
   for (const s of ['APPROVAL_STALE', 'CHANGED_SINCE_DECISION', 'AWAITING_REVIEW', 'PENDING_RECHECK', 'SCREENING_FAILED', 'NEEDS_MORE_INFORMATION', 'AWAITING_SCREENING', 'REJECTED', 'APPROVED_WITH_CONDITIONS', 'APPROVED', 'NOT_REQUIRED']) assert.equal(typeof STATUS_URGENCY[s], 'number', s);
+});
+
+test('checkedWithAi reads the check mode from real pipeline versions; unknown is not AI', () => {
+  assert.equal(checkedWithAi(pipelineVersion('ai', 'claude-haiku-5-5')), true);
+  assert.equal(checkedWithAi(pipelineVersion('ai', null)), true);
+  assert.equal(checkedWithAi(pipelineVersion('rules')), false);
+  for (const v of [null, undefined, '', 'p', 42]) assert.equal(checkedWithAi(v), false);
+});
+test('recheckVerdict: carry-over needs no material change AND a re-check as thorough as the approval basis', () => {
+  const set = { outcome: 'REVIEW_REQUIRED', categories: ['health'], criteria: [], recipients: [], transfers: [] };
+  const more = { ...set, categories: ['health', 'location'] };
+  const v = (approvedWithAi, recheckedWithAi, current = set) => recheckVerdict({ approvedSignalSet: set, current, approvedWithAi, recheckedWithAi });
+  assert.deepEqual([v(true, true).invalidate, v(true, true).lessThorough], [false, false]); // AI → AI, nothing new: carried
+  assert.deepEqual([v(false, false).invalidate, v(false, false).lessThorough], [false, false]); // rules → rules: carried (unchanged behaviour)
+  assert.deepEqual([v(false, true).invalidate, v(false, true).lessThorough], [false, false]); // rules → AI: more thorough, carried if nothing new
+  assert.deepEqual([v(true, false).invalidate, v(true, false).lessThorough, v(true, false).material], [true, true, false]); // AI → rules: never carried
+  assert.deepEqual([v(true, true, more).invalidate, v(true, true, more).material], [true, true]);
+  assert.deepEqual([v(false, false, more).invalidate, v(false, false, more).material], [true, true]);
 });

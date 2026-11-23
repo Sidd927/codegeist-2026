@@ -9,6 +9,7 @@ import { createGateService } from '../src/backend/services/gate.js';
 import { createLedgerService } from '../src/backend/services/ledger.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { createLlmAdapter } from '../src/backend/adapters/llm.js';
+import { createPricing } from '../src/backend/adapters/pricing.js';
 import { configFor, settingsFromEnv } from '../src/backend/lib/config.js';
 import { AppError, ErrorCode } from '../src/backend/lib/errors.js';
 
@@ -26,7 +27,9 @@ export const DEV = 'acc-dev';
 export const OUTSIDER = 'acc-outsider';
 export const ADMIN = 'acc-admin';
 
-export function world({ signingKey = KEY, recordKey = RECORD_KEY, recordKeyPrevious = null, sod = 'on', siteId = 'site-test' } = {}) {
+// `chat` (optional): a MOCKED LLM transport, so tests can switch between AI-assisted and rule-based
+// checks. No billable calls are ever made. `aiEnv` overrides the AI limits.
+export function world({ signingKey = KEY, recordKey = RECORD_KEY, recordKeyPrevious = null, sod = 'on', siteId = 'site-test', chat = null, aiEnv = {} } = {}) {
   const fake = createFakeRepos();
   let now = 1_800_000_000_000;
   const clock = () => now;
@@ -72,7 +75,7 @@ export function world({ signingKey = KEY, recordKey = RECORD_KEY, recordKeyPrevi
     statusName: async (id) => ({ 1: 'To Do', 3: 'In Progress', 10001: 'Done' })[id] ?? null,
     searchWorkflowsWithTransitions: async () => { if (workflowFixture.current instanceof Error) throw workflowFixture.current; return workflowFixture.current; },
   });
-  const env = { A25_AI_ENABLED: 'false', ...(signingKey ? { A25_SIGNING_KEY: signingKey } : {}), ...(recordKey ? { A25_RECORD_SIGNING_KEY: recordKey } : {}), ...(recordKeyPrevious ? { A25_RECORD_SIGNING_KEY_PREVIOUS: recordKeyPrevious } : {}) };
+  const env = { A25_AI_ENABLED: chat ? 'true' : 'false', ...(chat ? { A25_AI_SPEND_CAP_USD: '5', A25_AI_DAILY_BUDGET: '300' } : {}), ...aiEnv, ...(signingKey ? { A25_SIGNING_KEY: signingKey } : {}), ...(recordKey ? { A25_RECORD_SIGNING_KEY: recordKey } : {}), ...(recordKeyPrevious ? { A25_RECORD_SIGNING_KEY_PREVIOUS: recordKeyPrevious } : {}) };
   // Separation of duties is an audited admin setting (settings_events); seed it directly for tests.
   if (sod === 'off') fake.sev.push({ setting: 'review.separation_of_duties', seq: 1, value: 'off', changed_by: ADMIN, changed_at: 1, request_id: 'seed-sod-off', note: null });
   const settings = settingsFromEnv(env);
@@ -81,7 +84,8 @@ export function world({ signingKey = KEY, recordKey = RECORD_KEY, recordKeyPrevi
   const reviewFor = (actor, ledger = ledgerFor()) => createReviewService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId, ledger });
   const queue = [];
   const screening = createScreeningService({
-    repos: fake.repos, jira: jiraFor(null), llm: createLlmAdapter({ chat: null, model: 'claude-haiku-5-5', timeoutMs: 1000 }), queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings,
+    repos: fake.repos, jira: jiraFor(null), llm: createLlmAdapter({ chat, model: 'claude-haiku-5-5', timeoutMs: 1000 }), queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings,
+    pricing: createPricing(async () => ({ models: [{ model: 'claude-haiku-5-5', pricing: { inputCreditsPerMillionTokens: 5, outputCreditsPerMillionTokens: 5 } }] })),
     onCompleted: (args) => reviewFor(null).onScreeningCompleted(args),
   });
   // Overrides of settings/siteId rebuild a matching ledger (keys come from settings + site id).

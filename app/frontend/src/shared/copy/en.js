@@ -419,6 +419,7 @@ export const copy = {
       invalidated: 'Approval invalidated: the text changed in a way that needs a new review.',
       reconfirmed: (carried) => `Approval carried over: the text changed but no new privacy signals were found (${carried}).`,
       added: 'New since the approval',
+      lessThorough: 'The approval was based on AI-assisted checks, but the edited text could only be checked rule-based, which can miss new personal data. A reviewer needs to look at it again.',
       escalated: (from, to) => `Outcome went from ${from} to ${to}.`,
       contentRef: (ref) => `Content ${ref}`,
       conditions: 'Conditions',

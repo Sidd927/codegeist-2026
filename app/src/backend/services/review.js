@@ -8,7 +8,7 @@
 //    left half-applied;
 //  - anchoring in the signed chain is idempotent; unanchored decisions are repaired by the reconciler.
 import { AppError, ErrorCode } from '../lib/errors.js';
-import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, isApprovingDecision, deriveReviewStatus } from '../../core/review.js';
+import { validateDecisionInput, decisionIdOf, signalSetOf, recheckVerdict, checkedWithAi, isApprovingDecision, deriveReviewStatus } from '../../core/review.js';
 import { buildScreeningText } from '../../core/screening-text.js';
 import { createSettingsService } from './settings.js';
 
@@ -181,7 +181,11 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     // completes, and the gate compares the CURRENT text anyway (a changed text never passes).
     if (await restoreState()) return { status: 'deferred_restore' };
     const current = signalSetOf({ ...screening.result, outcome: screening.outcome });
-    const m = materialChange(latest.signal_set, current);
+    // The human approval this one stands on (itself, or the one a carry-over chain carries). Its check
+    // mode is the review condition it was granted under. Not found → assume AI-assisted (fail safe).
+    const basis = latest.kind === 'human' ? latest : (await decisions.list(issueId)).filter((d) => d.kind === 'human' && d.seq < latest.seq).at(-1) ?? null;
+    const approvedWithAi = basis ? checkedWithAi(basis.pipeline_version) : true;
+    const m = recheckVerdict({ approvedSignalSet: latest.signal_set, current, approvedWithAi, recheckedWithAi: checkedWithAi(screening.pipelineVersion) });
     // Signal sets compare lower-cased values; show recipients/transfers with the text's own casing.
     const original = (kinds, v) => (screening.result?.findings ?? []).find((f) => kinds.includes(f.kind) && String(f.signal ?? '').toLowerCase() === v)?.signal ?? v;
     if (m.added.recipients) m.added.recipients = m.added.recipients.map((v) => original(['external_sharing'], v));
@@ -189,9 +193,13 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     const carried = latest.decision === 'APPROVAL_RECONFIRMED' ? latest.detail?.carried ?? 'APPROVED' : latest.decision;
     const row = {
       issueId, seq: latest.seq + 1, requestId: `sys:${issueId}:${latest.seq}:${screening.screeningId}`.slice(0, 100), kind: 'system',
-      decision: m.material ? 'APPROVAL_INVALIDATED' : 'APPROVAL_RECONFIRMED', rationale: null, conditions: m.material ? [] : latest.conditions, questions: [],
+      decision: m.invalidate ? 'APPROVAL_INVALIDATED' : 'APPROVAL_RECONFIRMED', rationale: null, conditions: m.invalidate ? [] : latest.conditions, questions: [],
       decidedBy: null, decidedAt: clock(), screeningId: screening.screeningId, fp: screening.fp, pipelineVersion: screening.pipelineVersion, outcome: screening.outcome,
-      signalSet: m.material ? current : latest.signal_set, detail: { basedOnSeq: latest.seq, carried, added: m.added, escalated: m.escalated, from: m.from, to: m.to },
+      signalSet: m.invalidate ? current : latest.signal_set,
+      detail: {
+        basedOnSeq: latest.seq, carried, added: m.added, escalated: m.escalated, from: m.from, to: m.to,
+        ...(m.lessThorough ? { recheck: { approvedWith: 'ai', checkedWith: 'rules' }, ...(m.material ? {} : { reason: 'LESS_THOROUGH_RECHECK' }) } : {}),
+      },
     };
     const { inserted } = await insertDecision(row);
     if (!inserted) return { status: 'skipped' }; // already recorded, or a human decided concurrently
