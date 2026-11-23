@@ -60,13 +60,16 @@ cd app && export PATH=/opt/homebrew/opt/node@24/bin:$PATH
 - **Approval:** **yes**: merges beyond PRs #1–#7 were not covered by the stack authorisation.
 - **Done when:** `git grep -c one-atlas-psvy origin/main` prints nothing.
 
-### G3. Merge the release PR (`release/v1.0.0`) ⏳ needs your approval
+### G3. Merge the release [PR #10](https://github.com/Sidd927/codegeist-2026/pull/10) (`release/v1.0.0`) ⏳ needs your approval
 - **What:**
   - app version 1.0.0 (Settings shows "Version 1.0.0");
   - README "For judges" section and current status;
   - `docs/RELEASE_NOTES.md`;
   - this checklist's updates.
-- **How:** `gh pr merge <number> --merge` (the number is in §10).
+- **How:**
+  ```bash
+  gh pr ready 10 && gh pr merge 10 --merge
+  ```
 - **Needs:** its CI ✅.
 - **Who:** You, or the Agent on "merge the release PR".
 - **Approval:** **yes**.
@@ -541,7 +544,7 @@ All must be true:
 
 | # | Action | Step | Approval you give | Target date |
 |---|---|---|---|---|
-| 1 | Approve merging [PR #8](https://github.com/Sidd927/codegeist-2026/pull/8) (redaction) and the release PR (version 1.0.0, README, notes, this checklist) | G2, G3 | Merges | 26 Nov |
+| 1 | Approve merging [PR #8](https://github.com/Sidd927/codegeist-2026/pull/8) (redaction) and [PR #10](https://github.com/Sidd927/codegeist-2026/pull/10) (version 1.0.0, README, notes, this checklist) | G2, G3 | Merges | 26 Nov |
 | 2 | Give the privacy contact email and publication date; confirm your name may appear | PP1 | Publishing your contact details | 28 Nov |
 | 3 | Approve merging [PR #9](https://github.com/Sidd927/codegeist-2026/pull/9) (policy) and confirm the repository URL as the public location | PP2, PP3 | Publishing | 30 Nov |
 | 4 | **Approve the permission freeze** ("freeze permissions") | F2 | Freeze | **4 Dec** |
