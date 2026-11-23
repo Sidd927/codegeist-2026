@@ -120,6 +120,43 @@ export const MIGRATIONS = [
       UNIQUE KEY uq_chain_decision (decision_id)
     )`,
   ],
+  // M4 ENFORCE. Admin settings are an append-only log: the latest row per setting is the current
+  // value, and every change IS its own audit event (one INSERT, nothing to half-apply).
+  [
+    'v008_settings_events',
+    `CREATE TABLE IF NOT EXISTS settings_events (
+      setting VARCHAR(40) NOT NULL,
+      seq INT NOT NULL,
+      value VARCHAR(40) NOT NULL,
+      changed_by VARCHAR(128) NOT NULL,
+      changed_at BIGINT NOT NULL,
+      request_id VARCHAR(100) NOT NULL,
+      note VARCHAR(300) NULL,
+      PRIMARY KEY (setting, seq),
+      UNIQUE KEY uq_settings_request (request_id)
+    )`,
+  ],
+  // Gate evaluations (validator runs). Content-free: ids, codes, a short content reference.
+  [
+    'v009_gate_events',
+    `CREATE TABLE IF NOT EXISTS gate_events (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      at BIGINT NOT NULL,
+      issue_id VARCHAR(20) NULL,
+      project_key VARCHAR(100) NULL,
+      from_status VARCHAR(20) NULL,
+      to_status VARCHAR(20) NULL,
+      mode VARCHAR(10) NOT NULL,
+      verdict VARCHAR(12) NOT NULL,
+      reason VARCHAR(40) NOT NULL,
+      policy_version VARCHAR(10) NOT NULL,
+      decision_seq INT NULL,
+      content_ref CHAR(16) NULL,
+      ms INT NULL,
+      INDEX idx_gate_events_at (at),
+      INDEX idx_gate_events_issue (issue_id, at)
+    )`,
+  ],
 ];
 
 /** Apply pending migrations. Called only from the migration queue consumer (never per request). */

@@ -12,11 +12,11 @@ const ENVIRONMENTS = {
 export const FEATURES = Object.freeze({
   screening: true, // M2: automatic privacy checks (AI extraction only when approved; see settingsFromEnv)
   decisions: true, // M3: reviewer assignment, decisions and decision history
-  gate: false, // workflow validator
+  gate: true, // M4: workflow validator (monitor by default; enforcement is an audited admin choice)
   register: false, // Confluence decision register
 });
 
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.4.0';
 
 export function configFor(environmentType) {
   return ENVIRONMENTS[String(environmentType ?? '').toUpperCase()] ?? ENVIRONMENTS.PRODUCTION;
@@ -44,7 +44,6 @@ export function settingsFromEnv(env = process.env) {
     isProjectInScope: (projectKey) => scope.length === 0 || scope.includes(String(projectKey ?? '').toUpperCase()),
     // M3 REVIEW
     reviewerGroup: (env.A25_REVIEWER_GROUP || 'article25-reviewers').trim(),
-    separationOfDuties: env.A25_SEPARATION_OF_DUTIES !== 'off', // on unless explicitly switched off
     signingKey: env.A25_SIGNING_KEY || null, // encrypted Forge variable; never logged or returned
   };
 }
