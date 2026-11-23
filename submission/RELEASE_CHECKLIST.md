@@ -24,14 +24,21 @@ cd app && export PATH=/opt/homebrew/opt/node@24/bin:$PATH
 
 ## 1. Git: the real state, and the merge order
 **Current state (verified 24 Nov):**
-- Branch: `milestone-m5-record`, HEAD `f22baaf57fc387d11ee6acdb585e3afcfe831a26`, clean, in sync with origin.
-- CI on `f22baaf`: push run `45252793765` ✅ and PR run `45252805791` ✅. All steps executed: 204 backend, 89 UI, 24 contrast, lint with the freeze guard, build.
+- Branch: `milestone-m5-record`, clean, in sync with origin.
+- **Last code change:** `f22baaf` (the approval-validity fix and its docs). CI on it: push run `45252793765` ✅ and PR run `45252805791` ✅. All steps executed: 204 backend, 89 UI, 24 contrast, lint with the freeze guard, build.
+- **Later commits are documentation and housekeeping only:**
+  - `cf22627`, this checklist;
+  - `5a522ee`, which stops tracking `.DS_Store` (CI ✅ on push run `45254776057` and PR run `45254790367`);
+  - the commit that added this paragraph.
+- Check the live head with `git log -1 --oneline origin/milestone-m5-record` and `gh pr checks 7`.
 - Repository: public, default branch `main` (still only the "Initial commit" `f45568b`). Merge commits are allowed. **Delete-branch-on-merge is off**, so GitHub will *not* retarget the next PR by itself.
 
 **Recent history on the release branch:**
 
 | Commit | Change |
 |---|---|
+| `5a522ee` | chore: untrack `.DS_Store` |
+| `cf22627` | docs: this release checklist |
 | `f22baaf` | docs: approval-validity investigation |
 | `5a3dc54` | fix(review): no AI → rules carry-over |
 | `ef87c66` | docs: final reports |
@@ -54,7 +61,7 @@ cd app && export PATH=/opt/homebrew/opt/node@24/bin:$PATH
 | 4 | [#4](https://github.com/Sidd927/codegeist-2026/pull/4) M2 Detect | `milestone-m2-detect` (0f8e579) → `stage3-…` | 10 |
 | 5 | [#5](https://github.com/Sidd927/codegeist-2026/pull/5) M3 Review | `milestone-m3-review` (0852246) → `milestone-m2-detect` | 9 |
 | 6 | [#6](https://github.com/Sidd927/codegeist-2026/pull/6) M4 Enforce | `milestone-m4-enforce` (7254fbb) → `milestone-m3-review` | 9 |
-| 7 | [#7](https://github.com/Sidd927/codegeist-2026/pull/7) M5 Record | `milestone-m5-record` (f22baaf) → `milestone-m4-enforce` | 40 |
+| 7 | [#7](https://github.com/Sidd927/codegeist-2026/pull/7) M5 Record | `milestone-m5-record` (latest head) → `milestone-m4-enforce` | 40 at `f22baaf`, plus the docs commits above |
 
 ### G1. Merge the stack into `main` (recommended by 1 Dec, before the freeze and the deploy)
 **What:** merge #1 → #7 in order, each with a **merge commit**. Never squash or rebase: that rewrites the commits the next PR is built on. Never force-push.
