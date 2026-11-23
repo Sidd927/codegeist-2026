@@ -1,6 +1,6 @@
 # 13 — Spike B: Jira & Confluence Integration Results
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net (Codegeist demo site) · **Data:** synthetic only
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net (Codegeist demo site) · **Data:** synthetic only
 **App:** `article25-core-spike` (`a6a87625-08ce-466e-9322-016c9af89fa8`), code in `spikes/article25-core-spike/`
 **Evidence method:** each resolver wraps its result in a `console.log({evidence: <name>, ms, payload, out})` line, captured with `forge logs -e development`. Browser checks used the signed-in user's own session (Jira/Confluence REST from the page) for comparison and for setup steps.
 

@@ -19,13 +19,13 @@
 
 ## 2. Authentication
 - `forge login` was run **by the user** in a terminal tab with a scoped API token (app = Forge). The token was never shown to or handled by the assistant.
-- `forge whoami` → `Logged in as Siddhant Patil (siddhantpatil.hak@gmail.com)`, account `712020:406009af-…`.
+- `forge whoami` → `Logged in as the developer account`, account `<account-id>`.
 
 ## 3. Development site
 | Item | Value |
 |---|---|
 | Command | `forge site provision` (first call timed out its watch window: "continuing in the background"; second call returned the site) |
-| Site | **https://one-atlas-psvy.atlassian.net** (`one-atlas-psvy`) |
+| Site | **https://<dev-site>.atlassian.net** (`<dev-site>`) |
 | Status / expiry | active / **2027-02-20** (after judging ends on 2027-02-03) |
 | Products observed | Jira (spaces list incl. seeded service projects such as Engineering Support, Facilities, HR); Confluence and Rovo to be confirmed in Spike B |
 | User permissions on test project | `ADMINISTER_PROJECTS`, `CREATE_ISSUES`, `EDIT_ISSUES`, `MODIFY_REPORTER`, `BROWSE_PROJECTS` = true (`/rest/api/3/mypermissions`) |
@@ -36,12 +36,12 @@
 | Step | Command | Actual result |
 |---|---|---|
 | Create (1st try, non-TTY) | `forge create -t jira-issue-panel-ui-kit -d article25-forge-foundation -y article25-forge-foundation` | **Failed:** "You are not currently a member of a Developer Space… Prompts can not be meaningfully rendered in non-TTY environments" |
-| Create (user terminal) | same command in an interactive terminal | User created Developer Space **`codegeist-2026`** and accepted the Developer Terms (incl. billing for usage above free allowances). App created and registered: `ari:cloud:ecosystem::app/360eedae-4eba-4f4a-aae1-3dd8f8eb0a17`. Environments: production, staging, development. |
+| Create (user terminal) | same command in an interactive terminal | User created Developer Space **`codegeist-2026`** and accepted the Developer Terms (incl. billing for usage above free allowances). App created and registered: `ari:cloud:ecosystem::app/<spike-app-id>`. Environments: production, staging, development. |
 | Lint | `forge lint` | `No issues found.` |
 | Deploy | `forge deploy -e development --non-interactive` | `✔ Deployed` (version 2.0.0). CLI: "eligible for the Runs on Atlassian program" |
-| Install (1st) | `forge install --site one-atlas-psvy.atlassian.net --product jira -e development --non-interactive` | **Failed:** "An unexpected error occurred… request ID b998762a5d4b40868fa93489262f78d5". Also warned: "You are about to install a development app to a production site" (the demo site is treated as a production site). |
+| Install (1st) | `forge install --site <dev-site>.atlassian.net --product jira -e development --non-interactive` | **Failed:** "An unexpected error occurred… request ID b998762a5d4b40868fa93489262f78d5". Also warned: "You are about to install a development app to a production site" (the demo site is treated as a production site). |
 | Install (2nd) | `forge install --demo-site --product jira -e development --non-interactive --confirm-scopes --verbose` | `appInstallationTask state: COMPLETE` → `✔ Install in Jira complete!` |
-| Verify | `forge install list` | Installation `e7b23f49-…`, development, one-atlas-psvy: Jira, version 2, **Up-to-date** |
+| Verify | `forge install list` | Installation `<installation-id>`, development, <dev-site>: Jira, version 2, **Up-to-date** |
 
 Template defaults worth noting: `runtime: nodejs24.x`, `memoryMB: 256`, `architecture: arm64`; dependencies pinned to pre-release `@forge/bridge 7.3.0-next.12`, `@forge/react 12.5.0-next.2`. The product build should pin stable versions.
 
@@ -59,7 +59,7 @@ Template defaults worth noting: `runtime: nodejs24.x`, `memoryMB: 256`, `archite
   "serverTime": "2026-11-22T04:45:48.772Z",
   "node": "v24.22.3",
   "echoedPayload": { "example": "spike-A-payload" },
-  "accountId": "712020:406009af-…(redacted)",
+  "accountId": "<account-id>",
   "cloudId": "0ef78c36-…(redacted)",
   "moduleKey": "article25-forge-foundation-hello-world-issue-panel",
   "issueKey": "AS-1",
@@ -97,5 +97,5 @@ Template defaults worth noting: `runtime: nodejs24.x`, `memoryMB: 256`, `archite
 
 ## 7. Artefacts
 - Code: `spikes/article25-forge-foundation/` (template + modified `src/resolvers/index.js`, `src/frontend/index.jsx`)
-- App ID: `360eedae-4eba-4f4a-aae1-3dd8f8eb0a17` · Installation: `e7b23f49-92c7-4140-81de-88097a282d75`
+- App ID: (the spike app, see `spikes/article25-forge-foundation/manifest.yml`) · Installation: `<installation-id>`
 - Synthetic data created on the site: issue `AS-1`

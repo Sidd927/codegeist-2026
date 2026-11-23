@@ -1,7 +1,7 @@
 # 19 — Stage 1 Final Decision: Article25
 
 **Date:** 2026-11-22 · **Deadline:** 2026-12-22 12:00 PT (30 days)
-**Evidence:** docs 11–18; spike code in `spikes/`; live tests on one-atlas-psvy.atlassian.net with synthetic data.
+**Evidence:** docs 11–18; spike code in `spikes/`; live tests on <dev-site>.atlassian.net with synthetic data.
 
 ## Decision: **CONDITIONAL GO**
 

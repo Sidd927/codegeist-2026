@@ -1,6 +1,6 @@
 # 20 — Stage 1.5 Results: Conditions C1–C3
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net · **App:** `article25-core-spike` (multi-app: Jira required, Confluence optional) · **Data:** synthetic only
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net · **App:** `article25-core-spike` (multi-app: Jira required, Confluence optional) · **Data:** synthetic only
 **Status (updated 2026-11-22, after C3b):** C2 ✅ PASSED · C3 ✅ PASSED, **recovery integrity (hash chain + authorised recovery) ✅ PASSED**, see `22_RECOVERY_RESULTS.md` · **C1 ⏳ PREPARED, NOT RUN** (needs user actions, see below and `23_STAGE15_FINAL_DECISION.md`)
 
 > **Verified vs. outstanding at a glance**
