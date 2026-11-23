@@ -387,3 +387,19 @@ Sources consulted for platform limits:
 - [Forge invocation limits](https://developer.atlassian.com/platform/forge/limits-invocation/) (25 s resolver);
 - [Forge environments](https://developer.atlassian.com/platform/forge/environments-and-versions/);
 - the Atlassian community discussion on [multiple environments on one site](https://community.developer.atlassian.com/t/connect-on-forge-with-different-environments/77442).
+
+---
+
+## P1 amendment (23 Nov 2026)
+[P1_EXPERIENCE_RESULTS.md](P1_EXPERIENCE_RESULTS.md) records the following.
+- **U1 cold start:** improved.
+  - Bundles: panel 193.4 → 81.4 KB, desk 212.1 → 101.4 KB.
+  - Desk first content p50: 2.6 → 1.3 s.
+  - Forge function start still dominates the worst case.
+- **U4 separation of duties:** fixed; guidance appears in the workspace and the panel.
+- **U9 contrast:** an automated real-browser check now runs in CI, with 0 violations across 11 screens in both themes.
+- **P1 roadmap:**
+  - items 1–3 are done;
+  - item 4 (standalone verifier) and item 5 (re-run recovery after production) remain.
+- **Bundle note:** the panel headroom concern in §10 no longer applies (118 KB free).
+

@@ -29,7 +29,7 @@ Confluence is not needed.
 
 ## 2. Set up (site admin, about 5 minutes)
 1. **Reviewer group.** In *Admin → Groups*, create the group **`article25-reviewers`** and add yourself.
-2. **Open the desk.** *Apps → Article25*. The Overview shows your access and the setup status.
+2. **Open the desk.** *Apps → Article25*. As a site admin, you see **Get started**: each required step, what Article25 found just now, and a link to the exact setting. The steps below follow the same order.
    - If a page says *"Article25 is setting up"*, wait a few seconds and choose **Try again**.
    - That only happens in the first minute after installing.
 3. **Single-person trial: separation of duties.** It is on by default: nobody can decide on a work item they reported or are assigned to.

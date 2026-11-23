@@ -123,7 +123,7 @@ Forge environment variables belong to the app **environment**, not to a site. In
 
 | Claim | How to check |
 |---|---|
-| All tests pass; bundles are within budget (panel ≤ 200 KB gzip, desk ≤ 400 KB) | `cd app && npm run check` (CI runs the same on every push) |
+| All tests pass, including colour contrast in real Chromium (light and dark ADS themes); bundles are within budget (panel ≤ 200 KB gzip, desk ≤ 400 KB) | `cd app && npm run check` (CI runs the same on every push; the contrast step needs `npx playwright install chromium` once locally) |
 | Ledger performance | `cd app && npm run bench -- 1000 5000 10000` |
 | An exported archive is genuine and complete | `node scripts/verify-archive.mjs <file> --fingerprint "<pinned>"` |
 | What was tested live, and what was only tested automatically | [`product/FINAL_READINESS_AUDIT.md`](product/FINAL_READINESS_AUDIT.md) §3 |
@@ -133,6 +133,7 @@ Forge environment variables belong to the app **environment**, not to a site. In
 - Product: [vision](product/PRODUCT_VISION.md) · [requirements](product/PRODUCT_REQUIREMENTS.md) · [MVP scope](product/MVP_SCOPE.md) · [journeys](product/USER_JOURNEYS.md) · [UX spec](product/UX_DESIGN_SPEC.md)
 - Engineering: [architecture](product/SYSTEM_ARCHITECTURE.md) · [data and security model](product/DATA_AND_SECURITY_MODEL.md) · [frontend](product/FRONTEND_ARCHITECTURE.md) · [roadmap](product/IMPLEMENTATION_ROADMAP.md)
 - Results:
+  - [P1 experience](product/P1_EXPERIENCE_RESULTS.md)
   - [M1 foundation](product/STAGE3_FOUNDATION_RESULTS.md)
   - [M2 detect](product/M2_DETECT_RESULTS.md)
   - [M3 review](product/M3_REVIEW_RESULTS.md)

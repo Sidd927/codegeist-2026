@@ -13,7 +13,8 @@
 | **M4 Enforce** (workflow validator, policy g1, monitor/enforce, audited settings, verified coverage health check, CI) | ✅ **Done (development)** | `milestone-m4-enforce` (#6) | [M4_ENFORCE_RESULTS.md](M4_ENFORCE_RESULTS.md) |
 | **M5 Record & Recovery** (Ed25519 ledger v3, trusted-key lifecycle, signed archive + offline verifier, verified restore, Record page, retention) | ✅ **Done (development)**; Confluence register **BLOCKED** on scope approval | `milestone-m5-record` (#7) | [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md) |
 | **Final readiness audit** (CI, live isolated reinstall/restore, crypto audit, 11 defects fixed, README, judge guide) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) |
-| Onboarding, admin polish, release | Planned | — | phases 9–12 below |
+| **P1 experience** (Get started, separation-of-duties guidance, bundles −55%, parallel loading, real-browser contrast check in CI) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [P1_EXPERIENCE_RESULTS.md](P1_EXPERIENCE_RESULTS.md) |
+| Release (blockers B1–B7 need the owner), remaining P2 polish | Planned | — | [FINAL_READINESS_AUDIT.md §13–14](FINAL_READINESS_AUDIT.md) |
 
 **Scope changes so far:**
 - M3 added `read:jira-user`.
@@ -44,6 +45,8 @@
 - the AI-in-production decision;
 - the privacy policy URL;
 - the submission.
+
+*Update (P1, 23 Nov): items 1–3 below are **done** (Get started; separation-of-duties guidance in the workspace and panel; bundles −55%, parallel loading). A real-browser contrast check was added to CI. Item 4, publishing the standalone verifier, remains open.*
 
 In parallel I can build P1 work that needs no new scope:
 1. a Get-started checklist;
