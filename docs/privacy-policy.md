@@ -1,21 +1,15 @@
-> **⚠️ DRAFT: NOT PUBLISHED AND NOT LEGALLY REVIEWED.** Rewritten on 23 Nov 2026 to match the app as built. Draft v1 described a Stage 1 prototype with a Confluence register and issue properties; the product has neither, and draft v1 remains in the Git history.
->
-> - Items marked **[CONFIRM]** need your input.
-> - Items marked **[REVIEW]** need a lawyer or privacy professional.
-> - Do not publish until both are resolved.
-
 # Article25: Privacy Policy
 
-_Last updated: [DATE OF PUBLICATION] [CONFIRM]_
+_Last updated: {{PUBLICATION_DATE}}_
 
 **Scope.** This policy covers the Article25 app for Atlassian Jira, built on Atlassian Forge and distributed for Atlassian Codegeist 2026 testing and judging. It covers nothing else.
 
 ## Who we are
 **The developer.** Article25 is built by an individual developer, Siddhant Patil. It is not offered by a company, and it comes with no service-level commitment.
 
-**Contact for privacy questions and deletion requests:** [PRIVATE CONTACT EMAIL] [CONFIRM]. Please don't send personal data through public issue trackers.
+**Contact for privacy questions and deletion requests:** {{CONTACT_EMAIL}}. Please don't send personal data through public issue trackers.
 
-**What the name means.** "Article25" is a product name. It is **not** a statement that the app, or anyone who uses it, complies with GDPR Article 25 or any other law. We hold no security or privacy certifications. [REVIEW: the developer's role (controller, processor or neither) for a Forge app with no external data transfer]
+**What the name means.** "Article25" is a product name. It is **not** a statement that the app, or anyone who uses it, complies with GDPR Article 25 or any other law. We hold no security or privacy certifications, and this policy makes no statement about anyone's legal role under any data-protection law.
 
 ## What the app does
 Article25 runs entirely on Atlassian's Forge platform, hosted by Atlassian. It:
@@ -52,20 +46,20 @@ Please don't put unnecessary personal data in rationales, conditions or question
 **In the app's storage.** All stored data is in **Forge SQL storage for your installation**, hosted by Atlassian. Nothing is stored on your Jira site, in Confluence, or on any server operated by the developer.
 - The app has **no external network access**: the manifest declares no egress.
 - Atlassian processes data as the platform provider under its own terms: https://www.atlassian.com/legal/privacy-policy.
-- We make **no claim about data residency**. [REVIEW]
+- We make **no claim about data residency**. Where your data is hosted is determined by Atlassian's platform, not by Article25.
 
-**In operational logs.** Logs are kept by Atlassian and visible to the developer in Atlassian's developer console, unless your site administrator has turned off developer log access.
+**In operational logs.** Logs are kept by Atlassian. The developer can see them in Atlassian's developer console when Atlassian's platform allows log access for your site.
 - Article25 writes only an allow-listed set of fields: event names, error codes, durations, numeric work-item IDs, outcome codes and counts.
 - **It never logs work-item text, rationales or account IDs.**
 
 ## AI processing
-**In the published build, AI-assisted checks are on, within limits set by the developer:** a daily number of AI checks and a total spending cap per installation, both enforced on the server. If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so. Administrators see spend against the cap in Settings. [CONFIRM: the published limits, currently 300 checks a day and USD 5 per installation]
+**In the published build, AI-assisted checks are on, within limits set by the developer:** a daily number of AI checks and a total spending cap per installation, both enforced on the server. If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so. The limits are **300 AI-assisted checks a day** and **USD 5 of AI usage in total per installation**. Administrators see spend against the cap in Settings.
 
 **When AI-assisted checks run:**
 - work-item text is sent to **Atlassian's Forge LLM service**, which runs within Atlassian's platform, to extract possible privacy signals;
 - every signal must quote the text verbatim, or it is discarded;
 - a rules engine, not the AI, sets the outcome;
-- that processing is governed by Atlassian's terms for Forge LLM [REVIEW: confirm Atlassian's published Forge LLM terms on retention, training and sub-processors before stating anything beyond this];
+- that processing is governed by Atlassian's own terms and documentation for the Forge platform and Forge LLM (https://developer.atlassian.com/platform/forge/manifest-reference/modules/llm/); we make no statement about it beyond what Atlassian publishes;
 - each result shows whether it came from AI-assisted or rule-based checks.
 
 ## Retention and deletion
@@ -95,10 +89,9 @@ Site administrators can:
 - choose which workflow transitions carry the gate, and switch between Monitoring and Enforcing;
 - switch separation of duties off or on (audited);
 - export, verify and restore the decision record;
-- turn off developer log access in Atlassian administration;
 - uninstall the app at any time.
 
-For questions or deletion requests, use the contact above. [REVIEW: the rights and requests wording, jurisdiction]
+For questions about this policy, or to ask for data about you to be deleted, use the contact above. Data held by Article25 sits in your site's installation, so your site administrator can also remove it by uninstalling the app.
 
 ## Changes
 We will update this page and its date if the app's data handling changes.
