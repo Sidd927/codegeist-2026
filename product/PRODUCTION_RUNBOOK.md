@@ -13,7 +13,7 @@ Run everything from `app/` with Node 24 (`export PATH=/opt/homebrew/opt/node@24/
 ## 0. Preconditions (check before anything else)
 | Check | How | Must be |
 |---|---|---|
-| Release commit | `git log -1` on the branch you will merge | Tagged, CI green (lint incl. the permission-freeze guard, 187 backend, 88 UI, 24 contrast, build, budgets) |
+| Release commit | `git log -1` on the branch you will merge | Tagged, CI green (lint incl. the permission-freeze guard, 204 backend, 89 UI, 24 contrast, build, budgets) |
 | Scopes frozen | `manifest.yml` → `permissions.scopes` | Exactly `read:jira-work`, `read:jira-user`, `read:workflow:jira`; plus the `llm` module (decision: [AI_PRODUCTION_DECISION.md](AI_PRODUCTION_DECISION.md)) |
 | Scope freeze date | Calendar; [PERMISSIONS_MATRIX.md](PERMISSIONS_MATRIX.md) §5 | **On or before Fri 4 Dec 2026.** Scope changes after judges install force re-consent |
 | Privacy policy URL | [`docs/privacy-policy.md`](../docs/privacy-policy.md), published by you | A public URL (Sharing requires one) **[YOU]** |

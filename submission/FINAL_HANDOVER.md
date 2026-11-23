@@ -39,7 +39,7 @@ None of these can be done by the agent under your rules.
 
 ## C. Verification summary
 **Checks:**
-- `npm run check`: ✅ (187 backend, 88 UI, 24 contrast, lint, guards, build, budgets).
+- `npm run check`: ✅ (204 backend, 89 UI, 24 contrast, lint, guards, build, budgets; as of 24 Nov).
 - `forge lint`: ✅.
 - `npm audit`: 7 moderate, build-time and transitive; accepted (report §1).
 
@@ -67,7 +67,7 @@ The detail is in report §6 and `docs/CLEAN_SITE_REHEARSAL.md` Part 0.
 - fallbacks are labelled with the right reason;
 - logs are content-free.
 
-**Residual risk (documented):** an approval made with AI can be carried over by a later rules-only check, if AI is over a limit at that moment. It is labelled. Closing it would change behaviour, so it is better done after judging.
+**Approval validity (fixed 24 Nov):** an approval granted on an AI-assisted check is no longer carried over when an edit can only be checked rule-based; it is invalidated and needs a reviewer. See `product/APPROVAL_VALIDITY_INVESTIGATION.md`.
 
 **Security pass:**
 - server-side authorisation on every resolver;

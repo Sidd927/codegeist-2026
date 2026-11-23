@@ -111,7 +111,7 @@ We wanted to close that gap inside Jira itself: not another reminder, but a revi
   - A daily call budget and a cumulative spending cap per installation, both reserved atomically in SQL before each call.
   - Settings shows spend against the cap. Without a cap, no AI call is made.
 - **Quality.**
-  - 187 backend tests, 88 UI tests with axe accessibility checks, and 24 real-browser colour-contrast checks against Atlassian's light and dark design tokens, all in CI.
+  - 204 backend tests, 89 UI tests with axe accessibility checks, and 24 real-browser colour-contrast checks against Atlassian's light and dark design tokens, all in CI.
   - Lint, copy lint, bundle budgets (81 KB panel, 101 KB desk, gzip), and a permission-freeze guard, also in CI.
 
 ### Challenges we ran into
@@ -125,7 +125,7 @@ We wanted to close that gap inside Jira itself: not another reminder, but a revi
 ### Accomplishments that we're proud of
 - **Approvals that expire on material change**, automatically, and a real Jira gate that enforces them.
 - **A record you don't have to trust us for**: signed, chained, exportable, verifiable offline with one script, and restorable after a reinstall. Tested live: uninstall → reinstall → restore → verify → re-check, in an isolated environment.
-- **AI that can only add evidence, never decide**, with spend limits enforced on the server.
+- **AI that can only add evidence, never decide**, with spend limits enforced on the server. If AI is unavailable when an approved item is edited, the approval is not carried over on a weaker check: a reviewer looks again.
 - **Live-tested** on a development site with synthetic data:
   - screening;
   - all four decisions;

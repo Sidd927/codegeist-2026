@@ -7,7 +7,7 @@ Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live deve
 ## 1. Readiness matrix
 | Area | State | Evidence | Blocking? |
 |---|---|---|---|
-| Code and CI | PR #7: lint (incl. the permission-freeze guard), 187 backend, 88 UI with axe, Chromium install + 24 contrast, build, budgets | The latest GitHub Actions run on PR #7 (see the final verification report) | No |
+| Code and CI | PR #7: lint (incl. the permission-freeze guard), 204 backend, 89 UI with axe, Chromium install + 24 contrast, build, budgets | The latest GitHub Actions run on PR #7 (see the final verification report) | No |
 | PR stack | ✅ #1–#7 open as drafts, stacked: #7 → M4 → M3 → M2 → Stage 3 → Stage 2 → Stage 1 → `main`. Nothing merged | `gh pr list` | Merge plan needs you (17 Dec) |
 | Forge environments | Development: installed (v6), AI **off**, gate **Monitoring**. `recovery`: empty, no install. Staging: unused. **Production: deployed 22 Nov, no install, no variables** | `forge environments/variables/install list` | Production setup needs you |
 | Scopes | `read:jira-work`, `read:jira-user`, `read:workflow:jira` + `llm` module; no egress. Guarded in CI | `manifest.yml`, [`PERMISSIONS_MATRIX.md`](PERMISSIONS_MATRIX.md) | Freeze by **4 Dec** (you) |

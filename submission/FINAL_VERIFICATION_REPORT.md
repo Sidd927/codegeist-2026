@@ -12,8 +12,8 @@
 |---|---|
 | `npm run check` (local, Node 24) | ✅ Exit 0 |
 | Lint, copy lint (35 files), **permission-freeze guard** (new) | ✅ |
-| Backend tests | ✅ 187 / 187 (was 183; +4 for the AI cap, budget concurrency and spend reporting) |
-| UI tests (jsdom + axe) | ✅ 88 / 88 (was 87; +1 for the spend line) |
+| Backend tests | ✅ 204 / 204 (183 at the start of the pass; +4 AI cap and spend; +17 approval validity on 24 Nov) |
+| UI tests (jsdom + axe) | ✅ 89 / 89 (87 at the start; +1 spend line; +1 invalidation reason) |
 | Real-browser contrast (Chromium, light and dark ADS tokens) | ✅ 24 / 24 |
 | Bundles (gzip, initial) | ✅ Panel 81.6 KB (budget 200); desk 101.5 KB (budget 400) |
 | `forge lint` | ✅ No issues |
@@ -36,11 +36,7 @@
 | No content in logs | `logger.js` allow-list; no `console.*` in app code; gate logs key names only | Logger tests; a repository scan | ✅ |
 | Prompt injection | The ticket text is data in `<ITEM>`; the output must be a schema-valid tool call; the rules floor still applies | Pipeline tests (malformed output → rules) | ✅ |
 
-**Residual risk (documented, not changed):**
-- Suppose an approval was AI-assisted, and later the AI is over a limit, so the edited text is checked rules-only.
-- Then a new signal that only AI would find is missed, and the approval is carried over.
-- The result is labelled rule-based, and the gate still requires the current text to have been approved or carried over.
-- To close it fully, a carry-over would need a check at least as thorough as the one that approved. That is a behaviour change better made after judging.
+**Approval validity across check modes (resolved 24 Nov):** an approval granted on an AI-assisted check could be carried over by a rule-based re-check of edited text (AI unavailable, or over a limit). This was confirmed as a genuine defect and fixed: a carry-over now needs a re-check at least as thorough as the approval's basis, otherwise the approval is invalidated and needs a human. Details, code references and 18 new tests: [`product/APPROVAL_VALIDITY_INVESTIGATION.md`](../product/APPROVAL_VALIDITY_INVESTIGATION.md).
 
 ## 3. Security audit (one focused pass)
 | Area | Finding | Status |
