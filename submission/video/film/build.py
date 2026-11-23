@@ -269,13 +269,74 @@ total = round(t, 2)
 </body>
 </html>
 """)
-# Captions (YouTube upload): one cue per narration line, timed to the voice.
+# Captions (YouTube upload). The narration text is written for the voice ("S M S" is spelled out
+# so it is read as letters); captions show the written form. Each line is split into readable cues
+# (at most two lines of 42 characters), timed in proportion to their length within the spoken line.
+import re as _re
+DISPLAY = [("S M S", "SMS"), ("AI assisted", "AI-assisted"), ("rule based", "rule-based"), ("thumbs up", "thumbs-up")]
+MAXL = 42
+
+
+def display(text):
+    for a, b in DISPLAY:
+        text = text.replace(a, b)
+    return text
+
+
+def wrap(text):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > MAXL:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    return lines + ([cur] if cur else [])
+
+
+def split_long(sent):
+    """Split a sentence that needs more than two lines: at a comma or colon when both parts fit,
+    otherwise into balanced halves by words."""
+    if len(wrap(sent)) <= 2:
+        return [sent]
+    best = None
+    for m in _re.finditer(r"[,:] ", sent):
+        left, right = sent[: m.start() + 1], sent[m.end():]
+        if len(wrap(left)) <= 2 and min(len(left), len(right)) >= 0.3 * len(sent):  # no stubs
+            score = abs(len(left) - len(right))
+            if best is None or score < best[0]:
+                best = (score, left, right)
+    if best is None:
+        words = sent.split()
+        half = len(words) // 2
+        best = (0, " ".join(words[:half]), " ".join(words[half:]))
+    return split_long(best[1]) + split_long(best[2])
+
+
+def cues_of(text):
+    out = []  # (cue, is_whole_short_sentence)
+    for sent in _re.split(r"(?<=[.!?])\s+", display(text).strip()):
+        parts = split_long(sent)
+        if len(parts) == 1 and out and out[-1][1] and len(wrap(f"{out[-1][0]} {sent}")) <= 2 and len(sent) <= MAXL:
+            out[-1] = (f"{out[-1][0]} {sent}", True)  # short sentences ("Detect. Review.") share a cue
+            continue
+        out += [(p, len(parts) == 1 and len(p) <= MAXL) for p in parts]
+    return [c for c, _ in out]
+
+
 srt, t, n = [], 0.0, 1
-fmt = lambda x: f"{int(x // 3600):02}:{int(x % 3600 // 60):02}:{int(x % 60):02},{int(round((x % 1) * 1000)):03}"
+fmt = lambda x: f"{int(x // 3600):02}:{int(x % 3600 // 60):02}:{int(x % 60):02},{int(round((x % 1) * 1000)) % 1000:03}"
 for sc in S:
     st = t + sc.pad_in
-    srt.append(f"{n}\n{fmt(st)} --> {fmt(st + sc.vdur)}\n{NARRATION[sc.voice]}\n")
-    n += 1
+    cues = cues_of(NARRATION[sc.voice])
+    weights = [len(c) + 6 for c in cues]  # +6: the pause between sentences
+    total_w = sum(weights)
+    at = st
+    for c, w in zip(cues, weights):
+        d = sc.vdur * w / total_w
+        srt.append(f"{n}\n{fmt(at)} --> {fmt(at + d - 0.04)}\n" + "\n".join(wrap(c)) + "\n")
+        n += 1
+        at += d
     t += sc.duration
 (HERE.parent / "article25-demo.en.srt").write_text("\n".join(srt))
 print(f"scenes {len(S)} · total {total:.1f} s ({int(total // 60)}:{int(total % 60):02})")

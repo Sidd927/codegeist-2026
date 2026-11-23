@@ -1,6 +1,6 @@
 # Article25 demo film: creative direction
 
-**Deliverable:** `build/article25-demo-final.mp4`, 3:59.3, 1920×1080, 30 fps, H.264 + AAC, −15.0 LUFS integrated, −1.3 dBTP. Captions: `article25-demo.en.srt`.
+**Deliverable:** `build/article25-demo-final.mp4`, 3:59.3, 1920×1080, 30 fps, H.264 + AAC, −15.0 LUFS integrated, −1.1 dBTP. Captions: `article25-demo.en.srt`.
 
 ## 1. What the film must do for judges
 The 2026 rules judge five criteria equally. Presentation explicitly asks for:
