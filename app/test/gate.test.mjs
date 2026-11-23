@@ -132,7 +132,7 @@ test('modes: monitor never blocks and records would_*; enforce blocks exactly wh
 const ST = [{ statusReference: 's-todo', name: 'To Do' }, { statusReference: 's-ip', name: 'In Progress' }, { statusReference: 's-done', name: 'Done' }];
 // Real shape observed live (Jira stores Forge lambda validators under this ruleKey).
 const APP = 'a2030a0d-5fd0-4ace-8ff5-7cdbfdba0cd1';
-const ENV = 'cbb17771-fe76-4c1d-be4a-e65eff0c94be';
+const ENV = '00000000-0000-4000-8000-000000000001'; // synthetic environment id
 const GATE_RULE = { ruleKey: 'forge:expression-validator', parameters: { key: `ari:cloud:ecosystem::extension/${APP}/${ENV}/static/article25-gate`, id: 'r1', config: '' } };
 const OTHER_RULE = { ruleKey: 'system:check-permission', parameters: {} };
 const isGate = (r) => String(r.parameters?.key ?? '').endsWith('/static/article25-gate');
