@@ -359,8 +359,9 @@ export async function gateSnapshot(issueId, now = Date.now()) {
     humanRecord: record(r.ch_record),
     mode: r.g_mode ?? null,
     modeSeq: r.g_seq === null || r.g_seq === undefined ? 0 : Number(r.g_seq),
-    // M5: a restore that stopped part-way, or one being verified right now, closes the gate.
-    restore: r.r_outcome === 'failed_partial' ? 'incomplete' : Number(r.r_open ?? 0) > 0 ? 'in_progress' : null,
+    // M5: a restore that is being applied (in_progress), stopped part-way, or is being verified closes
+    // the gate. A rejected confirm is logged as type restore_rejected, so it can never mask these.
+    restore: r.r_outcome === 'failed_partial' || r.r_outcome === 'in_progress' ? 'incomplete' : Number(r.r_open ?? 0) > 0 ? 'in_progress' : null,
   };
 }
 
@@ -445,29 +446,30 @@ export const exportReads = {
   settings: async () => many('SELECT setting, seq, value, changed_by, changed_at, request_id, note FROM settings_events ORDER BY setting ASC, seq ASC'),
 };
 
-/** Restore writes (each INSERT IGNORE: idempotent and resumable). Returns true when inserted. */
+/**
+ * Restore writes: multi-row INSERT IGNORE batches (idempotent and resumable; a whole restore of
+ * thousands of decisions fits one resolver invocation). Each returns how many rows were inserted.
+ */
+async function insertIgnoreBatch(table, cols, rows, valuesOf) {
+  if (!rows.length) return 0;
+  const tuple = `(${cols.map(() => '?').join(', ')})`;
+  const r = await run(`INSERT IGNORE INTO ${table} (${cols.join(', ')}) VALUES ${rows.map(() => tuple).join(', ')}`, ...rows.flatMap(valuesOf));
+  return affected(r);
+}
 export const restoreWrites = {
-  async chain(record) {
-    const r = await run('INSERT IGNORE INTO chain (seq, decision_id, record, record_hash, created_at) VALUES (?, ?, ?, ?, ?)', record.seq, record.decisionId, JSON.stringify(record), record.hash, Date.parse(record.decidedAt) || 0);
-    return affected(r) === 1;
-  },
-  async decision(d) {
-    const r = await run(
-      `INSERT IGNORE INTO decisions (issue_id, seq, decision_id, request_id, kind, decision, rationale, conditions, questions, decided_by, decided_at, screening_id, fp, pipeline_version, outcome, signal_set, detail)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      d.issue_id, d.seq, d.decision_id, d.request_id, d.kind, d.decision, d.rationale ?? null, JSON.stringify(d.conditions ?? []), JSON.stringify(d.questions ?? []),
-      d.decided_by ?? null, d.decided_at, d.screening_id, d.fp, d.pipeline_version, d.outcome ?? null, JSON.stringify(d.signal_set ?? {}), d.detail ? JSON.stringify(d.detail) : null,
-    );
-    return affected(r) === 1;
-  },
-  async assignment(a) {
-    const r = await run('INSERT IGNORE INTO assignments (issue_id, seq, assignee, assigned_by, assigned_at, request_id) VALUES (?, ?, ?, ?, ?, ?)', a.issue_id, a.seq, a.assignee ?? null, a.assigned_by, a.assigned_at, a.request_id);
-    return affected(r) === 1;
-  },
-  async setting(s) {
-    const r = await run('INSERT IGNORE INTO settings_events (setting, seq, value, changed_by, changed_at, request_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)', s.setting, s.seq, s.value, s.changed_by, s.changed_at, s.request_id, s.note ?? null);
-    return affected(r) === 1;
-  },
+  chainRecords: (records) => insertIgnoreBatch('chain', ['seq', 'decision_id', 'record', 'record_hash', 'created_at'], records, (r) => [r.seq, r.decisionId, JSON.stringify(r), r.hash, Date.parse(r.decidedAt) || 0]),
+  decisions: (rows) =>
+    insertIgnoreBatch(
+      'decisions',
+      ['issue_id', 'seq', 'decision_id', 'request_id', 'kind', 'decision', 'rationale', 'conditions', 'questions', 'decided_by', 'decided_at', 'screening_id', 'fp', 'pipeline_version', 'outcome', 'signal_set', 'detail'],
+      rows,
+      (d) => [
+        d.issue_id, d.seq, d.decision_id, d.request_id, d.kind, d.decision, d.rationale ?? null, JSON.stringify(d.conditions ?? []), JSON.stringify(d.questions ?? []),
+        d.decided_by ?? null, d.decided_at, d.screening_id, d.fp, d.pipeline_version, d.outcome ?? null, JSON.stringify(d.signal_set ?? {}), d.detail ? JSON.stringify(d.detail) : null,
+      ],
+    ),
+  assignments: (rows) => insertIgnoreBatch('assignments', ['issue_id', 'seq', 'assignee', 'assigned_by', 'assigned_at', 'request_id'], rows, (a) => [a.issue_id, a.seq, a.assignee ?? null, a.assigned_by, a.assigned_at, a.request_id]),
+  settings: (rows) => insertIgnoreBatch('settings_events', ['setting', 'seq', 'value', 'changed_by', 'changed_at', 'request_id', 'note'], rows, (x) => [x.setting, x.seq, x.value, x.changed_by, x.changed_at, x.request_id, x.note ?? null]),
 };
 
 /** Retention: delete gate events older than `before` (bounded batch). */

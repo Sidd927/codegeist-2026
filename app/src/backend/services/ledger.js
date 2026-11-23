@@ -18,12 +18,18 @@ import { APP_VERSION } from '../lib/config.js';
 import { buildRecord, genesis } from '../../core/chain-core.js';
 import { decisionIdOf } from '../../core/review.js';
 import {
-  loadSigner, registerKey, succession, trustedKeys, keyEntryValid, buildRecordV3, verifyLedger, signCheckpointV3,
+  loadSigner, loadPublicKey, registerKey, succession, trustedKeys, keyEntryValid, buildRecordV3, verifyLedger, signCheckpointV3,
   decisionMatchesRecord, buildArchive, verifyArchive, fingerprintOf, recordIssueId,
 } from '../../core/ledger.js';
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 const SESSION_MS = 10 * 60 * 1000;
+// A confirm runs inside one resolver invocation (Forge limit 25 s). An `in_progress` marker older than
+// this can only belong to an invocation that was killed; it may then be resumed.
+const STALE_RESTORE_MS = 60 * 1000;
+const RESTORE_BATCH = 50; // rows per multi-row INSERT IGNORE: ~200 statements for 5,000 decisions, each well under Forge SQL's request size
+/** Restore outcomes that leave the record incomplete: the gate stays closed and nothing new is signed. */
+export const RESTORE_INCOMPLETE_OUTCOMES = Object.freeze(['in_progress', 'failed_partial']);
 const iso = (ms) => new Date(ms).toISOString();
 
 export function createLedgerService({ repos, log, clock = () => Date.now(), settings, siteId, rescreen = async () => undefined }) {
@@ -31,11 +37,15 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
   const prevSigner = siteId ? loadSigner(settings.recordKeyPrevious) : null;
   const hmacKey = siteId ? settings.signingKey ?? null : null;
   const mode = signer ? 'v3' : hmacKey ? 'v2' : 'none';
+  // Retired keys' PUBLIC halves (A25_RECORD_TRUSTED_KEYS): anchors with the same authority as the
+  // signing key (the app's environment), without keeping a retired private key alive.
+  const retired = siteId ? (settings.recordTrustedKeys ?? []).map(loadPublicKey).filter(Boolean) : [];
+  const anchorKeys = () => [...[signer, prevSigner].filter(Boolean).map((s) => ({ publicKey: s.publicKeyB64 })), ...retired.map((k) => ({ publicKey: k.publicKey }))];
 
-  /** Trusted keys: anchored only by keys from encrypted environment variables. */
+  /** Trusted keys: anchored only by keys from the app's environment variables. */
   async function trust() {
     const { registry, successions } = await repos.trustMaterial();
-    const anchors = [signer, prevSigner].filter(Boolean).map((s) => ({ publicKey: s.publicKeyB64 }));
+    const anchors = anchorKeys();
     const valid = registry.filter((k) => keyEntryValid(k, siteId));
     return { keys: trustedKeys(valid, successions, { siteId, anchors }), hmacKey, registry: valid, successions };
   }
@@ -91,10 +101,21 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     return { status: 'adopted' };
   }
 
+  /**
+   * Is a restore being verified ('verifying'), being applied or stopped part-way ('incomplete')?
+   * While it is, nothing may be signed or decided: it would interleave with the restored history.
+   * A rejected confirm (type restore_rejected) wrote nothing and never changes this state.
+   */
+  async function restoreState() {
+    if (await repos.recoverySessions.active(clock())) return 'verifying';
+    const last = await repos.ledgerEvents.latest('restore');
+    return last && RESTORE_INCOMPLETE_OUTCOMES.includes(last.outcome) ? 'incomplete' : null;
+  }
+
   /** Append the signed record for a stored decision. Idempotent; retries sequence races. */
   async function anchor(d) {
     if (mode === 'none') return { anchored: false, reason: 'no_signing_key' };
-    if (await repos.recoverySessions.active(clock())) return { anchored: false, reason: 'recovery_in_progress' };
+    if (await restoreState()) return { anchored: false, reason: 'recovery_in_progress' };
     await ensureKeys();
     const existing = await repos.chain.byDecision(d.decision_id);
     if (existing) return { anchored: true, seq: existing.seq };
@@ -168,7 +189,7 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     return Number(c?.decisions ?? 0) === 0 && Number(c?.chain ?? 0) === 0 && Number(c?.assignments ?? 0) === 0;
   }
 
-  const anchorsForArchive = () => [signer, prevSigner].filter(Boolean).map((s) => ({ publicKey: s.publicKeyB64 }));
+  const anchorsForArchive = anchorKeys;
 
   /** Step 1: verify an uploaded archive and open a single-use restore session (empty store only). */
   async function beginRestore({ actor, archive }) {
@@ -185,11 +206,28 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     return { report, token, resume: Boolean(resume) };
   }
 
-  /** A previous restore of THIS archive that stopped part-way may be resumed (idempotent writes). */
+  /**
+   * A previous restore of THIS archive that stopped part-way may be resumed (idempotent writes):
+   * it failed (`failed_partial`), or its invocation was killed (`in_progress` older than a minute).
+   * A restore that is running right now cannot be resumed concurrently.
+   */
   async function resumableRestore(digest) {
     if (!digest) return false;
     const last = await repos.ledgerEvents.latest('restore');
-    return Boolean(last && last.digest === digest && last.outcome === 'failed_partial');
+    if (!last || last.digest !== digest) return false;
+    if (last.outcome === 'failed_partial') return true;
+    if (last.outcome === 'in_progress') {
+      if (clock() - Number(last.at) < STALE_RESTORE_MS) throw new AppError(ErrorCode.CONFLICT, 'This restore is still running. Wait a minute, then verify the archive again.');
+      return true;
+    }
+    return false;
+  }
+
+  /** Write rows in batches (multi-row INSERT IGNORE). Returns how many were newly inserted. */
+  async function writeBatches(write, rows) {
+    let n = 0;
+    for (let i = 0; i < rows.length; i += RESTORE_BATCH) n += await write(rows.slice(i, i + RESTORE_BATCH));
+    return n;
   }
 
   /** Step 2: consume the session, re-verify, write in a gate-safe order, classify the result. */
@@ -199,28 +237,35 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     if (!session) throw new AppError(ErrorCode.CONFLICT, 'This restore was not verified by you in the last 10 minutes, or it was already used. Verify the archive again.');
     const report = verifyArchive(archive, { siteId, anchors: anchorsForArchive(), hmacKey, decisionIdOf });
     if (!report.restorable || report.digest !== session.digest) {
-      await repos.ledgerEvents.insert({ at: now, type: 'restore', actor, outcome: 'rejected', digest: report.digest ?? null, summary: { reason: 'archive changed or invalid since verification' } });
+      // Its own event type: nothing was written, so it must never mask an incomplete restore.
+      await repos.ledgerEvents.insert({ at: now, type: 'restore_rejected', actor, outcome: 'rejected', digest: report.digest ?? null, summary: { reason: 'archive changed or invalid since verification' } });
       throw new AppError(ErrorCode.STALE_EVIDENCE, 'The archive changed or became invalid since it was verified. Nothing was restored.');
     }
     if (!(await storeIsEmpty()) && !(await resumableRestore(report.digest))) throw new AppError(ErrorCode.CONFLICT, 'The decision record is no longer empty. Nothing was restored.');
+
+    // Mark the restore as running BEFORE writing anything. Until a final outcome replaces it, the gate
+    // stays closed and nothing new is decided or signed, even if this invocation is killed (timeout).
+    await repos.ledgerEvents.insert({ at: clock(), type: 'restore', actor, outcome: 'in_progress', headSeq: report.head.seq, digest: report.digest, summary: { decisions: archive.decisions.length, records: archive.records.length } });
 
     // Gate-safe order: DECISIONS first (an approval without its record is blocked as pending), then the
     // CHAIN, then keys, checkpoints, assignments and settings. A failure part-way leaves the gate closed.
     const counts = { decisions: 0, records: 0, assignments: 0, settings: 0, keys: 0 };
     try {
-      for (const d of archive.decisions) if (await repos.restoreWrites.decision(d)) counts.decisions++;
-      for (const r of archive.records) if (await repos.restoreWrites.chain(r)) counts.records++;
+      counts.decisions = await writeBatches(repos.restoreWrites.decisions, archive.decisions);
+      counts.records = await writeBatches(repos.restoreWrites.chainRecords, archive.records);
       for (const k of archive.keys) if (await repos.recordKeys.insert(k)) counts.keys++;
       for (const s of archive.successions) await repos.keySuccessions.insert(s);
       for (const c of archive.checkpoints) await repos.checkpoints.insert(c);
-      for (const a of archive.assignments) if (await repos.restoreWrites.assignment(a)) counts.assignments++;
-      for (const s of archive.settings) if (await repos.restoreWrites.setting(s)) counts.settings++;
+      counts.assignments = await writeBatches(repos.restoreWrites.assignments, archive.assignments);
+      counts.settings = await writeBatches(repos.restoreWrites.settings, archive.settings);
     } catch (e) {
       await repos.ledgerEvents.insert({ at: clock(), type: 'restore', actor, outcome: 'failed_partial', headSeq: report.head.seq, digest: report.digest, summary: { ...counts, code: e?.code ?? 'INTERNAL' } });
       log.error({ evt: 'ledger.restore.failed', code: e?.code ?? 'INTERNAL' });
       throw new AppError(ErrorCode.UPSTREAM_UNAVAILABLE, 'The restore stopped part-way. Protected transitions stay blocked. Verify the same archive again to resume.');
     }
-    // Post-condition: what is stored now must verify and match the archive exactly.
+    // Post-condition: what is stored now must verify and match the archive exactly. (`verify` and
+    // `anchor` refuse nothing here: verification reads only, and nothing else can sign while the
+    // in_progress marker stands.)
     const after = await verify({ record: false });
     const storedRecords = await repos.chain.all();
     const exact = after.status !== 'problem' && storedRecords.length === archive.records.length && storedRecords.at(-1)?.hash === archive.head.hash;
@@ -249,6 +294,8 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
       lastExport: lastExport ? { at: lastExport.at, headSeq: lastExport.head_seq, digest: lastExport.digest } : null,
       lastVerify: lastVerify ? { at: lastVerify.at, outcome: lastVerify.outcome, headSeq: lastVerify.head_seq } : null,
       lastRestore: lastRestore ? { at: lastRestore.at, outcome: lastRestore.outcome, headSeq: lastRestore.head_seq } : null,
+      restoreIncomplete: Boolean(lastRestore && RESTORE_INCOMPLETE_OUTCOMES.includes(lastRestore.outcome)),
+      retiredKeys: retired.map((k) => ({ kid: k.kid, fingerprint: fingerprintOf(k.publicKey) })),
       notInLastExport: head ? Math.max(0, Number(head.seq) - (lastExport?.head_seq ?? 0)) : 0,
     };
   }
@@ -265,5 +312,5 @@ export function createLedgerService({ repos, log, clock = () => Date.now(), sett
     };
   }
 
-  return { mode, signerKid: signer?.kid ?? null, ensureKeys, trust, anchor, verify, exportArchive, beginRestore, confirmRestore, status, adoptPredecessor, recordBundle, storeIsEmpty };
+  return { mode, signerKid: signer?.kid ?? null, ensureKeys, trust, anchor, verify, exportArchive, beginRestore, confirmRestore, status, adoptPredecessor, recordBundle, storeIsEmpty, restoreState };
 }

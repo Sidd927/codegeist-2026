@@ -50,5 +50,10 @@ export function settingsFromEnv(env = process.env) {
     // independently. A25_RECORD_SIGNING_KEY_PREVIOUS is supplied only during a key rotation.
     recordKey: env.A25_RECORD_SIGNING_KEY || null,
     recordKeyPrevious: env.A25_RECORD_SIGNING_KEY_PREVIOUS || null,
+    // Final audit: PUBLIC keys of retired record keys (base64 SPKI DER, comma or space separated). They
+    // are trust anchors exactly like the keys above (same authority: the app's environment variables),
+    // but need no private key, so a retired or lost key's archives and approvals stay verifiable and
+    // restorable without keeping its secret alive. Public values; not encrypted.
+    recordTrustedKeys: String(env.A25_RECORD_TRUSTED_KEYS ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean),
   };
 }

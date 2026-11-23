@@ -46,6 +46,7 @@ export const REASONS = Object.freeze({
   RECORD_INVALID: { allow: false, message: 'The approval record for this work item failed its integrity check, so it cannot be used. Ask your Jira administrator.' },
   RESTORE_INCOMPLETE: { allow: false, message: 'Article25 is restoring its decision record, or a restore stopped part-way. Protected transitions stay blocked until it completes. Ask your Jira administrator.' },
   RECORD_KEY_UNTRUSTED: { allow: false, message: 'The approval was signed with a key Article25 does not trust yet (the signing key changed). Ask your Jira administrator to confirm the previous key in Settings.' },
+  RECORD_LEGACY_UNVERIFIABLE: { allow: false, message: 'This approval was recorded in an older format whose verification key is not configured, so it cannot be checked. Ask a reviewer to approve the current text again.' },
   INCONSISTENT_RECORD: { allow: false, message: 'Article25 found inconsistent review records for this work item, so the transition was stopped. Ask a reviewer to record a new decision.' },
   UNKNOWN_STATE: { allow: false, message: 'Article25 could not determine the review state of this work item, so the transition was stopped. Ask a reviewer to check it.' },
 });
@@ -81,7 +82,7 @@ export function verifyDecisionRecord(row, record, signing) {
   if (!record) return 'RECORD_PENDING'; // inserted but not yet anchored (reconciler repairs)
   const problem = verifyRecordSignature(record, { siteId, keys, hmacKey });
   if (problem === 'unknown_key') return 'RECORD_KEY_UNTRUSTED';
-  if (problem === 'legacy_unverifiable') return 'SIGNING_NOT_CONFIGURED';
+  if (problem === 'legacy_unverifiable') return 'RECORD_LEGACY_UNVERIFIABLE'; // pre-M5 (HMAC) record and the legacy key is gone
   if (problem) return 'RECORD_INVALID';
   if (record.decisionId !== row.decision_id || record.state !== row.decision || recordIssueId(record) !== String(row.issue_id)) return 'RECORD_INVALID';
   return null;

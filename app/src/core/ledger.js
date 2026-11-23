@@ -54,6 +54,23 @@ export function loadSigner(privateKeyB64) {
   }
 }
 
+/**
+ * Load a PUBLIC Ed25519 key (base64 SPKI DER), e.g. a retired key listed in A25_RECORD_TRUSTED_KEYS.
+ * Returns { kid, publicKey } or null for anything that is not an Ed25519 public key. Never throws.
+ */
+export function loadPublicKey(publicKeyB64) {
+  try {
+    const raw = String(publicKeyB64 ?? '').trim();
+    if (!raw) return null;
+    const key = createPublicKey({ key: Buffer.from(raw, 'base64'), format: 'der', type: 'spki' });
+    if (key.asymmetricKeyType !== 'ed25519') return null;
+    const canonicalB64 = b64(key.export({ format: 'der', type: 'spki' }));
+    return { kid: kidOf(canonicalB64), publicKey: canonicalB64 };
+  } catch {
+    return null;
+  }
+}
+
 /** Verify an Ed25519 signature with a base64 SPKI public key. Never throws. */
 export function verifySig(publicKeyB64, message, sigB64) {
   try {

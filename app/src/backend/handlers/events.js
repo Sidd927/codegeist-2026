@@ -36,7 +36,7 @@ export function buildLedger(siteId) {
   const settings = settingsFromEnv();
   return createLedgerService({
     repos, log, siteId,
-    settings: siteId ? settings : { ...settings, signingKey: null, recordKey: null, recordKeyPrevious: null },
+    settings: siteId ? settings : { ...settings, signingKey: null, recordKey: null, recordKeyPrevious: null, recordTrustedKeys: [] },
     rescreen: (issueId) => maintenanceQueue.push({ body: { type: 'rescreen', issueId: String(issueId) } }),
   });
 }

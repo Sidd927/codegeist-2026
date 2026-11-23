@@ -64,6 +64,10 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
 
   // ---- signed record (delegated to the ledger service, M5) ----------------------------------------
   const anchor = (d) => ledger.anchor(d);
+  const restoreState = () => (ledger.restoreState ? ledger.restoreState() : null);
+  async function requireNoRestore() {
+    if (await restoreState()) throw new AppError(ErrorCode.CONFLICT, 'A restore of the decision record is in progress or did not finish. Try again once your Jira administrator has completed it.');
+  }
 
   async function insertDecision(row) {
     const decisionId = decisionIdOf({
@@ -96,6 +100,7 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     }
     const prior = await assignments.byRequest(rid);
     if (prior) return { status: 'unchanged', assignment: prior };
+    await requireNoRestore();
     const latest = await assignments.latest(doc.id);
     if ((latest?.seq ?? 0) !== exp) throw new AppError(ErrorCode.CONFLICT);
     if ((latest?.assignee ?? null) === target) return { status: 'unchanged', assignment: latest };
@@ -122,8 +127,9 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     const exp = expectedSeqOf(expectedSeq);
     await requireReviewer(actorId);
     if (ledger.mode === 'none') throw new AppError(ErrorCode.NOT_CONFIGURED); // fail closed: no unsigned decisions
-    // While a restore is being verified or applied, new decisions would collide with restored history.
-    if (await repos.recoverySessions.active(clock())) throw new AppError(ErrorCode.CONFLICT, 'A restore of the decision record is in progress. Try again in a few minutes.');
+    // While a restore is being verified, applied or is incomplete, new decisions would collide with
+    // the restored history (same issue sequence numbers, same chain positions).
+    await requireNoRestore();
 
     const doc = await jira.getIssueDocument(issueKey); // as-user browse check
     if ((await separationOfDutiesOn()) && (doc.reporterId === actorId || doc.assigneeId === actorId)) throw new AppError(ErrorCode.SOD_BLOCKED);
@@ -171,6 +177,9 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
   async function onScreeningCompleted({ issueId, screening }) {
     const latest = await decisions.latest(issueId);
     if (!latest || !isApprovingDecision(latest.decision) || latest.fp === screening.fp) return { status: 'no_change' };
+    // During a restore, do not append: the restore re-checks every restored work item when it
+    // completes, and the gate compares the CURRENT text anyway (a changed text never passes).
+    if (await restoreState()) return { status: 'deferred_restore' };
     const current = signalSetOf({ ...screening.result, outcome: screening.outcome });
     const m = materialChange(latest.signal_set, current);
     // Signal sets compare lower-cased values; show recipients/transfers with the text's own casing.
@@ -195,9 +204,7 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
   /** Repair partial failures: anchor decisions that were inserted but not chained. Never while a
    *  restore is in progress or incomplete (it would interleave new records with restored history). */
   async function repairChain(limit = 25) {
-    if (await repos.recoverySessions.active(clock())) return 0;
-    const lastRestore = await repos.ledgerEvents.latest('restore').catch(() => null);
-    if (lastRestore?.outcome === 'failed_partial') return 0;
+    if (await restoreState()) return 0;
     let repaired = 0;
     for (const d of await decisions.unanchored(limit)) if ((await anchor(d)).anchored) repaired++;
     return repaired;

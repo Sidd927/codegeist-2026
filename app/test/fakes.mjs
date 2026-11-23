@@ -126,7 +126,7 @@ export function createFakeRepos() {
   const dec = []; // stored as SQL would store them (JSON columns serialised)
   const asg = [];
   const chn = [];
-  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false, restoreChainAfter: null };
+  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false, restoreChainAfter: null, restoreHang: false };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const parseD = (r) => r && { ...clone(r), conditions: JSON.parse(r.conditions), questions: JSON.parse(r.questions), signal_set: JSON.parse(r.signal_set), detail: r.detail ? JSON.parse(r.detail) : null };
   const decisions = {
@@ -222,7 +222,7 @@ export function createFakeRepos() {
       mode: g?.value ?? null, modeSeq: g ? g.seq : 0,
       restore: (() => {
         const last = [...lev].filter((e) => e.type === 'restore').sort((a, b) => b.at - a.at || b.id - a.id)[0];
-        if (last?.outcome === 'failed_partial') return 'incomplete';
+        if (last?.outcome === 'failed_partial' || last?.outcome === 'in_progress') return 'incomplete';
         return sessions.some((x) => x.used_at === null && x.expires_at > now) ? 'in_progress' : null;
       })(),
     };
@@ -295,7 +295,7 @@ export function createFakeRepos() {
     settings: async () => clone([...sev].sort((a, b) => a.setting.localeCompare(b.setting) || a.seq - b.seq)),
   };
   let restoredChain = 0;
-  const restoreWrites = {
+  const one1 = {
     async chain(r) {
       if (failures.restoreChainAfter !== null && restoredChain >= failures.restoreChainAfter) throw new Error('sql unavailable');
       if (chn.some((c) => c.seq === r.seq || c.decision_id === r.decisionId)) return false;
@@ -314,6 +314,17 @@ export function createFakeRepos() {
       return settingsEvents.insert({ setting: x.setting, seq: x.seq, value: x.value, changedBy: x.changed_by, changedAt: x.changed_at, requestId: x.request_id, note: x.note });
     },
   };
+  // Batched like the SQL implementation (one multi-row INSERT IGNORE per call). `restoreStatements`
+  // counts calls; failures.restoreHang makes the chain phase never return (a killed invocation).
+  const batch = (fn) => async (rows) => {
+    restoreStatements.n++;
+    if (fn === one1.chain && failures.restoreHang) return new Promise(() => {});
+    let n = 0;
+    for (const r of rows) if (await fn(r)) n++;
+    return n;
+  };
+  const restoreStatements = { n: 0 };
+  const restoreWrites = { chainRecords: batch(one1.chain), decisions: batch(one1.decision), assignments: batch(one1.assignment), settings: batch(one1.setting) };
   const transfers = {
     async put(x) {
       if (xfer.some((y) => y.transfer_id === x.transferId && y.idx === x.idx)) return false;
@@ -355,6 +366,6 @@ export function createFakeRepos() {
   }
   return {
     repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable, recordKeys, keySuccessions, trustMaterial, checkpoints, ledgerEvents, recoverySessions, storeCounts, exportReads, restoreWrites, transfers, registerRows, purgeGateEvents },
-    items, scr, use, counters, spendState, dec, asg, chn, sev, gev, keys, succ, cps, lev, sessions, xfer, failures, wipe,
+    items, scr, use, counters, spendState, dec, asg, chn, sev, gev, keys, succ, cps, lev, sessions, xfer, failures, wipe, restoreStatements,
   };
 }
