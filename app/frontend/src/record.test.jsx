@@ -119,6 +119,13 @@ describe('Decision record settings', () => {
     expect(screen.getByRole('status').textContent).toMatch(/Restored and verified/);
   });
 
+  it('an unfinished restore (failed or killed mid-write) is called out and the restore form stays available to resume', async () => {
+    render(<RecordSettingsView resource={resource({ data: STATUS({ restoreIncomplete: true, lastRestore: { at: NOW - 120000, outcome: 'in_progress', headSeq: 7 } }) })} client={{}} />);
+    expect(screen.getByText('A restore did not finish')).toBeTruthy();
+    expect(screen.getByText(/Verify the same archive again below to resume it/)).toBeTruthy();
+    expect(screen.getByLabelText('Archive file')).toBeTruthy(); // not hidden behind "only possible when empty"
+  });
+
   it('an invalid archive shows its errors and offers no restore button', async () => {
     const report = { status: 'invalid', restorable: false, errors: ['archive is not signed by a trusted key'], warnings: [], head: null, keys: [], pending: 0 };
     const client = { uploadArchiveChunk: vi.fn().mockResolvedValue({}), beginRestore: vi.fn().mockResolvedValue({ report, token: null }) };

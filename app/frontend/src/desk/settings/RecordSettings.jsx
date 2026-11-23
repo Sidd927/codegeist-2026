@@ -241,7 +241,8 @@ function Restore({ status, onChanged, client }) {
   const [progress, setProgress] = useState(null);
   const [verify, setVerify] = useState(null); // { report, token, transferId, chunks, resume }
   const [msg, setMsg] = useState(null);
-  const lastRestoreFailed = status.lastRestore?.outcome === 'failed_partial';
+  // A restore that failed part-way, or whose invocation was killed while writing, must be resumed.
+  const lastRestoreFailed = status.restoreIncomplete ?? status.lastRestore?.outcome === 'failed_partial';
   const empty = status.counts.decisions === 0 && status.counts.records === 0;
 
   const [pasted, setPasted] = useState('');
@@ -289,6 +290,11 @@ function Restore({ status, onChanged, client }) {
       <h3 id="a25-rec-res" className="a25-zone__subtitle">
         {R.restoreTitle}
       </h3>
+      {lastRestoreFailed ? (
+        <SectionMessage appearance="error" title={R.restoreIncompleteTitle}>
+          <p>{R.restoreIncompleteBody}</p>
+        </SectionMessage>
+      ) : null}
       {!empty && !lastRestoreFailed ? (
         <p className="a25-subtle a25-small">{R.restoreOnlyEmpty}</p>
       ) : (
