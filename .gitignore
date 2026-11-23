@@ -8,3 +8,6 @@ submission/video/film/.hyperframes/
 submission/video/thumbnail/.hyperframes/
 submission/video/film/snapshots/
 submission/video/film/assets/sfx/
+
+# macOS Finder metadata
+.DS_Store
