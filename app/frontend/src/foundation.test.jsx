@@ -138,20 +138,31 @@ describe('Issue panel (real screening states)', () => {
 });
 
 describe('Review workspace (Margin with verified highlights)', () => {
-  const data = (screening) => ({ issue: { key: 'SHOP-42', summary: 'Add session replay', projectName: 'Shop', issueType: 'Task', status: 'To Do' }, document: DOC, screening, decision: { available: false, reason: 'DECISIONS_NOT_ENABLED' } });
-  it('draws marks from server ranges, links them to margin notes, and keeps decisions disabled with a reason', async () => {
+  const REVIEW = { status: 'AWAITING_REVIEW', approvedForContent: false, latestSeq: 0, assignmentSeq: 0, assignee: null, decisions: [], assignments: [], binding: null, permissions: { isReviewer: false, canDecide: false, decideReason: 'NOT_REVIEWER', canAssign: false } };
+  const data = (screening, review = REVIEW) => ({ issue: { key: 'SHOP-42', summary: 'Add session replay', projectName: 'Shop', issueType: 'Task', status: 'To Do' }, document: DOC, screening, review });
+  it('draws marks from server ranges, links them to margin notes, and shows why a non-reviewer cannot decide', async () => {
     const { container } = withRouter(<ReviewView resource={resource({ data: data({ state: 'DPIA_LIKELY', result: RESULT, marksValid: true }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} onRecheck={vi.fn()} />);
     const marks = container.querySelectorAll('mark');
     expect([...marks].map((m) => m.textContent.replace(/\d+\s*\(evidence.*$/, ''))).toEqual(['ReplayCloud', 'prescription items']);
     expect(marks[0].getAttribute('aria-describedby')).toBe('a25-rv-note-f2');
-    expect(screen.getAllByRole('radio').every((r) => r.disabled)).toBe(true);
-    expect(screen.getByText(/Recording decisions arrives in the next milestone/)).toBeTruthy();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Record decision' })).toBeNull();
+    expect(screen.getByText(/Only members of the reviewer group can record decisions/)).toBeTruthy();
+    expect(screen.getAllByText('Awaiting review').length).toBeGreaterThan(0);
+    // Processing summary: only verified findings; transfers are explicitly not assessed by rules.
+    expect(screen.getByText('What the text says')).toBeTruthy();
+    expect(screen.getAllByText('Not assessed by the rule-based check')).toHaveLength(2); // transfers + retention
     expect(await axeViolations(container)).toEqual([]);
+  });
+  it('out-of-scope work items have no review block and say so', () => {
+    withRouter(<ReviewView resource={resource({ data: data({ state: 'OUT_OF_SCOPE', result: null, marksValid: false }, null) })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
+    expect(screen.getByText(/not in scope for privacy review/)).toBeTruthy();
   });
   it('draws NO marks when the text changed since the check (offsets would be wrong)', () => {
     const { container } = withRouter(<ReviewView resource={resource({ data: data({ state: 'RESCREEN_REQUIRED', result: RESULT, marksValid: false }) })} onBack={vi.fn()} onOpenIssue={vi.fn()} />);
     expect(container.querySelectorAll('mark')).toHaveLength(0);
     expect(screen.getByText(/may be out of date/)).toBeTruthy();
+    expect(screen.getByText(/Highlights are hidden because the text changed/)).toBeTruthy();
   });
   it('ignores out-of-range server offsets defensively', () => {
     const bad = { ...RESULT, findings: [{ ...RESULT.findings[0], source: { field: 'description', blockIndex: 0, start: 60, end: 999 } }] };
@@ -202,24 +213,58 @@ describe('Desk navigation and access', () => {
 
 describe('Inbox', () => {
   const items = [
-    { issueId: '1', key: 'SHOP-42', summary: 'Add session replay', state: 'DPIA_LIKELY', mode: 'rules', chips: [{ kind: 'sensitive_data', signal: 'health' }], findingCount: 3, updatedAt: Date.now() - 3600000 },
-    { issueId: '2', key: 'HR-8', summary: 'Track contractor screens', state: 'REVIEW_REQUIRED', mode: 'ai', chips: [], findingCount: 2, updatedAt: Date.now() - 7200000 },
+    { issueId: '1', key: 'SHOP-42', summary: 'Add session replay', projectKey: 'SHOP', outcome: 'DPIA_LIKELY', screeningState: 'SCREENED', reviewStatus: 'APPROVAL_STALE', assignee: { name: 'Reviewer One', active: true }, mode: 'rules', chips: [{ kind: 'sensitive_data', signal: 'health' }], findingCount: 3, ageMs: 3600000 },
+    { issueId: '2', key: 'HR-8', summary: 'Track contractor screens', projectKey: 'HR', outcome: 'REVIEW_REQUIRED', screeningState: 'SCREENED', reviewStatus: 'AWAITING_REVIEW', assignee: null, mode: 'ai', chips: [], findingCount: 2, ageMs: 7200000 },
   ];
-  it('lists real items with state, key and chips; strip numbers switch views', async () => {
-    const setView = vi.fn();
+  const DATA = { items, total: 2, page: 1, pages: 1, pageSize: 25, counts: { attention: 2, awaiting: 1, changed: 1, dpiaLikely: 1, mine: 1, oldestAttentionMs: 7200000 }, projects: ['HR', 'SHOP'], isReviewer: true };
+  const FILTERS = { view: 'attention', severity: 'any', project: 'any', assignee: 'any', page: 1 };
+  it('lists real items with outcome, review status, reviewer, age and chips; the key opens the review', async () => {
+    const setFilters = vi.fn();
     const onOpen = vi.fn();
-    const { container } = withRouter(<InboxView resource={resource({ data: { enabled: true, view: 'pending', items, counts: { pending: 2, dpiaLikely: 1, needsInfo: 0, oldestPendingMs: 7200000 } } })} view="pending" setView={setView} onOpen={onOpen} />, '/inbox');
-    expect(screen.getByText('SHOP-42')).toBeTruthy();
+    const { container } = withRouter(<InboxView resource={resource({ data: DATA })} filters={FILTERS} setFilters={setFilters} onOpen={onOpen} />, '/inbox');
+    expect(screen.getByRole('table')).toBeTruthy();
+    expect(screen.getByText('Approval invalidated')).toBeTruthy();
+    expect(screen.getByText('Reviewer One')).toBeTruthy();
+    expect(screen.getByRole('table').textContent).toContain('Unassigned');
     expect(screen.getByText('Health data')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /SHOP-42/ }));
+    fireEvent.click(screen.getByRole('link', { name: 'SHOP-42' }));
     expect(onOpen).toHaveBeenCalledWith('SHOP-42');
-    fireEvent.click(screen.getAllByRole('button', { name: /Needs information$/ })[0]);
-    expect(setView).toHaveBeenCalled();
     expect(await axeViolations(container)).toEqual([]);
   });
-  it('shows an empty view and validates the open-work-item key', async () => {
-    const { history } = withRouter(<InboxView resource={resource({ data: { enabled: true, view: 'pending', items: [], counts: { pending: 0, dpiaLikely: 0, needsInfo: 0, oldestPendingMs: null } } })} view="pending" setView={vi.fn()} onOpen={vi.fn()} />, '/inbox');
-    expect(screen.getByText('Nothing in this view')).toBeTruthy();
+  it('views, strip numbers and filters are sent to the server (page resets to 1)', () => {
+    const setFilters = vi.fn();
+    withRouter(<InboxView resource={resource({ data: DATA })} filters={{ ...FILTERS, page: 3 }} setFilters={setFilters} onOpen={vi.fn()} />, '/inbox');
+    fireEvent.click(screen.getByRole('button', { name: 'Changed' }));
+    expect(setFilters).toHaveBeenLastCalledWith({ ...FILTERS, view: 'changed', page: 1 });
+    fireEvent.click(screen.getByRole('button', { name: /Assigned to you/ }));
+    expect(setFilters).toHaveBeenLastCalledWith({ ...FILTERS, assignee: 'me', page: 1 });
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'HR' } });
+    expect(setFilters).toHaveBeenLastCalledWith({ ...FILTERS, project: 'HR', page: 1 });
+    fireEvent.change(screen.getByLabelText('Outcome'), { target: { value: 'DPIA_LIKELY' } });
+    expect(setFilters).toHaveBeenLastCalledWith({ ...FILTERS, severity: 'DPIA_LIKELY', page: 1 });
+  });
+  it('paginates with previous/next', () => {
+    const setFilters = vi.fn();
+    withRouter(<InboxView resource={resource({ data: { ...DATA, total: 60, page: 2, pages: 3 } })} filters={{ ...FILTERS, page: 2 }} setFilters={setFilters} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.getByText('Page 2 of 3 · 60 work items')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(setFilters).toHaveBeenLastCalledWith({ ...FILTERS, page: 3 });
+  });
+  it('non-reviewers get no reviewer filter or "assigned to you" number', () => {
+    withRouter(<InboxView resource={resource({ data: { ...DATA, isReviewer: false } })} filters={FILTERS} setFilters={vi.fn()} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.queryByLabelText('Reviewer')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Assigned to you/ })).toBeNull();
+    expect(screen.getByText(/Only members of the reviewer group can assign and decide/)).toBeTruthy();
+  });
+  it('loading, error and empty states; validates the open-work-item key', async () => {
+    const { unmount } = withRouter(<InboxView resource={resource({ status: 'loading' })} filters={FILTERS} setFilters={vi.fn()} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+    unmount();
+    const r2 = withRouter(<InboxView resource={resource({ status: 'error', error: { message: 'Jira did not respond in time. Try again.', retryable: true } })} filters={FILTERS} setFilters={vi.fn()} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    r2.unmount();
+    const { history } = withRouter(<InboxView resource={resource({ data: { ...DATA, items: [], total: 0 } })} filters={FILTERS} setFilters={vi.fn()} onOpen={vi.fn()} />, '/inbox');
+    expect(screen.getByText('Nothing waiting for review')).toBeTruthy();
     const input = screen.getByLabelText('Work item key');
     fireEvent.change(input, { target: { value: 'not a key' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));
@@ -227,5 +272,18 @@ describe('Inbox', () => {
     fireEvent.change(input, { target: { value: 'shop-42' } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open' })));
     expect(history.location.pathname).toBe('/review/SHOP-42');
+  });
+});
+
+describe('Issue panel review summary', () => {
+  const RESULT2 = { screeningId: 's1', outcome: 'REVIEW_REQUIRED', mode: 'rules', aiStatus: 'not_enabled', checkedAt: Date.now(), rulesVersion: 'r1.0.0', reasons: [], trace: [], criteria: [], truncated: false, quality: { rejected: 0, dropped: 0 }, findings: [] };
+  const panel = (latest) => ({ access: 'granted', issue: { id: '1', key: 'AS-79', projectKey: 'AS' }, screening: { state: 'REVIEW_REQUIRED', result: RESULT2 }, review: { status: 'APPROVED', assignee: null, latest } });
+  it('says an approval was carried over by the system, not decided again by a person', () => {
+    render(<PanelView resource={resource({ data: panel({ kind: 'system', decision: 'APPROVAL_RECONFIRMED', decidedBy: null, decidedAt: Date.now(), detail: { carried: 'APPROVED' } }) })} />);
+    expect(screen.getByText(/Approval carried over to the edited text/)).toBeTruthy();
+  });
+  it('names the reviewer for human decisions', () => {
+    render(<PanelView resource={resource({ data: panel({ kind: 'human', decision: 'APPROVED', decidedBy: { name: 'Reviewer One' }, decidedAt: Date.now() }) })} />);
+    expect(screen.getByText(/Approved by Reviewer One/)).toBeTruthy();
   });
 });

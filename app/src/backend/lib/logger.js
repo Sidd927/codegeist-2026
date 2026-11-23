@@ -4,8 +4,12 @@
 
 const ALLOWED_FIELDS = new Set([
   'evt', // event name, e.g. 'resolver.ok'
+  'errno', // numeric database error number (e.g. 1054)
   'resolver', // resolver key
   'code', // error code from errors.js
+  'errName', // class name of an unexpected error (e.g. TypeError) — never its message
+  'errCode', // driver/platform error code of an unexpected error (e.g. SQL error code)
+  'errKind', // letters-only leading words of a driver message, cut at the first quote (no identifiers/values)
   'ms', // duration in milliseconds
   'status', // upstream HTTP status
   'surface', // 'panel' | 'desk'
@@ -33,7 +37,7 @@ const ALLOWED_FIELDS = new Set([
   'finish', // model finish reason enum (e.g. tool_calls, length)
 ]);
 
-const NUMERIC_FIELDS = new Set(['ms', 'status', 'value', 'count', 'dbMs', 'jiraMs', 'modelMs', 'queueMs', 'rejected', 'dropped', 'sensitive', 'tokensIn', 'tokensOut', 'costMicros']);
+const NUMERIC_FIELDS = new Set(['errno', 'ms', 'status', 'value', 'count', 'dbMs', 'jiraMs', 'modelMs', 'queueMs', 'rejected', 'dropped', 'sensitive', 'tokensIn', 'tokensOut', 'costMicros']);
 const SAFE_STRING = /^[A-Za-z0-9_.:\-/]{1,64}$/;
 
 /** Keep only allow-listed fields with safe primitive values. Exported for tests. */
@@ -65,3 +69,11 @@ export const log = {
   warn: (fields) => write('warn', fields),
   error: (fields) => write('error', fields),
 };
+
+/** Content-free description of an unexpected error: class, platform code, DB errno, message kind. */
+export function errorFacts(e) {
+  const msg = typeof e?.message === 'string' ? e.message : '';
+  const errno = /\b(1\d{3}|[2-9]\d{3})\b/.exec(msg)?.[1];
+  const kind = msg.split(/['"`]/)[0].replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).slice(0, 5).join('_').slice(0, 60);
+  return { errName: e?.name, errCode: typeof e?.code === 'string' ? e.code : undefined, errno: errno ? Number(errno) : undefined, errKind: kind || undefined };
+}

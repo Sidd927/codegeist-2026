@@ -62,6 +62,35 @@ function ScreeningStatus({ s }) {
   );
 }
 
+function ReviewStatus({ r }) {
+  const T = copy.settings;
+  return (
+    <section className="a25-card a25-settings__screening" aria-labelledby="a25-review-settings-title">
+      <h2 id="a25-review-settings-title" className="a25-card__title">
+        {T.reviewTitle}
+      </h2>
+      <dl className="a25-setup">
+        <div>
+          <dt>{T.reviewerGroupLabel}</dt>
+          <dd className="a25-mono">{r.reviewerGroup}</dd>
+        </div>
+        <div>
+          <dt>{T.youLabel}</dt>
+          <dd>{r.youAreReviewer ? T.youReviewer : T.youNotReviewer}</dd>
+        </div>
+        <div>
+          <dt>{T.sodLabel}</dt>
+          <dd>{r.separationOfDuties ? T.sodOn : T.sodOff}</dd>
+        </div>
+        <div>
+          <dt>{T.signingLabel}</dt>
+          <dd>{T.signing[r.recordSigning] ?? r.recordSigning}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 export function SettingsView({ resource }) {
   const { status, data, error, reload } = resource;
   return (
@@ -92,6 +121,7 @@ export function SettingsView({ resource }) {
             ))}
           </ul>
           <p className="a25-subtle a25-small">{copy.settings.availableLater}</p>
+          {data.review ? <ReviewStatus r={data.review} /> : null}
           {data.screening ? <ScreeningStatus s={data.screening} /> : null}
           <dl className="a25-settings__meta a25-small">
             <div>

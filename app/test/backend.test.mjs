@@ -11,6 +11,7 @@ import { presentScreening } from '../src/backend/services/presenter.js';
 import { pipelineVersion } from '../src/core/analyse.js';
 import { adfToBlocks } from '../src/core/text.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
+import { createReviewService } from '../src/backend/services/review.js';
 
 const silentLog = { info() {}, warn() {}, error() {} };
 const ADF = {
@@ -23,8 +24,11 @@ const ADF = {
   ],
 };
 
-function fakeJira({ admin = false, deny = false, adminThrows = false, visible = null } = {}) {
+function fakeJira({ admin = false, deny = false, adminThrows = false, visible = null, reviewers = [] } = {}) {
   return {
+    groupsOf: async (id) => (reviewers.includes(id) ? ['article25-reviewers'] : []),
+    searchUsers: async () => reviewers.map((accountId) => ({ accountId, displayName: `Reviewer ${accountId}`, active: true })),
+    usersBulk: async (ids) => new Map(ids.map((id) => [id, { displayName: `User ${id}`, active: true }])),
     async getIssueDocument(key) {
       if (deny) throw new AppError(ErrorCode.NOT_FOUND);
       return { id: '10042', key: /^\d+$/.test(key) ? 'SHOP-42' : key, summary: 'Add session replay', description: ADF, status: 'To Do', statusCategory: 'new', projectKey: 'SHOP', projectName: 'Shop', issueType: 'Task' };
@@ -41,7 +45,10 @@ function fakeJira({ admin = false, deny = false, adminThrows = false, visible = 
 const svc = (opts = {}) => {
   const fake = opts.fake ?? createFakeRepos();
   const screening = { aiAvailable: false, requestManual: async () => ({ status: 'queued' }) };
-  return createDeskServices({ jira: fakeJira(opts), config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings: settingsFromEnv({}) });
+  const jira = fakeJira(opts);
+  const settings = settingsFromEnv({});
+  const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
+  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review });
 };
 
 // ---- logger: content-free by construction
@@ -126,22 +133,22 @@ test('panel: a user who cannot browse the issue gets no screening data at all (u
 test('panel rejects a missing or malformed context issue id', async () => {
   await assert.rejects(svc().panelState(undefined), (e) => e.code === 'INVALID_INPUT');
 });
-test('workspace returns the current text, valid highlights for identical text, and decisions unavailable', async () => {
+test('workspace returns the current text, valid highlights for identical text, and no decision rights for non-reviewers', async () => {
   const w = await svc({ fake: await seeded(currentFp) }).workspace('shop-42');
   assert.equal(w.issue.key, 'SHOP-42');
   assert.equal(w.document.blocks.length, 3);
   assert.equal(w.screening.marksValid, true);
-  assert.equal(w.decision.available, false);
+  assert.deepEqual([w.review.permissions.canDecide, w.review.permissions.decideReason, w.review.status], [false, 'NOT_REVIEWER', 'AWAITING_REVIEW']);
 });
 test('inbox: only issues the caller can see in Jira are returned (invisible ones are dropped)', async () => {
   const fake = createFakeRepos();
   for (const id of ['1', '2', '3']) fake.items.set(id, { ...SCREENING_ROW('x'), issue_id: id, issue_key: `SHOP-${id}`, screening_id: 'sid' });
   fake.scr.set('sid', SCREENING);
-  const i = await svc({ fake, visible: ['1', '3'] }).inbox('pending');
+  const i = await svc({ fake, visible: ['1', '3'] }).inbox({ view: 'awaiting' }, 'acc-viewer');
   assert.deepEqual(i.items.map((x) => x.issueId).sort(), ['1', '3']);
-  assert.equal(i.counts.pending, 2);
+  assert.equal(i.counts.awaiting, 2);
   assert.equal(JSON.stringify(i).includes('Synthetic 2'), false);
-  await assert.rejects(svc().inbox('everything'), (e) => e.code === 'INVALID_INPUT');
+  await assert.rejects(svc().inbox({ view: 'everything' }), (e) => e.code === 'INVALID_INPUT');
 });
 test('re-check requires as-user access to the issue', async () => {
   await assert.rejects(svc({ deny: true }).requestRescreen({ issueKey: 'SHOP-42' }), (e) => e.code === 'NOT_FOUND');
@@ -156,8 +163,8 @@ test('settings are refused for non-admins and when the admin check fails (fail c
   assert.equal(s.screening.ai, 'off');
 });
 test('app context reports roles without personal identifiers', async () => {
-  const c = await svc({ admin: true }).appContext();
-  assert.deepEqual(c.roles, { jiraAdmin: true });
+  const c = await svc({ admin: true }).appContext('acc-admin');
+  assert.deepEqual(c.roles, { jiraAdmin: true, reviewer: false });
   assert.equal(/accountId|email|displayName/.test(JSON.stringify(c)), false);
 });
 test('presenter: queued/screening and failed states never present a result as current', () => {
@@ -165,8 +172,8 @@ test('presenter: queued/screening and failed states never present a result as cu
   assert.equal(presentScreening({ state: 'SCREENING_FAILED', last_error: 'X' }, null).state, 'SCREENING_FAILED');
   assert.equal(presentScreening({ state: 'SCREENED', screened_fp: 'a' }, null).state, 'NOT_SCREENED');
 });
-test('only screening is switched on; decision, gate and register features stay off until their milestones', () => {
-  assert.deepEqual(FEATURES, { screening: true, decisions: false, gate: false, register: false });
+test('screening and decisions are on; the Jira workflow gate and register stay off until their milestones', () => {
+  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: false, register: false });
 });
 
 test('version-aware: a stored result from an older pipeline version is shown as rescreening required', () => {
@@ -174,4 +181,12 @@ test('version-aware: a stored result from an older pipeline version is shown as 
   const old = { ...SCREENING, pipelineVersion: 't1.r0.9.0.f1.noai' };
   assert.deepEqual([presentScreening(row, old, 'a').state, presentScreening(row, old, 'a').reason], ['RESCREEN_REQUIRED', 'pipeline_changed']);
   assert.equal(presentScreening(row, SCREENING, 'a').state, 'REVIEW_REQUIRED');
+});
+
+test('error facts for logs keep only class, code, errno and letters-only message kind (no identifiers or values)', async () => {
+  const { errorFacts } = await import('../src/backend/lib/logger.js');
+  const e = Object.assign(new Error("Error 1054 (42S22): Unknown column 'secret_col' in 'field list' for value 'diabetes'"), { name: 'ForgeSQLError', code: 'SQL_EXECUTION_ERROR' });
+  const f = sanitise({ evt: 'x', ...errorFacts(e) });
+  assert.deepEqual(f, { evt: 'x', errName: 'ForgeSQLError', errCode: 'SQL_EXECUTION_ERROR', errno: 1054, errKind: 'Error_S_Unknown_column' });
+  assert.equal(JSON.stringify(f).includes('diabetes') || JSON.stringify(f).includes('secret'), false);
 });

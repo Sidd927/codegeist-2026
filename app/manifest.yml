@@ -73,6 +73,7 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - read:jira-user # M3: reviewer-group membership, reviewer names, separation of duties
 app:
   runtime:
     name: nodejs24.x

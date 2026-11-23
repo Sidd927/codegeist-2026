@@ -55,7 +55,9 @@ export function createFakeRepos() {
     get: async (issueId) => (items.has(issueId) ? { ...items.get(issueId) } : null),
     async getView(issueId) {
       const row = items.has(issueId) ? { ...items.get(issueId) } : null;
-      const s = row?.screening_id && scr.has(row.screening_id) ? JSON.parse(JSON.stringify(scr.get(row.screening_id))) : null;
+      const raw = row?.screening_id && scr.has(row.screening_id) ? JSON.parse(JSON.stringify(scr.get(row.screening_id))) : null;
+      // Same snake_case shape as the SQL LEFT JOIN in sql-repositories.js.
+      const s = raw && { ...raw, screening_id: raw.screeningId, pipeline_version: raw.pipelineVersion, ai_status: raw.aiStatus, created_at: raw.createdAt };
       return { row, screening: s };
     },
     listStuck: async ({ olderThan, now, limit }) => [...items.values()].filter((r) => ['QUEUED', 'SCREENING'].includes(r.state) && r.updated_at < olderThan && (r.lease_until === null || r.lease_until < now)).slice(0, limit).map((r) => ({ ...r })),
@@ -119,5 +121,62 @@ export function createFakeRepos() {
     },
     get: async () => ({ ...spendState }),
   };
-  return { repos: { workItems, screenings, usage, spend }, items, scr, use, counters, spendState };
+
+  // ---- M3: append-only decisions / assignments / chain (INSERT IGNORE on PK + unique keys) ----
+  const dec = []; // stored as SQL would store them (JSON columns serialised)
+  const asg = [];
+  const chn = [];
+  const failures = { decisionInsert: false, chainInsert: false };
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const parseD = (r) => r && { ...clone(r), conditions: JSON.parse(r.conditions), questions: JSON.parse(r.questions), signal_set: JSON.parse(r.signal_set), detail: r.detail ? JSON.parse(r.detail) : null };
+  const decisions = {
+    async insert(d) {
+      if (failures.decisionInsert) throw new Error('sql unavailable');
+      if (dec.some((r) => (r.issue_id === d.issueId && r.seq === d.seq) || r.decision_id === d.decisionId || r.request_id === d.requestId)) return false;
+      dec.push({ issue_id: d.issueId, seq: d.seq, decision_id: d.decisionId, request_id: d.requestId, kind: d.kind, decision: d.decision, rationale: d.rationale ?? null, conditions: JSON.stringify(d.conditions ?? []), questions: JSON.stringify(d.questions ?? []), decided_by: d.decidedBy ?? null, decided_at: d.decidedAt, screening_id: d.screeningId, fp: d.fp, pipeline_version: d.pipelineVersion, outcome: d.outcome ?? null, signal_set: JSON.stringify(d.signalSet ?? {}), detail: d.detail ? JSON.stringify(d.detail) : null });
+      return true;
+    },
+    latest: async (issueId) => parseD(dec.filter((r) => r.issue_id === issueId).sort((a, b) => b.seq - a.seq)[0] ?? null),
+    list: async (issueId) => dec.filter((r) => r.issue_id === issueId).sort((a, b) => a.seq - b.seq).map(parseD),
+    byRequest: async (rid) => parseD(dec.find((r) => r.request_id === rid) ?? null),
+    unanchored: async (limit) => dec.filter((r) => !chn.some((c) => c.decision_id === r.decision_id)).slice(0, limit).map(parseD),
+  };
+  const assignments = {
+    async insert(a) {
+      if (asg.some((r) => (r.issue_id === a.issueId && r.seq === a.seq) || r.request_id === a.requestId)) return false;
+      asg.push({ issue_id: a.issueId, seq: a.seq, assignee: a.assignee ?? null, assigned_by: a.assignedBy, assigned_at: a.assignedAt, request_id: a.requestId });
+      return true;
+    },
+    latest: async (issueId) => clone(asg.filter((r) => r.issue_id === issueId).sort((a, b) => b.seq - a.seq)[0] ?? null),
+    list: async (issueId) => clone(asg.filter((r) => r.issue_id === issueId).sort((a, b) => a.seq - b.seq)),
+    byRequest: async (rid) => clone(asg.find((r) => r.request_id === rid) ?? null),
+  };
+  const chain = {
+    head: async () => (chn.length ? { seq: chn.at(-1).seq, record_hash: chn.at(-1).record_hash } : null),
+    async insert({ seq, decisionId, record, recordHash }) {
+      if (failures.chainInsert) throw new Error('sql unavailable');
+      if (chn.some((c) => c.seq === seq || c.decision_id === decisionId)) return false;
+      chn.push({ seq, decision_id: decisionId, record: JSON.stringify(record), record_hash: recordHash });
+      chn.sort((a, b) => a.seq - b.seq);
+      return true;
+    },
+    byDecision: async (id) => {
+      const c = chn.find((x) => x.decision_id === id);
+      return c ? { seq: c.seq, record: JSON.parse(c.record) } : null;
+    },
+    all: async () => chn.map((c) => JSON.parse(c.record)),
+  };
+  async function inboxCandidates({ projectKey = null, outcome = null, limit = 300 }) {
+    const out = [];
+    for (const w of [...items.values()].sort((a, b) => a.updated_at - b.updated_at)) {
+      const d = parseD(dec.filter((r) => r.issue_id === w.issue_id).sort((a, b) => b.seq - a.seq)[0] ?? null);
+      const a = asg.filter((r) => r.issue_id === w.issue_id).sort((x, y) => y.seq - x.seq)[0] ?? null;
+      if (!(['NEEDS_INFO', 'REVIEW_REQUIRED', 'DPIA_LIKELY'].includes(w.outcome) || d || ['QUEUED', 'SCREENING', 'SCREENING_FAILED'].includes(w.state))) continue;
+      if (projectKey && w.project_key !== projectKey) continue;
+      if (outcome && w.outcome !== outcome) continue;
+      out.push({ ...clone(w), latest: d ? { decision: d.decision, fp: d.fp, seq: d.seq, decided_at: d.decided_at, carried: d.detail?.carried ?? null } : null, assignee: a?.assignee ?? null });
+    }
+    return out.slice(0, limit);
+  }
+  return { repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates }, items, scr, use, counters, spendState, dec, asg, chn, failures };
 }

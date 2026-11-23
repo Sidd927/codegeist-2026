@@ -1,7 +1,7 @@
 // Jira REST adapter. All reads in this milestone run AS THE USER, so Jira's own permission model
 // decides what the caller may see (DATA_AND_SECURITY_MODEL §3). Upstream bodies are never returned
 // or logged; failures map to AppError codes.
-import api, { route } from '@forge/api';
+import api, { route, assumeTrustedRoute } from '@forge/api';
 import { AppError, ErrorCode } from '../lib/errors.js';
 
 const withTimeout = (promise, ms) =>
@@ -53,7 +53,7 @@ export function createJiraAdapter({ timeoutMs }) {
     },
     /** Fields needed by the Margin document view. */
     async getIssueDocument(idOrKey) {
-      const j = await getJson(route`/rest/api/3/issue/${idOrKey}?fields=summary,description,status,project,issuetype`);
+      const j = await getJson(route`/rest/api/3/issue/${idOrKey}?fields=summary,description,status,project,issuetype,reporter,assignee`);
       return {
         id: String(j.id),
         key: j.key,
@@ -64,7 +64,33 @@ export function createJiraAdapter({ timeoutMs }) {
         projectKey: j.fields?.project?.key ?? null,
         projectName: j.fields?.project?.name ?? null,
         issueType: j.fields?.issuetype?.name ?? null,
+        // Server-internal only (separation of duties); never returned to the frontend.
+        reporterId: j.fields?.reporter?.accountId ?? null,
+        assigneeId: j.fields?.assignee?.accountId ?? null,
       };
+    },
+    /** Group names of a user (as the app; requires read:jira-user). */
+    async groupsOf(accountId) {
+      const j = await getJson(route`/rest/api/3/user/groups?accountId=${accountId}`, { asApp: true });
+      return (Array.isArray(j) ? j : []).map((g) => g.name);
+    },
+    /**
+     * Find people by name (as the app; read:jira-user). Listing a group's members would need the
+     * admin-level manage:jira-configuration scope, so reviewers are found by search and then
+     * filtered by group membership on the server.
+     */
+    async searchUsers(query) {
+      const j = await getJson(route`/rest/api/3/user/search?query=${query}&maxResults=20`, { asApp: true });
+      return (Array.isArray(j) ? j : []).filter((u) => u.accountType === 'atlassian').map((u) => ({ accountId: u.accountId, displayName: u.displayName ?? '', active: u.active === true }));
+    },
+    /** Display names for a set of account ids (as the app). */
+    async usersBulk(accountIds) {
+      const ids = [...new Set(accountIds.filter((x) => typeof x === 'string' && /^[A-Za-z0-9:_-]{1,128}$/.test(x)))].slice(0, 50);
+      if (!ids.length) return new Map();
+      const qs = ids.map((id) => `accountId=${encodeURIComponent(id)}`).join('&');
+      // ids are regex-validated and URL-encoded above, so the composed path is safe to trust.
+      const j = await getJson(assumeTrustedRoute(`/rest/api/3/user/bulk?${qs}&maxResults=50`), { asApp: true });
+      return new Map((j.values ?? []).map((u) => [u.accountId, { displayName: u.displayName ?? '', active: u.active === true }]));
     },
     /** Jira global ADMINISTER permission for the calling user. */
     async isJiraAdmin() {

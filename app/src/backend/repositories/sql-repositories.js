@@ -188,3 +188,98 @@ export const spend = {
   },
   get: () => one("SELECT micros, calls FROM ai_spend WHERE scope = 'total'"),
 };
+
+// ---------------------------------------------------------------------------------------------
+// M3 REVIEW. Decisions and assignments are APPEND-ONLY: there is no UPDATE or DELETE path for them.
+// Each write is one INSERT IGNORE keyed by (issue_id, seq) plus a unique request_id, so concurrent or
+// repeated submissions resolve atomically: exactly one insert for a given position wins.
+
+const parseDecision = (r) =>
+  r && {
+    ...r,
+    seq: Number(r.seq),
+    decided_at: Number(r.decided_at),
+    conditions: JSON.parse(r.conditions ?? '[]'),
+    questions: JSON.parse(r.questions ?? '[]'),
+    signal_set: JSON.parse(r.signal_set ?? '{}'),
+    detail: r.detail ? JSON.parse(r.detail) : null,
+  };
+const parseAssignment = (r) => r && { ...r, seq: Number(r.seq), assigned_at: Number(r.assigned_at) };
+
+export const decisions = {
+  async insert(d) {
+    const r = await run(
+      `INSERT IGNORE INTO decisions (issue_id, seq, decision_id, request_id, kind, decision, rationale, conditions, questions, decided_by, decided_at,
+         screening_id, fp, pipeline_version, outcome, signal_set, detail)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      d.issueId, d.seq, d.decisionId, d.requestId, d.kind, d.decision, d.rationale ?? null, JSON.stringify(d.conditions ?? []), JSON.stringify(d.questions ?? []),
+      d.decidedBy ?? null, d.decidedAt, d.screeningId, d.fp, d.pipelineVersion, d.outcome ?? null, JSON.stringify(d.signalSet ?? {}), d.detail ? JSON.stringify(d.detail) : null,
+    );
+    return affected(r) === 1;
+  },
+  latest: async (issueId) => parseDecision(await one('SELECT * FROM decisions WHERE issue_id = ? ORDER BY seq DESC LIMIT 1', issueId)),
+  list: async (issueId) => (await many('SELECT * FROM decisions WHERE issue_id = ? ORDER BY seq ASC', issueId)).map(parseDecision),
+  byRequest: async (requestId) => parseDecision(await one('SELECT * FROM decisions WHERE request_id = ?', requestId)),
+  /** Decisions without a chain record (partial failure between insert and anchoring). */
+  unanchored: async (limit) =>
+    (await many(`SELECT d.* FROM decisions d LEFT JOIN chain c ON c.decision_id = d.decision_id WHERE c.decision_id IS NULL ORDER BY d.decided_at ASC LIMIT ${Number(limit) | 0}`)).map(parseDecision),
+};
+
+export const assignments = {
+  async insert(a) {
+    const r = await run(
+      'INSERT IGNORE INTO assignments (issue_id, seq, assignee, assigned_by, assigned_at, request_id) VALUES (?, ?, ?, ?, ?, ?)',
+      a.issueId, a.seq, a.assignee ?? null, a.assignedBy, a.assignedAt, a.requestId,
+    );
+    return affected(r) === 1;
+  },
+  latest: async (issueId) => parseAssignment(await one('SELECT * FROM assignments WHERE issue_id = ? ORDER BY seq DESC LIMIT 1', issueId)),
+  list: async (issueId) => (await many('SELECT * FROM assignments WHERE issue_id = ? ORDER BY seq ASC', issueId)).map(parseAssignment),
+  byRequest: async (requestId) => parseAssignment(await one('SELECT * FROM assignments WHERE request_id = ?', requestId)),
+};
+
+export const chain = {
+  head: () => one('SELECT seq, record_hash FROM chain ORDER BY seq DESC LIMIT 1'),
+  async insert({ seq, decisionId, record, recordHash, createdAt }) {
+    const r = await run('INSERT IGNORE INTO chain (seq, decision_id, record, record_hash, created_at) VALUES (?, ?, ?, ?, ?)', seq, decisionId, JSON.stringify(record), recordHash, createdAt);
+    return affected(r) === 1;
+  },
+  byDecision: async (decisionId) => {
+    const r = await one('SELECT seq, record FROM chain WHERE decision_id = ?', decisionId);
+    return r ? { seq: Number(r.seq), record: JSON.parse(r.record) } : null;
+  },
+  all: async (limit = 5000) => (await many(`SELECT record FROM chain ORDER BY seq ASC LIMIT ${Number(limit) | 0}`)).map((r) => JSON.parse(r.record)),
+};
+
+/** Inbox candidates with their latest decision and assignment (grouped derived tables, one statement). */
+export async function inboxCandidates({ projectKey = null, outcome = null, limit = 300 }) {
+  const where = ["(w.outcome IN ('NEEDS_INFO', 'REVIEW_REQUIRED', 'DPIA_LIKELY') OR d.decision IS NOT NULL OR w.state IN ('QUEUED', 'SCREENING', 'SCREENING_FAILED'))"];
+  const params = [];
+  if (projectKey) {
+    where.push('w.project_key = ?');
+    params.push(projectKey);
+  }
+  if (outcome) {
+    where.push('w.outcome = ?');
+    params.push(outcome);
+  }
+  const rows = await many(
+    `SELECT w.issue_id, w.issue_key, w.project_key, w.state, w.outcome, w.screening_id, w.screened_fp, w.updated_at, w.created_at,
+            d.decision AS d_decision, d.fp AS d_fp, d.seq AS d_seq, d.decided_at AS d_at, d.detail AS d_detail,
+            a.assignee AS a_assignee, a.seq AS a_seq
+     FROM work_items w
+     LEFT JOIN (SELECT issue_id, MAX(seq) AS max_seq FROM decisions GROUP BY issue_id) dm ON dm.issue_id = w.issue_id
+     LEFT JOIN decisions d ON d.issue_id = dm.issue_id AND d.seq = dm.max_seq
+     LEFT JOIN (SELECT issue_id, MAX(seq) AS max_seq FROM assignments GROUP BY issue_id) am ON am.issue_id = w.issue_id
+     LEFT JOIN assignments a ON a.issue_id = am.issue_id AND a.seq = am.max_seq
+     WHERE ${where.join(' AND ')}
+     ORDER BY w.updated_at ASC LIMIT ${Number(limit) | 0}`,
+    ...params,
+  );
+  return rows.map((r) => ({
+    ...r,
+    updated_at: Number(r.updated_at),
+    latest: r.d_decision ? { decision: r.d_decision, fp: r.d_fp, seq: Number(r.d_seq), decided_at: Number(r.d_at), carried: r.d_detail ? JSON.parse(r.d_detail)?.carried ?? null : null } : null,
+    assignee: r.a_assignee ?? null,
+  }));
+}

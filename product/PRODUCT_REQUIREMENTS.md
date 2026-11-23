@@ -12,7 +12,7 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | **Signal** | An extracted fact with a verbatim evidence quote: data category, WP248 criterion, vendor/recipient, data subject, change type |
 | **Outcome** | Deterministic screening result: `CLEAR` < `INVENTORY_UPDATE` < `NEEDS_INFO` < `REVIEW_REQUIRED` < `DPIA_LIKELY` (from doc 15) |
 | **Inventory** | What the organisation has already approved: vendors (site-wide) and data categories per project |
-| **Decision** | A human reviewer's act: `APPROVED`, `APPROVED_WITH_CONDITIONS`, `CHANGES_REQUESTED`, `REJECTED` |
+| **Decision** | A human reviewer's act: `APPROVED`, `APPROVED_WITH_CONDITIONS`, `NEEDS_MORE_INFORMATION` (was `CHANGES_REQUESTED`, renamed in M3), `REJECTED` |
 | **Review state** | The work item's current governance state (see [DATA_AND_SECURITY_MODEL.md §2](DATA_AND_SECURITY_MODEL.md)) |
 | **Gate** | The Article25 Jira workflow validator on a configured transition |
 | **Ledger** | The append-only, signed hash chain of decisions |
@@ -41,23 +41,23 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 |---|---|---|---|
 | FR-R1 | Outcomes `REVIEW_REQUIRED` and `DPIA_LIKELY` (and others per gate policy, FR-A3) put the work item in **Pending review** automatically. No request step for the PM. | M | [PROPOSED] |
 | FR-R2 | `NEEDS_INFO` shows the open questions to the requester. The item waits for clarification: an edit triggers a re-screen, or the requester can **Send to reviewer anyway**. | M | [PROPOSED] |
-| FR-R3 | **Inbox** lists pending items with outcome, what's new, age, project and requester, sorted by severity, then age. Filters: outcome, project, age. | M | [PROPOSED] |
+| FR-R3 | **Inbox** lists pending items with outcome, what's new, age, project and requester, sorted by severity, then age. Filters: outcome, project, age. **M3:** views (needs attention, awaiting review, changed, info requested, decided, all), filters (outcome, project, reviewer), ordered by urgency → severity → age, server-side pagination; requester not shown (identifier minimisation). | M | [VERIFIED] live, M3 |
 | FR-R4 | **Review workspace** shows: work-item text with highlighted evidence linked to findings; findings grouped by type; inventory diff; rule trace (rule IDs, version); open questions; screening mode/model; decision history. | M | [PROPOSED] |
-| FR-R5 | Decisions: `APPROVED`, `APPROVED_WITH_CONDITIONS` (≥1 condition required), `CHANGES_REQUESTED` (message required), `REJECTED` (rationale required). An optional rationale goes on every decision. | M | states [VERIFIED] in spike |
-| FR-R6 | Only members of the configured **reviewer group** may decide, checked server-side from `context.accountId` on every decision. | M | [VERIFIED] |
-| FR-R7 | **Separation of duties:** the decider must not be the work item's reporter or assignee (on by default; an admin may disable it, and that change is audited). | M | [PROPOSED] |
-| FR-R8 | **Optimistic concurrency:** a decision carries the screening ID and review version it was made against. If either changed, reject it with "This item changed while you were reviewing" and reload. | M | optimistic SQL [VERIFIED] |
+| FR-R5 | Decisions: `APPROVED`, `APPROVED_WITH_CONDITIONS` (≥1 condition required), `NEEDS_MORE_INFORMATION` (≥1 question required; replaces `CHANGES_REQUESTED`), `REJECTED`. **M3: a rationale (10–2,000 characters) is required on every decision**, and lists that don't belong to the chosen outcome are rejected. ✅ M3 | [VERIFIED] live, M3 |
+| FR-R6 | Only members of the configured **reviewer group** may decide, checked server-side from `context.accountId` on every decision. | M | [VERIFIED] live, M3 (non-member submission refused) |
+| FR-R7 | **Separation of duties:** the decider must not be the work item's reporter or assignee (on by default; an admin may disable it, and that change is audited). | M | [VERIFIED] live, M3 (server refusal). Disabling is an environment setting in M3; the audited admin toggle is M8 |
+| FR-R8 | **Optimistic concurrency:** a decision carries the screening ID and review version it was made against. If either changed, reject it with "This item changed while you were reviewing" and reload. | M | [VERIFIED] live, M3 (CONFLICT and STALE_EVIDENCE) |
 | FR-R9 | **Declared purpose** from a linked Atlassian Goal (Teamwork Graph, as the reviewer), shown in the workspace, with graceful degradation. | S | TWG goal traversal [VERIFIED]; org-admin install [UNVERIFIED for judges] |
 | FR-R10 | Conditions can optionally create **linked Jira tasks** (idempotent). | S | review-task creation [VERIFIED] |
 | FR-R11 | On approval, the reviewer may **add the new vendor/categories to the inventory** in the same action. | S | [PROPOSED] |
-| FR-R12 | Reviewer assignment, SLAs, notifications. | L | — |
+| FR-R12 | Reviewer assignment, SLAs, notifications. **M3 delivered assignment** (assign to me, search for an active reviewer-group member, unassign; history kept). SLAs and notifications stay Later. | L→M (assignment) | [VERIFIED] live, M3 |
 
 ### 2.3 Enforce (gate)
 | ID | Requirement | P | Basis |
 |---|---|---|---|
 | FR-G1 | A lambda workflow validator reads **only app-owned SQL state** and allows a transition only if the item is in-scope-cleared. **[VERIFIED: lambda + app storage; issue-property gate rejected as insecure]** | M | doc 14 |
 | FR-G2 | **Fail closed:** errors, missing state, unscreened items, screening in progress, pending, changes requested, rejected and stale items are blocked, each with a specific, actionable message (≤ 1 sentence + where to go). | M | fail-closed [VERIFIED] |
-| FR-G3 | **Evidence-locked approval:** a decision stores the content fingerprint and signal set it approved. A material change on re-screening sets the state to `STALE` and re-routes to review. A non-material change keeps the approval and records the new fingerprint, attributed to the system. | M | [PROPOSED] |
+| FR-G3 | **Evidence-locked approval:** a decision stores the content fingerprint and signal set it approved. A material change on re-screening sets the state to `STALE` and re-routes to review. A non-material change keeps the approval and records the new fingerprint, attributed to the system. | M | **[VERIFIED] live, M3** (`APPROVAL_INVALIDATED` / `APPROVAL_RECONFIRMED`); enforcement by the gate is M4 |
 | FR-G4 | The validator records each evaluation (project, transition, result, reason code; **no content**) for gate health and metrics. | M | [PROPOSED] |
 | FR-G5 | **Gate health:** Settings shows, per in-scope project, whether the validator has been seen evaluating and when. | M | [PROPOSED]; no extra scope needed |
 | FR-G6 | **Monitor mode** (admin kill-switch): the validator allows but records "would have blocked". The switch is audited and shown as a banner to reviewers and admins. | M | [PROPOSED] |

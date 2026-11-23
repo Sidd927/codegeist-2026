@@ -35,6 +35,8 @@ export function presentResult(s) {
     reasons: (r.reasons ?? []).map((x) => ({ ruleId: x.ruleId, outcome: x.outcome, params: x.params ?? {} })),
     trace: r.trace ?? [],
     criteria: r.criteria ?? [],
+    // Purposes are shown only with a verified verbatim quote; the AI's own wording is labelled as such.
+    purposes: (r.purposes ?? []).filter((p) => p?.evidence?.excerpt).map((p) => ({ excerpt: p.evidence.excerpt, description: p.provenance === 'ai' ? p.description ?? null : null, provenance: p.provenance ?? null, source: p.evidence.source ?? null })),
     truncated: r.truncated === true,
     quality: { rejected: s.quality?.rejected ?? 0, dropped: s.quality?.dropped ?? 0 },
     findings: (r.findings ?? []).map((f) => ({
