@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- a command-line check that reports to the terminal */
 // Permission freeze guard (runs in `npm run lint`, so in CI).
 // Adding a scope, egress or a consent-bearing module after the freeze (4 Dec 2026) would make
 // every installed site, judges' included, re-approve the app. This fails the build if the

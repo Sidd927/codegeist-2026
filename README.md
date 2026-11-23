@@ -65,7 +65,7 @@ cd app && npm ci && npm ci --prefix frontend
 npm run check
 ```
 
-`npm run check` runs lint, copy lint, backend tests, UI tests (including axe), the production build and the bundle budgets.
+`npm run check` runs lint, copy lint, the permission-freeze guard, backend tests, UI tests (including axe), real-browser contrast checks, the production build and the bundle budgets.
 
 Deploy to your own development environment (sign in with `forge login` first):
 
@@ -87,7 +87,7 @@ forge install --site <your-site>.atlassian.net --product jira -e development
 | `A25_SIGNING_KEY` | yes | Legacy HMAC key. Only verifies records made before Ed25519 signing (pre-M5 development data). |
 | `A25_REVIEWER_GROUP` | no | Jira group whose members may decide. Default `article25-reviewers`. |
 | `A25_SCOPE_PROJECTS` | no | Comma-separated project keys to screen. Empty means all projects. |
-| `A25_AI_ENABLED`, `A25_AI_MODEL`, `A25_AI_DAILY_BUDGET`, `A25_AI_SPEND_CAP_USD` | no | AI extraction. **Off** unless enabled; the spend cap defaults to $0 (no AI calls). |
+| `A25_AI_ENABLED`, `A25_AI_MODEL`, `A25_AI_DAILY_BUDGET`, `A25_AI_SPEND_CAP_USD` | no | AI extraction. **Off** unless enabled; the spend cap defaults to $0 (no AI calls). The cap and the daily budget are reserved atomically in SQL before each call; Settings shows spend against the cap. Planned production values: on, 300 a day, $5 per installation ([decision](product/AI_PRODUCTION_DECISION.md)). |
 
 Generate a record key without printing it:
 
@@ -141,7 +141,7 @@ Forge environment variables belong to the app **environment**, not to a site. In
   - [M5 record](product/M5_RECORD_RESULTS.md)
   - [**final readiness audit**](product/FINAL_READINESS_AUDIT.md)
 - Judges: [install guide](docs/JUDGE_INSTALL.md) · [clean-site rehearsal](docs/CLEAN_SITE_REHEARSAL.md)
-- Release: [readiness and approvals](product/RELEASE_READINESS.md) · [production runbook](product/PRODUCTION_RUNBOOK.md) · [AI decision memo](product/AI_PRODUCTION_DECISION.md) · [privacy policy draft](docs/privacy-policy.md)
+- Release: [final handover](submission/FINAL_HANDOVER.md) · [final verification](submission/FINAL_VERIFICATION_REPORT.md) · [readiness and approvals](product/RELEASE_READINESS.md) · [production runbook](product/PRODUCTION_RUNBOOK.md) · [permissions matrix](product/PERMISSIONS_MATRIX.md) · [AI decision memo](product/AI_PRODUCTION_DECISION.md) · [privacy policy draft](docs/privacy-policy.md)
 - Submission: [Devpost draft](submission/DEVPOST_FINAL_SUBMISSION.md) · [checklist](submission/SUBMISSION_CHECKLIST.md) · [demo film notes](submission/video/VIDEO_PRODUCTION_NOTES.md)
 
 Article25 helps teams run their own privacy reviews. It does not give legal advice, and its findings are prompts for a human decision.

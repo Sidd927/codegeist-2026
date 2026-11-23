@@ -1,32 +1,34 @@
-# Release readiness: competition handoff (23 Nov 2026)
+# Release readiness: competition handoff (23 Nov 2026; updated at the final release pass)
+
+**Latest:** see `submission/FINAL_VERIFICATION_REPORT.md` and `submission/FINAL_HANDOVER.md`.
 
 Verified on 23 Nov 2026 from the repository, CI, the Forge CLI and the live development site. Previous reports were not trusted.
 
 ## 1. Readiness matrix
 | Area | State | Evidence | Blocking? |
 |---|---|---|---|
-| Code and CI | ✅ PR #7 green. All steps execute: lint, 183 backend, 87 UI with axe, Chromium install + 24 contrast, build, budgets | GitHub Actions run 45177317534 and later | No |
+| Code and CI | PR #7: lint (incl. the permission-freeze guard), 187 backend, 88 UI with axe, Chromium install + 24 contrast, build, budgets | The latest GitHub Actions run on PR #7 (see the final verification report) | No |
 | PR stack | ✅ #1–#7 open as drafts, stacked: #7 → M4 → M3 → M2 → Stage 3 → Stage 2 → Stage 1 → `main`. Nothing merged | `gh pr list` | Merge plan needs you (17 Dec) |
 | Forge environments | Development: installed (v6), AI **off**, gate **Monitoring**. `recovery`: empty, no install. Staging: unused. **Production: deployed 22 Nov, no install, no variables** | `forge environments/variables/install list` | Production setup needs you |
-| Scopes | `read:jira-work`, `read:jira-user`, `read:workflow:jira` + `llm` module; no egress | `manifest.yml` | Freeze by **4 Dec** (you) |
+| Scopes | `read:jira-work`, `read:jira-user`, `read:workflow:jira` + `llm` module; no egress. Guarded in CI | `manifest.yml`, [`PERMISSIONS_MATRIX.md`](PERMISSIONS_MATRIX.md) | Freeze by **4 Dec** (you) |
 | Signing keys | Development: Ed25519 + legacy HMAC. Production: **none** | variables list | **Yes:** production key (you generate) |
 | AI decision | ✅ **Decided: hybrid, $5 cap per installation, 300 checks a day** (owner, 23 Nov). Configured with the production deploy | `AI_PRODUCTION_DECISION.md` | No |
 | Sharing link | Not created | — | **Yes** (you) |
 | Privacy policy | Rewritten from the code; not published; contact and legal review open | `docs/privacy-policy.md` | **Yes** (you) |
 | Clean-site rehearsal | Isolated first-run and recovery done live; a real clean site needs you | `docs/CLEAN_SITE_REHEARSAL.md` | Strongly recommended |
-| Judge guide | Accurate; matches Get started | `docs/JUDGE_INSTALL.md` | No |
-| Demo film | ✅ Rendered, 3:59, real product footage. Synthetic voice; no music yet | `submission/video/` | Music and voice approvals; YouTube upload (you) |
+| Judge guide | Synthetic test text checked with the rules engine; troubleshooting; UI strings matched | `docs/JUDGE_INSTALL.md` | No |
+| Demo film | ✅ Rendered, 3:59, real product footage, full decode clean. Synthetic voice; no music. Captions, thumbnail, YouTube kit, licence record | `submission/video/` | **Listen**, then YouTube upload (you) |
 | Devpost package | ✅ Copy-ready; field-by-field checklist | `submission/` | Submission (you) |
 | Runbook | ✅ Exact commands | `PRODUCTION_RUNBOOK.md` | — |
 
 ## 2. Judge assessment (one pass)
 | Criterion | Strength a judge will see | Biggest remaining weakness | What was done here |
 |---|---|---|---|
-| Technological Implementation | Real Forge app: validator, triggers, queues, SQL, signed ledger, recovery; 294 automated checks | If AI is off in production, a judge's own paraphrased text may not be flagged (held-out recall 0.00 rules-only) | Decision memo; the judge guide uses text the rules catch; the panel labels the mode |
+| Technological Implementation | Real Forge app: validator, triggers, queues, SQL, signed ledger, recovery; 299 automated checks | If AI is off in production, a judge's own paraphrased text may not be flagged (held-out recall 0.00 rules-only) | Decision memo; the judge guide uses text the rules catch; the panel labels the mode |
 | Design | Coherent panel → desk → settings; ADS tokens; light and dark verified | The panel sits behind the apps icon in Jira | Renamed "Article25 privacy"; the guide says where it is |
 | Potential Impact | A concrete, common failure (stale or optional privacy approvals) | No user validation (hackathon); we claim none | The Devpost text states the problem and audience precisely, with no invented traction |
 | Innovation | Approval bound to the exact text + enforcement + an offline-verifiable record | Could be mistaken for "another AI scanner" | Positioning: governance workflow; AI optional and never decides |
-| Presentation | A 4-minute film on one story, real UI, honest captions | Synthetic voice and no music bed | Production notes give the exact swap paths |
+| Presentation | A 4-minute film on one story, real UI, honest captions | Synthetic voice and no music bed | Production notes give the exact swap paths; captions split for reading; dedicated thumbnail |
 
 **Product finding (documented, not fixed):** the rules floor can read a capitalised sentence-initial verb as a vendor ("Segment shoppers…"). Fixing it changes the pipeline version and forces a re-check of every item, and it doesn't affect the gate's safety. It's documented in the AI memo; the demo wording avoids it.
 
