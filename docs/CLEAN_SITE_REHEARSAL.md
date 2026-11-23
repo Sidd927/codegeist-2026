@@ -1,5 +1,27 @@
 # Clean-site rehearsal: report and script
 
+## Part 0: evidence status by scenario (final release pass, 23 Nov 2026)
+"Live" means it was done by hand on the development site or in the isolated `recovery` environment, with synthetic data. "Automated" means only tests cover it (backend 187, UI 88, real-browser contrast 24). **Nothing here has run on production or on a second site.**
+
+| Scenario | Live | Automated | Not tested yet | Needs a 2nd user or site |
+|---|---|---|---|---|
+| Install, first load, "setting up" self-heal | ✅ (`recovery`, 3.5 s) | ✅ | Production install | Clean site |
+| Get started on a fresh install, environment-specific coverage | ✅ | ✅ | | |
+| Screening a new and an edited item (rules mode) | ✅ | ✅ | | |
+| **AI-assisted screening in the judging configuration** | ❌ (development AI stays off, by your rule) | ✅ (mocked transport; M2 measured it live in Stage 1) | **Production with AI on** | |
+| AI daily budget and **spending cap**, including concurrency | ❌ | ✅ (new concurrency tests) | Reaching the cap for real | |
+| The four decisions; stale-evidence and concurrency refusals | ✅ | ✅ | | |
+| Separation of duties: the reporter is refused, with guidance | ✅ (single account) | ✅ | | **Two accounts**: a second person approving |
+| Gate: block in Enforcing, allow after approval, *Would block* in Monitoring | ✅ (company- and team-managed) | ✅ | | |
+| Approval invalidated on a material change; carried over on a harmless edit | ✅ / ✅ | ✅ | | |
+| Verify, export, offline verification, tamper detection | ✅ | ✅ | | |
+| Uninstall → reinstall → restore → verify → re-check | ✅ (`recovery`) | ✅ | | |
+| Restore killed mid-way, large restores in rounds | ❌ | ✅ | | |
+| Key rotation and key loss (adopt previous key) | ❌ | ✅ | | |
+| Judge sharing link, install by a non-developer account | ❌ | n/a | **Yes** | **Clean site** |
+| Long-running judging period (5 Jan–3 Feb 2027) | ❌ | n/a | Yes | |
+
+
 ## Part 1: what was rehearsed (isolated environment, live, 23 Nov 2026)
 A genuinely clean *site* needs a second Atlassian site, which you create. The closest safe substitute is a **fresh installation in an isolated Forge environment** (`recovery`). It has its own storage, keys and installation, and was installed on the development site without touching the development installation.
 
@@ -29,12 +51,12 @@ A genuinely clean *site* needs a second Atlassian site, which you create. The cl
 | 2 | *Admin → Groups*: create `article25-reviewers` and add yourself (1 min) | — |
 | 3 | *Apps → Article25*: read Get started (1 min) | *Choose who decides* shows *You are a member*; *Protect a workflow transition* shows *Not protected* |
 | 4 | Create a test project (team-managed); add the gate to *To Do → In Progress* (3 min) | Get started → *Protected*; Settings shows the workflow as **Complete** |
-| 5 | Create the work item from `docs/JUDGE_INSTALL.md` §3 | The panel shows a result (DPIA likely in rules mode for the guide's text) |
+| 5 | Create the work item from `docs/JUDGE_INSTALL.md` §3 | The panel shows **DPIA likely** (health, systematic monitoring, behavioural), labelled AI-assisted if AI is on; check that AI findings quote the text |
 | 6 | Try *In Progress* in **Monitoring** | Allowed; Settings → Recent gate checks shows *Would block* |
 | 7 | Start enforcing; try again | Jira refuses: "This work item needs a privacy review…" |
 | 8 | Approve your own item | Refused with *Another reviewer must decide* (you are the reporter). Turn separation of duties **off** (audited) and approve |
 | 9 | Move to *In Progress* | Allowed |
-| 10 | Edit the description (add a vendor and email addresses) | Within seconds: *Approval invalidated*; the transition is blocked again |
+| 10 | Add the sentence from `JUDGE_INSTALL.md` §3 step 6 (*Send shopper email addresses to Tidepost…*) | Within about 30 s: *Approval invalidated* (new: contact data); the transition is blocked again |
 | 11 | Record → Settings → *Verify the whole record*, then *Download signed archive* | *verified*; file saved |
 | 12 | `node app/scripts/verify-archive.mjs <file> --fingerprint "<from Settings>"` | VALID and complete |
 | 13 | Switch separation of duties back on and return the mode to Monitoring | Audited in the change history |

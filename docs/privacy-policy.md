@@ -33,13 +33,15 @@ Article25 runs entirely on Atlassian's Forge platform, hosted by Atlassian. It:
 | Data | Source | Kept? | Why |
 |---|---|---|---|
 | Work-item summary and description | Jira | **Not stored.** Read in memory for each check | Screening |
+| Work-item tracking: work-item ID and key, project key, processing state and outcome | Jira / derived | Yes, until the work item is deleted | Know what to check and show its state |
 | Screening result: outcome, findings with **short excerpts (120 characters or fewer)** of the text that triggered them, a one-way content fingerprint (SHA-256), rule and pipeline versions | Derived | Yes | Explain why a work item was flagged; detect later edits |
 | Review decisions: work-item ID, decision, the reviewer's rationale, conditions or questions, the **reviewer's Atlassian account ID**, timestamps, the fingerprint of the reviewed text | Reviewers | Yes | Accountability; workflow protection |
 | Reviewer assignments: the assignee's and assigner's account IDs, timestamps | Reviewers | Yes | Routing |
 | Signed decision records: decision ID, work-item ID, decision, conditions, the reviewer's account ID, timestamps, signature and chain hash | Derived | Yes | Tamper-evident history |
 | Audited settings changes: the administrator's account ID, value, optional note, timestamp | Administrators | Yes | Accountability |
 | Workflow-gate checks: work-item ID, project key, transition status IDs, result, reason code, a short content reference (16 hex characters of the fingerprint) | Derived | **30 days** | Show what the gate did |
-| Record activity (export, verify, restore): the administrator's account ID, result, archive digest | Derived | Yes | Accountability |
+| Record activity (export, verify, restore, adopting a previous signing key): the administrator's account ID, result, archive digest | Derived | Yes | Accountability |
+| Usage counters: per day, the number of checks, AI calls, rule-based checks and tokens; the installation's total AI spend | Derived | Yes | Enforce the daily AI budget and the spending cap. **No text and no account IDs** |
 | Archive transfers in progress | Administrators | **1 hour** | Chunked export and restore |
 | Group membership and display names of users | Jira | **Not stored.** Read when needed | Permission checks; showing names |
 | Workflow configuration | Jira | **Not stored** | Showing which transitions carry the gate |
@@ -57,7 +59,7 @@ Please don't put unnecessary personal data in rationales, conditions or question
 - **It never logs work-item text, rationales or account IDs.**
 
 ## AI processing
-**In the published build, AI-assisted checks are on, within a spending cap set by the developer.** If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so.
+**In the published build, AI-assisted checks are on, within limits set by the developer:** a daily number of AI checks and a total spending cap per installation, both enforced on the server. If AI is unavailable, over its daily budget or over the cap, screening falls back to deterministic rules only, and the result says so. Administrators see spend against the cap in Settings. [CONFIRM: the published limits, currently 300 checks a day and USD 5 per installation]
 
 **When AI-assisted checks run:**
 - work-item text is sent to **Atlassian's Forge LLM service**, which runs within Atlassian's platform, to extract possible privacy signals;

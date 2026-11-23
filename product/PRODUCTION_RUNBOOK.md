@@ -13,9 +13,9 @@ Run everything from `app/` with Node 24 (`export PATH=/opt/homebrew/opt/node@24/
 ## 0. Preconditions (check before anything else)
 | Check | How | Must be |
 |---|---|---|
-| Release commit | `git log -1` on the branch you will merge | Tagged, CI green (lint, 183 backend, 87 UI, 24 contrast, build, budgets) |
+| Release commit | `git log -1` on the branch you will merge | Tagged, CI green (lint incl. the permission-freeze guard, 187 backend, 88 UI, 24 contrast, build, budgets) |
 | Scopes frozen | `manifest.yml` → `permissions.scopes` | Exactly `read:jira-work`, `read:jira-user`, `read:workflow:jira`; plus the `llm` module (decision: [AI_PRODUCTION_DECISION.md](AI_PRODUCTION_DECISION.md)) |
-| Scope freeze date | Calendar | **On or before Fri 4 Dec 2026.** Scope changes after judges install force re-consent |
+| Scope freeze date | Calendar; [PERMISSIONS_MATRIX.md](PERMISSIONS_MATRIX.md) §5 | **On or before Fri 4 Dec 2026.** Scope changes after judges install force re-consent |
 | Privacy policy URL | [`docs/privacy-policy.md`](../docs/privacy-policy.md), published by you | A public URL (Sharing requires one) **[YOU]** |
 | Clean-site rehearsal | [`docs/CLEAN_SITE_REHEARSAL.md`](../docs/CLEAN_SITE_REHEARSAL.md) | Passed on a separate site |
 
@@ -27,6 +27,19 @@ Set these before the first production deploy. A deploy without a record key inst
 ```bash
 forge variables set --encrypt -e production A25_RECORD_SIGNING_KEY "$(node -e "process.stdout.write(require('crypto').generateKeyPairSync('ed25519').privateKey.export({format:'der',type:'pkcs8'}).toString('base64'))")"
 ```
+
+**Why this is safe:**
+- the key is created inside the `node` process and handed straight to `forge`, which stores it encrypted;
+- it is never written to a file, the clipboard or the terminal;
+- your shell history keeps only the command text, not the key.
+
+**Two cautions:**
+- For the moment the command runs, the key is an argument of the `forge` process. Run it on your own machine, not a shared one.
+- Run it **once**. Running it again silently replaces the key, so records signed with the first key would then need its public key in `A25_RECORD_TRUSTED_KEYS` (see §7, key loss).
+
+**Verify without revealing it:**
+1. `forge variables list -e production` must list `A25_RECORD_SIGNING_KEY` with the value shown as `****` (encrypted).
+2. After the deploy and the first install, *Settings → Decision record and recovery* shows signing as **Configured**, with a key id and fingerprint. *Get started* shows *Sign every decision · Configured*.
 
 Do **not** set `A25_SIGNING_KEY` (legacy HMAC) in production: there are no legacy records there.
 
@@ -86,9 +99,19 @@ forge deploy -e production --non-interactive
 - Pages show "Article25 is setting up" until they finish.
 
 ## 3. Sharing link [YOU]
-**Steps:**
-1. [developer.atlassian.com/console/myapps](https://developer.atlassian.com/console/myapps) → Article25 → **Distribution** → *Sharing*. Fill in the privacy-policy URL, a contact email, and the data-handling answers (answers below).
-2. Generate the **installation link**. It goes into the Devpost form and `docs/JUDGE_INSTALL.md`.
+**Steps** (console labels may differ slightly; nothing here was clicked by the agent):
+1. Open [developer.atlassian.com/console/myapps](https://developer.atlassian.com/console/myapps) → **Article25** → **Distribution**.
+2. Set the distribution status to **Sharing**.
+3. Fill in:
+   - the app's name and description (from `submission/DEVPOST_FINAL_SUBMISSION.md`, the tagline);
+   - the **privacy-policy URL** (published by you);
+   - a **contact email** you choose;
+   - the data-handling answers (below).
+4. Save, then **generate the installation link** for the **production** environment and Jira.
+5. Test it signed out of your developer account, on the clean site (§4).
+6. Then paste it into the Devpost form and `docs/JUDGE_INSTALL.md`.
+
+The link is a sharing link, not a Marketplace listing: anyone who has it can install. Share it only where the rules require (the Devpost form).
 
 **Data-handling answers:**
 - **Personal data:** account ids of reviewers; work-item excerpts of up to 120 characters.
@@ -109,7 +132,7 @@ forge deploy -e production --non-interactive
 ## 5. Monitoring during judging (5 Jan – 3 Feb 2027)
 - Daily: `forge logs -e production --since 24h` and grep for `resolver.failed|gate.error|migrations.failed`. The logs are content-free by design.
 - Weekly: the developer console's installations and invocation errors.
-- If AI is on: watch `costMicros` in the logs against the cap.
+- If AI is on: watch `costMicros` in the logs, and the *AI spending limit* line in each site's Settings ("$x of $5.00 used"). When a site reaches the cap, its checks continue rule-based, labelled *The AI spending limit for this installation is reached.*
 
 ## 6. Rollback
 - **Code:** redeploy the previous tagged commit with `forge deploy -e production`.
