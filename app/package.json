@@ -10,7 +10,8 @@
     "test:ui": "npm --prefix frontend test",
     "lint": "eslint src test eval frontend/src scripts && node scripts/copy-lint.mjs",
     "check": "npm run lint && npm test && npm run test:ui && npm run build:ui",
-    "eval": "node eval/evaluate.mjs"
+    "eval": "node eval/evaluate.mjs",
+    "bench": "node scripts/bench-ledger.mjs"
   },
   "dependencies": {
     "@forge/api": "8.5.0",
