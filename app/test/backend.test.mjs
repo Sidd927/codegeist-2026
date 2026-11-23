@@ -12,6 +12,7 @@ import { pipelineVersion } from '../src/core/analyse.js';
 import { adfToBlocks } from '../src/core/text.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
 import { createReviewService } from '../src/backend/services/review.js';
+import { createGateService } from '../src/backend/services/gate.js';
 
 const silentLog = { info() {}, warn() {}, error() {} };
 const ADF = {
@@ -33,6 +34,12 @@ function fakeJira({ admin = false, deny = false, adminThrows = false, visible = 
       if (deny) throw new AppError(ErrorCode.NOT_FOUND);
       return { id: '10042', key: /^\d+$/.test(key) ? 'SHOP-42' : key, summary: 'Add session replay', description: ADF, status: 'To Do', statusCategory: 'new', projectKey: 'SHOP', projectName: 'Shop', issueType: 'Task' };
     },
+    async getIssueForScreening(key) {
+      if (deny) throw new AppError(ErrorCode.NOT_FOUND);
+      return { id: '10042', key: /^\d+$/.test(key) ? 'SHOP-42' : key, projectKey: 'SHOP', summary: 'Add session replay', description: ADF };
+    },
+    statusName: async (id) => `Status ${id}`,
+    searchWorkflowsWithTransitions: async () => ({ workflows: [], statuses: [] }),
     async visibleIssues(ids) {
       return new Map(ids.filter((id) => !visible || visible.includes(id)).map((id) => [id, { key: `SHOP-${id}`, summary: `Synthetic ${id}`, projectKey: 'SHOP' }]));
     },
@@ -48,7 +55,8 @@ const svc = (opts = {}) => {
   const jira = fakeJira(opts);
   const settings = settingsFromEnv({});
   const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
-  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review });
+  const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
+  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review, gate });
 };
 
 // ---- logger: content-free by construction
@@ -172,8 +180,8 @@ test('presenter: queued/screening and failed states never present a result as cu
   assert.equal(presentScreening({ state: 'SCREENING_FAILED', last_error: 'X' }, null).state, 'SCREENING_FAILED');
   assert.equal(presentScreening({ state: 'SCREENED', screened_fp: 'a' }, null).state, 'NOT_SCREENED');
 });
-test('screening and decisions are on; the Jira workflow gate and register stay off until their milestones', () => {
-  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: false, register: false });
+test('screening, decisions and the workflow gate are on; the register stays off until its milestone', () => {
+  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: true, register: false });
 });
 
 test('version-aware: a stored result from an older pipeline version is shown as rescreening required', () => {

@@ -1,90 +1,10 @@
-// M3 review tests: real screening pipeline (rules only, no AI) + real review and desk services over
-// in-memory repositories. Synthetic data and synthetic account ids only. Run: npm test
+// M3 review tests (integration). Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFakeRepos } from './fakes.mjs';
-import { createScreeningService } from '../src/backend/services/screening.js';
-import { createReviewService } from '../src/backend/services/review.js';
-import { createDeskServices } from '../src/backend/services/desk.js';
-import { createLlmAdapter } from '../src/backend/adapters/llm.js';
-import { configFor, settingsFromEnv } from '../src/backend/lib/config.js';
 import { AppError, ErrorCode, toEnvelope } from '../src/backend/lib/errors.js';
 import { verifyHistory } from '../src/core/chain-core.js';
-
-const silent = { info() {}, warn() {}, error() {} };
-const adf = (t) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: t }] }] });
-const KEY = 'test-signing-key-0123456789abcdef0123456789abcdef';
-const REV1 = 'acc-rev-1';
-const REV2 = 'acc-rev-2';
-const INACTIVE = 'acc-rev-old';
-const REPORTER = 'acc-reporter';
-const DEV = 'acc-dev';
-const OUTSIDER = 'acc-outsider';
-
-function world({ signingKey = KEY, sod = 'on' } = {}) {
-  const fake = createFakeRepos();
-  let now = 1_800_000_000_000;
-  const clock = () => now;
-  const issues = {
-    10001: { key: 'SHOP-1', projectKey: 'SHOP', summary: 'Add session replay to checkout with ReplayCloud', description: adf('Record checkout sessions and segment shoppers who abandon carts containing prescription items.'), reporterId: REPORTER, assigneeId: DEV, hiddenFrom: [] },
-    10002: { key: 'HR-7', projectKey: 'HR', summary: 'Export payroll records to the new HR vendor', description: adf('Send employee bank details and medical leave notes to PayrollCo every month.'), reporterId: REPORTER, assigneeId: null, hiddenFrom: [OUTSIDER] },
-  };
-  const members = [
-    { accountId: REV1, displayName: 'Reviewer One', active: true },
-    { accountId: REV2, displayName: 'Reviewer Two', active: true },
-    { accountId: INACTIVE, displayName: 'Former Reviewer', active: false },
-  ];
-  const groupCalls = { n: 0 };
-  // One Jira adapter per acting user, mirroring Forge's per-invocation asUser() context.
-  const jiraFor = (actor) => ({
-    async getIssueForScreening(id) {
-      const i = issues[id];
-      if (!i) throw new AppError(ErrorCode.NOT_FOUND);
-      return { id, key: i.key, projectKey: i.projectKey, summary: i.summary, description: i.description };
-    },
-    async getIssueDocument(idOrKey) {
-      const id = Object.keys(issues).find((k) => k === String(idOrKey) || issues[k].key === String(idOrKey).toUpperCase());
-      const i = issues[id];
-      if (!i || i.hiddenFrom.includes(actor)) throw new AppError(ErrorCode.NOT_FOUND);
-      return { id, key: i.key, summary: i.summary, description: i.description, status: 'To Do', statusCategory: 'new', projectKey: i.projectKey, projectName: i.projectKey, issueType: 'Task', reporterId: i.reporterId, assigneeId: i.assigneeId };
-    },
-    async visibleIssues(ids) {
-      return new Map(ids.filter((id) => issues[id] && !issues[id].hiddenFrom.includes(actor)).map((id) => [String(id), { key: issues[id].key, summary: issues[id].summary, projectKey: issues[id].projectKey }]));
-    },
-    async groupsOf(id) {
-      groupCalls.n++;
-      return members.some((m) => m.accountId === id) ? ['article25-reviewers', 'jira-software-users'] : ['jira-software-users'];
-    },
-    // Name search returns reviewers AND non-reviewers; the service must filter to the group.
-    searchUsers: async (q) => [...members, { accountId: OUTSIDER, displayName: 'Outside Person', active: true }].filter((m) => m.displayName.toLowerCase().includes(q.toLowerCase())).map((m) => ({ ...m })),
-    usersBulk: async (ids) => new Map(ids.map((id) => [id, members.find((m) => m.accountId === id) ?? { displayName: `User ${id.slice(-3)}`, active: true }])),
-    isJiraAdmin: async () => false,
-  });
-  const env = { A25_AI_ENABLED: 'false', A25_SEPARATION_OF_DUTIES: sod, ...(signingKey ? { A25_SIGNING_KEY: signingKey } : {}) };
-  const settings = settingsFromEnv(env);
-  const reviewFor = (actor) => createReviewService({ repos: fake.repos, jira: jiraFor(actor), log: silent, clock, settings, siteId: 'site-test' });
-  const queue = [];
-  const screening = createScreeningService({
-    repos: fake.repos, jira: jiraFor(null), llm: createLlmAdapter({ chat: null, model: 'claude-haiku-5-5', timeoutMs: 1000 }), queue: { push: async (j) => queue.push(j) }, log: silent, clock, settings,
-    onCompleted: (args) => reviewFor(null).onScreeningCompleted(args),
-  });
-  const desk = (actor) => createDeskServices({ jira: jiraFor(actor), config: configFor('DEVELOPMENT'), log: silent, repos: fake.repos, screening, settings, review: reviewFor(actor) });
-  async function screen(id) {
-    await screening.onIssueEvent({ issueId: String(id), issueKey: issues[id].key, projectKey: issues[id].projectKey, contentChange: true });
-    while (queue.length) await screening.processJob(queue.shift());
-    now += 60_000;
-  }
-  return { fake, issues, members, desk, reviewFor, screen, settings, groupCalls, advance: (ms) => (now += ms) };
-}
-
-let rid = 0;
-const nextRid = () => `req-${Date.now().toString(36)}-${++rid}`;
-async function decision(w, actor, key, input, over = {}) {
-  const ws = await w.desk(actor).workspace(key, actor);
-  return w.desk(actor).decide({ issueKey: key, input, screeningId: ws.review.binding?.screeningId ?? '0'.repeat(64), fp: ws.review.binding?.fp ?? '0'.repeat(64), expectedSeq: ws.review.latestSeq, requestId: nextRid(), ...over }, actor);
-}
-const APPROVE = { decision: 'APPROVED', rationale: 'Proportionate: masking is in place and the vendor DPA is signed.' };
-const codeOf = (code) => (e) => e?.code === code;
+import { createReviewService } from '../src/backend/services/review.js';
+import { world, decision, adf, silent, KEY, REV1, REV2, INACTIVE, REPORTER, DEV, OUTSIDER, APPROVE, codeOf, nextRid } from './world.mjs';
 
 // ---------------------------------------------------------------- end-to-end happy path
 test('screened issue → inbox → assignment → decision → history (bound to the exact screened content)', async () => {
