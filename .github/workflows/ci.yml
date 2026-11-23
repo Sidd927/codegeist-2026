@@ -1,0 +1,39 @@
+# Article25 checks: lint, copy lint, backend tests, frontend tests (incl. axe), production build and
+# bundle budgets. No secrets, no deploys, read-only token. Forge deploys stay manual.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'milestone-*', 'stage*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            app/frontend/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: app/frontend
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:ui
+      - run: npm run build:ui

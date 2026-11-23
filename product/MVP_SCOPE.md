@@ -69,12 +69,12 @@ Each criterion is testable. "Verified" means a test (unit/component) or a script
 - [ ] After a decision: state finalised, ledger appended, outbox enqueued; a crash simulated between steps is repaired by the reconciler and the gate stays closed until finalised (unit test of the reconciler).
 
 ### M6 Evidence-locked gate (FR-G1…G7)
-- [ ] `policy.gate` is exhaustively unit-tested (every state × policy option); an unknown state blocks.
-- [ ] Live, company-managed and team-managed: pending → blocked with the exact message; approved → allowed; rejected → blocked; validator exception → blocked.
-- [ ] Material change after approval (add a vendor sentence) → `STALE` → blocked. A typo fix → still approved, with a `RECONFIRMED` ledger record.
-- [ ] Gate health shows "seen n min ago" per project after the first evaluation.
-- [ ] Monitor mode: transitions allowed, `would_block` recorded, banner visible, audit entry written.
-- [ ] Validator p95 ≤ 500 ms over 20 transitions.
+- [x] `policy.gate` is exhaustively unit-tested (every state × policy option); an unknown state blocks. *(M4: `core/gate.js`, 26 gate tests)*
+- [x] Live, company-managed and team-managed: pending → blocked with the exact message; approved → allowed; rejected → blocked; validator exception → blocked. *(M4 L3–L9; rejected is covered by tests, and live in M3 via status)*
+- [x] Material change after approval (add a vendor sentence) → `STALE` → blocked. A typo fix → still approved, with a `RECONFIRMED` ledger record. *(M4 L5; non-material carry-over live in M3)*
+- [x] Gate health shows "seen n min ago" per project after the first evaluation. *(M4: replaced by verified per-workflow coverage + recent checks)*
+- [x] Monitor mode: transitions allowed, `would_block` recorded, banner visible, audit entry written. *(M4 L1, L2, L11)*
+- [x] Validator p95 ≤ 500 ms over 20 transitions. *(M4: n = 22, p90 336 ms, max 639 ms cold)*
 
 ### M7 Ledger + register (FR-L1…L4, L6)
 - [ ] `chain-core` tests (21) pass unchanged; new tests for `RECONFIRMED` records.

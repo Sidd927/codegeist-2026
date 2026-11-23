@@ -126,7 +126,7 @@ export function createFakeRepos() {
   const dec = []; // stored as SQL would store them (JSON columns serialised)
   const asg = [];
   const chn = [];
-  const failures = { decisionInsert: false, chainInsert: false };
+  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const parseD = (r) => r && { ...clone(r), conditions: JSON.parse(r.conditions), questions: JSON.parse(r.questions), signal_set: JSON.parse(r.signal_set), detail: r.detail ? JSON.parse(r.detail) : null };
   const decisions = {
@@ -178,5 +178,53 @@ export function createFakeRepos() {
     }
     return out.slice(0, limit);
   }
-  return { repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates }, items, scr, use, counters, spendState, dec, asg, chn, failures };
+
+  // ---- M4: settings events (append-only, PK (setting, seq), unique request_id), gate events ----
+  const sev = [];
+  const gev = [];
+  const settingsEvents = {
+    async latest(setting) {
+      if (failures.settingsRead) throw new Error('sql unavailable');
+      return clone(sev.filter((r) => r.setting === setting).sort((a, b) => b.seq - a.seq)[0] ?? null);
+    },
+    history: async (setting, limit = 20) => clone(sev.filter((r) => r.setting === setting).sort((a, b) => b.seq - a.seq).slice(0, limit)),
+    async insert({ setting, seq, value, changedBy, changedAt, requestId, note }) {
+      if (sev.some((r) => (r.setting === setting && r.seq === seq) || r.request_id === requestId)) return false;
+      sev.push({ setting, seq, value, changed_by: changedBy, changed_at: changedAt, request_id: requestId, note: note ?? null });
+      return true;
+    },
+    byRequest: async (rid) => clone(sev.find((r) => r.request_id === rid) ?? null),
+  };
+  const gateEvents = {
+    async insert(e) {
+      if (failures.gateEventsInsert) throw new Error('sql unavailable');
+      gev.push({ id: gev.length + 1, at: e.at, issue_id: e.issueId ?? null, project_key: e.projectKey ?? null, from_status: e.from ?? null, to_status: e.to ?? null, mode: e.mode, verdict: e.verdict, reason: e.reason, policy_version: e.policyVersion, decision_seq: e.decisionSeq ?? null, content_ref: e.contentRef ?? null, ms: e.ms ?? null });
+    },
+    recent: async (limit = 20) => clone([...gev].sort((a, b) => b.at - a.at || b.id - a.id).slice(0, limit)),
+    forIssue: async (issueId, limit = 10) => clone(gev.filter((e) => e.issue_id === issueId).sort((a, b) => b.at - a.at || b.id - a.id).slice(0, limit)),
+    summary: async (since) => Object.entries(gev.filter((e) => e.at >= since).reduce((m, e) => ({ ...m, [e.verdict]: (m[e.verdict] ?? 0) + 1 }), {})).map(([verdict, n]) => ({ verdict, n })),
+  };
+  async function gateSnapshot(issueId) {
+    if (failures.gateSnapshotDelayMs) await new Promise((r) => setTimeout(r, failures.gateSnapshotDelayMs));
+    if (failures.schemaMissing) throw new Error("Table 'gate_events' doesn't exist");
+    if (failures.gateSnapshot) throw new Error('sql unavailable');
+    const w = items.get(issueId);
+    const mine = dec.filter((r) => r.issue_id === issueId).sort((a, b) => b.seq - a.seq);
+    const d = mine[0] ?? null;
+    const h = mine.find((r) => r.kind === 'human') ?? null;
+    const rec = (row) => (row ? chn.find((c) => c.decision_id === row.decision_id) : null);
+    const g = sev.filter((r) => r.setting === 'gate.mode').sort((a, b) => b.seq - a.seq)[0] ?? null;
+    return {
+      item: w ? { issue_id: w.issue_id, project_key: w.project_key, state: w.state, outcome: w.outcome, screening_id: w.screening_id, screened_fp: w.screened_fp } : null,
+      latest: parseD(d), latestHuman: parseD(h),
+      latestRecord: rec(d) ? JSON.parse(rec(d).record) : null, humanRecord: rec(h) ? JSON.parse(rec(h).record) : null,
+      mode: g?.value ?? null, modeSeq: g ? g.seq : 0,
+    };
+  }
+  async function gateTablesReachable() {
+    if (failures.schemaMissing) throw new Error("Table 'settings_events' doesn't exist");
+    if (failures.gateSnapshot) throw new Error('sql unavailable');
+    return { s: sev.length, g: gev.length, c: chn.length };
+  }
+  return { repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable }, items, scr, use, counters, spendState, dec, asg, chn, sev, gev, failures };
 }

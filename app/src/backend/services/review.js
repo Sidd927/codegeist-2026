@@ -11,6 +11,7 @@ import { AppError, ErrorCode } from '../lib/errors.js';
 import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, isApprovingDecision, deriveReviewStatus } from '../../core/review.js';
 import { buildRecord, genesis, verifyHistory } from '../../core/chain-core.js';
 import { buildScreeningText } from '../../core/screening-text.js';
+import { createSettingsService } from './settings.js';
 
 const REQUEST_ID = /^[A-Za-z0-9:_-]{8,100}$/;
 const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
@@ -18,6 +19,17 @@ const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
 export function createReviewService({ repos, jira, log, clock = () => Date.now(), settings, siteId }) {
   const { decisions, assignments, chain, workItems } = repos;
   const groupCache = new Map();
+  const settingsSvc = createSettingsService({ repos, log, clock });
+
+  /** Separation of duties (admin setting, audited; default on). Unreadable setting → on (strict). */
+  async function separationOfDutiesOn() {
+    try {
+      return (await settingsSvc.current('review.separation_of_duties')).value !== 'off';
+    } catch (e) {
+      log.warn({ evt: 'settings.read.failed', reason: 'review.separation_of_duties', code: e?.code ?? 'INTERNAL' });
+      return true;
+    }
+  }
 
   async function isReviewer(accountId) {
     if (!accountId || !ACCOUNT_ID.test(accountId)) return false;
@@ -136,7 +148,7 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     if (!settings.signingKey) throw new AppError(ErrorCode.NOT_CONFIGURED); // fail closed: no unsigned decisions
 
     const doc = await jira.getIssueDocument(issueKey); // as-user browse check
-    if (settings.separationOfDuties && (doc.reporterId === actorId || doc.assigneeId === actorId)) throw new AppError(ErrorCode.SOD_BLOCKED);
+    if ((await separationOfDutiesOn()) && (doc.reporterId === actorId || doc.assigneeId === actorId)) throw new AppError(ErrorCode.SOD_BLOCKED);
 
     const prior = await decisions.byRequest(rid); // duplicate submission (double click, retry)
     if (prior) {
@@ -234,5 +246,10 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     return { status, decisions: list, assignments: assigns, latestSeq: latest?.seq ?? 0, assignmentSeq: assigns.at(-1)?.seq ?? 0, assignee: assigns.at(-1)?.assignee ?? null };
   }
 
-  return { isReviewer, reviewers, assign, decide, onScreeningCompleted, repairChain, verify, reviewOf };
+  /** Admin: switch separation of duties (caller verified as Jira administrator). */
+  const setSeparationOfDuties = ({ actorId, value, expectedSeq, requestId, note }) => settingsSvc.change({ setting: 'review.separation_of_duties', value, actorId, expectedSeq, requestId, note });
+  const separationOfDutiesSetting = () => settingsSvc.current('review.separation_of_duties');
+  const separationOfDutiesHistory = () => settingsSvc.history('review.separation_of_duties');
+
+  return { isReviewer, reviewers, assign, decide, onScreeningCompleted, repairChain, verify, reviewOf, separationOfDutiesOn, setSeparationOfDuties, separationOfDutiesSetting, separationOfDutiesHistory };
 }

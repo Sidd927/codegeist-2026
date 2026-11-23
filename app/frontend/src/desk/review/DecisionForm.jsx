@@ -125,8 +125,28 @@ export function DecisionForm({ issueKey, review, onRecorded, client = api }) {
     }
   };
 
+  // Conditional approvals block protected transitions until a reviewer confirms the conditions are met
+  // (by recording APPROVED for the current text). This shortcut prefills that decision; nothing is sent
+  // until the reviewer submits it.
+  const latest = review.decisions?.[0];
+  const pendingConditions = review.status === 'APPROVED_WITH_CONDITIONS' ? (latest?.decision === 'APPROVED_WITH_CONDITIONS' || latest?.decision === 'APPROVAL_RECONFIRMED' ? latest.conditions : []) : [];
+  const prefillConfirmation = () => {
+    setDecision('APPROVED');
+    setRationale(D.conditionsRationale(pendingConditions));
+    setErrors({});
+    setConfirming(false);
+  };
+
   return (
     <form className="a25-decision-form" onSubmit={submit} noValidate aria-describedby="a25-binding-note">
+      {pendingConditions?.length ? (
+        <div className="a25-decision__confirm">
+          <Button appearance="default" onClick={prefillConfirmation}>
+            {D.confirmConditions}
+          </Button>
+          <span className="a25-subtle a25-small">{D.confirmConditionsHint}</span>
+        </div>
+      ) : null}
       <fieldset className="a25-decision" aria-describedby={errors.decision ? 'a25-decision-err' : undefined}>
         <legend className="a25-field__label">{D.legend}</legend>
         {DECISIONS.map((d) => (

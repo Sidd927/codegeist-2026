@@ -116,5 +116,10 @@ States are defined in [DATA_AND_SECURITY_MODEL.md §2](DATA_AND_SECURITY_MODEL.m
 | AWAITING_REVIEW (M3, = PENDING_REVIEW) | Awaiting review | moved | block |
 
 > M3 amendment: review statuses are derived on the server (`core/review.js`). The gate column is the M4 design; no gate is active yet.
+>
+> **M4 amendment:** the gate is live (policy `g1`):
+> - Every row blocks except a verified human APPROVED decision (direct or carried over) on the current text. CLEAR / INVENTORY_UPDATE **block** on protected transitions, and APPROVED_WITH_CONDITIONS blocks until conditions are confirmed.
+> - Gate reason vocabulary: 23 codes, in [M4_ENFORCE_RESULTS.md §4](M4_ENFORCE_RESULTS.md); short labels in the copy deck under `copy.gate.reasons`.
+> - Gate verdicts: Allowed, Blocked, Would allow and Would block. The last two only appear in monitoring, which is always labelled "not blocking".
 
 Monitor mode overrides every "block" to "allow + logged", with a banner.

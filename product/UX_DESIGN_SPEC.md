@@ -180,6 +180,7 @@ Left sub-navigation (vertical) + content. One save per section (optimistic concu
 | AI | Toggle · Model select (from `list()`; shows retirement date if provided) · Daily budget (number of checks) · "Today: 37 of 500 checks · 2 rule-based" |
 | Register | Space/page · last publish · backlog count · **[Republish now]** · Integrity status |
 | Gate | Per-project health table: project · last evaluation · allowed/blocked counts (7 d) · status · setup steps · **Monitor mode** toggle (confirm dialog: "Transitions will be allowed and logged as 'would have blocked'.") |
+| Gate (**M4, implemented**) | **Per-workflow verified coverage** instead of per-project: workflow · project type · Complete/Gaps · protected statuses · gated transitions · transitions into a protected status **without** the gate. Also: mode banner (monitoring = dashed information, "NOT blocked"; enforcing = solid danger), overall status, confirmed switch with a reason, dependency checks, recent checks, change history. In the workspace: a **Protected transitions** block (verdict, reason, recent checks); in the panel: a one-line gate state. |
 | Recovery | Visible to recovery admins. Two-step flow exactly as verified (doc 22): Verify → report (valid / complete / anchors / approvals to restore / untrusted claims) → Confirm (expires in 10 min) |
 | Audit | Read-only list: time · actor · action · result |
 

@@ -283,3 +283,76 @@ export async function inboxCandidates({ projectKey = null, outcome = null, limit
     assignee: r.a_assignee ?? null,
   }));
 }
+
+// ---- M4 ENFORCE ----------------------------------------------------------------------------------
+
+/** Append-only admin settings. The latest row per setting is the value; each row is an audit event. */
+export const settingsEvents = {
+  latest: (setting) => one('SELECT setting, seq, value, changed_by, changed_at, note FROM settings_events WHERE setting = ? ORDER BY seq DESC LIMIT 1', setting),
+  history: (setting, limit = 20) => many(`SELECT setting, seq, value, changed_by, changed_at, note FROM settings_events WHERE setting = ? ORDER BY seq DESC LIMIT ${Number(limit) | 0}`, setting),
+  async insert({ setting, seq, value, changedBy, changedAt, requestId, note }) {
+    const r = await run('INSERT IGNORE INTO settings_events (setting, seq, value, changed_by, changed_at, request_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)', setting, seq, value, changedBy, changedAt, requestId, note ?? null);
+    return affected(r) === 1;
+  },
+  byRequest: (requestId) => one('SELECT setting, seq, value, changed_by, changed_at, note FROM settings_events WHERE request_id = ?', requestId),
+};
+
+export const gateEvents = {
+  async insert(e) {
+    await run(
+      `INSERT INTO gate_events (at, issue_id, project_key, from_status, to_status, mode, verdict, reason, policy_version, decision_seq, content_ref, ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      e.at, e.issueId ?? null, e.projectKey ?? null, e.from ?? null, e.to ?? null, e.mode, e.verdict, e.reason, e.policyVersion, e.decisionSeq ?? null, e.contentRef ?? null, e.ms ?? null,
+    );
+  },
+  recent: (limit = 20) => many(`SELECT id, at, issue_id, project_key, from_status, to_status, mode, verdict, reason, policy_version, decision_seq, content_ref, ms FROM gate_events ORDER BY at DESC LIMIT ${Number(limit) | 0}`),
+  forIssue: (issueId, limit = 10) => many(`SELECT id, at, issue_id, project_key, from_status, to_status, mode, verdict, reason, policy_version, decision_seq, content_ref, ms FROM gate_events WHERE issue_id = ? ORDER BY at DESC LIMIT ${Number(limit) | 0}`, issueId),
+  summary: (since) => many('SELECT verdict, COUNT(*) AS n FROM gate_events WHERE at >= ? GROUP BY verdict', since),
+};
+
+const decisionCols = (p) =>
+  ['issue_id', 'seq', 'decision_id', 'kind', 'decision', 'rationale', 'conditions', 'questions', 'decided_by', 'decided_at', 'screening_id', 'fp', 'pipeline_version', 'outcome', 'detail']
+    .map((c) => `${p}.${c} AS ${p}_${c}`).join(', ');
+const pickDecision = (r, p) =>
+  r[`${p}_decision_id`]
+    ? parseDecision(Object.fromEntries(['issue_id', 'seq', 'decision_id', 'kind', 'decision', 'rationale', 'conditions', 'questions', 'decided_by', 'decided_at', 'screening_id', 'fp', 'pipeline_version', 'outcome', 'detail'].map((c) => [c, r[`${p}_${c}`]])))
+    : null;
+
+/**
+ * Everything the gate needs for one issue in ONE statement: the work item, the latest decision,
+ * the latest human decision, both signed chain records, and the current gate mode.
+ * Statement-level consistency: no interleaving write can produce a mixed snapshot.
+ */
+export async function gateSnapshot(issueId) {
+  const r = await one(
+    `SELECT w.issue_id AS w_issue_id, w.project_key AS w_project_key, w.state AS w_state, w.outcome AS w_outcome, w.screening_id AS w_screening_id, w.screened_fp AS w_screened_fp,
+            ${decisionCols('d')}, ${decisionCols('h')},
+            cd.record AS cd_record, ch.record AS ch_record,
+            g.value AS g_mode, g.seq AS g_seq
+     FROM (SELECT 1 AS one) base
+     LEFT JOIN work_items w ON w.issue_id = ?
+     LEFT JOIN (SELECT MAX(seq) AS max_seq FROM decisions WHERE issue_id = ?) dm ON 1 = 1
+     LEFT JOIN decisions d ON d.issue_id = ? AND d.seq = dm.max_seq
+     LEFT JOIN (SELECT MAX(seq) AS max_seq FROM decisions WHERE issue_id = ? AND kind = 'human') hm ON 1 = 1
+     LEFT JOIN decisions h ON h.issue_id = ? AND h.seq = hm.max_seq
+     LEFT JOIN chain cd ON cd.decision_id = d.decision_id
+     LEFT JOIN chain ch ON ch.decision_id = h.decision_id
+     LEFT JOIN (SELECT MAX(seq) AS max_seq FROM settings_events WHERE setting = 'gate.mode') gm ON 1 = 1
+     LEFT JOIN settings_events g ON g.setting = 'gate.mode' AND g.seq = gm.max_seq`,
+    issueId, issueId, issueId, issueId, issueId,
+  );
+  if (!r) throw new Error('gate snapshot returned no row');
+  const record = (x) => (x ? JSON.parse(x) : null);
+  return {
+    item: r.w_issue_id ? { issue_id: r.w_issue_id, project_key: r.w_project_key, state: r.w_state, outcome: r.w_outcome, screening_id: r.w_screening_id, screened_fp: r.w_screened_fp } : null,
+    latest: pickDecision(r, 'd'),
+    latestHuman: pickDecision(r, 'h'),
+    latestRecord: record(r.cd_record),
+    humanRecord: record(r.ch_record),
+    mode: r.g_mode ?? null,
+    modeSeq: r.g_seq === null || r.g_seq === undefined ? 0 : Number(r.g_seq),
+  };
+}
+
+/** Lightweight dependency probe for the health check (all gate tables reachable). */
+export const gateTablesReachable = () => one('SELECT (SELECT COUNT(*) FROM settings_events) AS s, (SELECT COUNT(*) FROM gate_events WHERE at > 0 LIMIT 1) AS g, (SELECT COUNT(*) FROM chain) AS c');

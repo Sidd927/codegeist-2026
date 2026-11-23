@@ -55,13 +55,14 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 ### 2.3 Enforce (gate)
 | ID | Requirement | P | Basis |
 |---|---|---|---|
-| FR-G1 | A lambda workflow validator reads **only app-owned SQL state** and allows a transition only if the item is in-scope-cleared. **[VERIFIED: lambda + app storage; issue-property gate rejected as insecure]** | M | doc 14 |
-| FR-G2 | **Fail closed:** errors, missing state, unscreened items, screening in progress, pending, changes requested, rejected and stale items are blocked, each with a specific, actionable message (≤ 1 sentence + where to go). | M | fail-closed [VERIFIED] |
-| FR-G3 | **Evidence-locked approval:** a decision stores the content fingerprint and signal set it approved. A material change on re-screening sets the state to `STALE` and re-routes to review. A non-material change keeps the approval and records the new fingerprint, attributed to the system. | M | **[VERIFIED] live, M3** (`APPROVAL_INVALIDATED` / `APPROVAL_RECONFIRMED`); enforcement by the gate is M4 |
-| FR-G4 | The validator records each evaluation (project, transition, result, reason code; **no content**) for gate health and metrics. | M | [PROPOSED] |
-| FR-G5 | **Gate health:** Settings shows, per in-scope project, whether the validator has been seen evaluating and when. | M | [PROPOSED]; no extra scope needed |
-| FR-G6 | **Monitor mode** (admin kill-switch): the validator allows but records "would have blocked". The switch is audited and shown as a banner to reviewers and admins. | M | [PROPOSED] |
-| FR-G7 | Works in company-managed and team-managed projects. | M | [VERIFIED] |
+| FR-G1 | A lambda workflow validator reads **only app-owned SQL state** and allows a transition only if the item is in-scope-cleared. **[VERIFIED: lambda + app storage; issue-property gate rejected as insecure]** **M4: implemented as `article25-gate`; "cleared" = a verified human APPROVED decision on the exact current text (CLEAR alone does not pass).** | M | ✅ live, M4 |
+| FR-G2 | **Fail closed:** errors, missing state, unscreened items, screening in progress, pending, changes requested, rejected and stale items are blocked, each with a specific, actionable message (≤ 1 sentence + where to go). | M | ✅ live, M4 (23 reason codes; platform crash and timeout also fail closed) |
+| FR-G3 | **Evidence-locked approval:** a decision stores the content fingerprint and signal set it approved. A material change on re-screening sets the state to `STALE` and re-routes to review. A non-material change keeps the approval and records the new fingerprint, attributed to the system. | M | **[VERIFIED] live, M3** (`APPROVAL_INVALIDATED` / `APPROVAL_RECONFIRMED`); enforcement ✅ live, M4 (`APPROVAL_INVALIDATED` / `CHANGED_RECHECKING` block; re-approval allows) |
+| FR-G4 | The validator records each evaluation (project, transition, result, reason code; **no content**) for gate health and metrics. | M | ✅ M4 (`gate_events`, policy version, content reference) |
+| FR-G5 | **Gate health:** Settings shows, per in-scope project, whether the validator has been seen evaluating and when. **M4 amendment:** a stronger check. It reads workflows (`read:workflow:jira`, approved 23 Nov 2026) and shows **verified coverage**: protected statuses, gated transitions, and transitions into a protected status that lack the gate. Recent gate checks are listed too. | M | ✅ live, M4 (a real gap was detected and fixed) |
+| FR-G6 | **Monitor mode** (admin kill-switch): the validator allows but records "would have blocked". The switch is audited and shown as a banner to reviewers and admins. | M | ✅ live, M4 (default mode; audited append-only setting) |
+| FR-G7 | Works in company-managed and team-managed projects. | M | ✅ live, M4 (A25GC, A25GT; bulk transitions per issue) |
+| FR-G8 (M4) | **Conditional approvals** never authorise a protected transition until a reviewer confirms the conditions by recording Approve for the current text. | M | ✅ live, M4 |
 
 ### 2.4 Record (ledger, register, recovery)
 | ID | Requirement | P | Basis |

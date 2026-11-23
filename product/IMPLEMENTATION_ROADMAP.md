@@ -2,19 +2,40 @@
 
 **Stage 2** · 2026-11-22 · Scope: [MVP_SCOPE.md](MVP_SCOPE.md) · Deadline: **Tue 22 Dec 2026, 12:00 PT** (submission). The app must keep working through judging, until **3 Feb 2027**.
 
-## 0. Progress (updated 23 Nov 2026)
+## 0. Progress (updated 23 Nov 2026, after M4)
 | Milestone | Status | Branch / PR (drafts, stacked) | Results |
 |---|---|---|---|
 | Stage 1/1.5 research + spikes | ✅ Done | `stage1-research-and-spikes` (#1) | `research/` |
 | Stage 2 blueprint | ✅ Done | `stage2-product-blueprint` (#2) | this folder |
 | M1 Foundation | ✅ Done | `stage3-product-foundation` (#3) | [STAGE3_FOUNDATION_RESULTS.md](STAGE3_FOUNDATION_RESULTS.md) |
 | M2 Detect (screening, AI validated at $0.40) | ✅ Done | `milestone-m2-detect` (#4) | [M2_DETECT_RESULTS.md](M2_DETECT_RESULTS.md) |
-| **M3 Review** (inbox, Margin workspace, assignment, four decisions, evidence-locked approval, signed record) | ✅ **Done (development)** | `milestone-m3-review` (#5) | [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md) |
-| M4 Enforce (Jira workflow gate) | ⏭ Next, **not started** | — | requirements: M3 results §11 |
-| Ledger publishing (Confluence register), onboarding, recovery, release | Planned | — | phases 7–12 below |
+| M3 Review (inbox, Margin workspace, assignment, four decisions, evidence-locked approval, signed record) | ✅ Done (development) | `milestone-m3-review` (#5) | [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md) |
+| **M4 Enforce** (workflow validator, policy g1, monitor/enforce, audited settings, verified coverage health check, CI) | ✅ **Done (development)** | `milestone-m4-enforce` (#6) | [M4_ENFORCE_RESULTS.md](M4_ENFORCE_RESULTS.md) |
+| M5 Record (Confluence register, uninstall-safe recovery) | ⏭ **Recommended next** | — | see below |
+| Onboarding, admin polish, release | Planned | — | phases 9–12 below |
 
-**Ahead of plan:** phase 5 (review and approval) shipped before phase 6 (gate). The gate can now enforce `approvedForContent` from day one.
-**Scope change in M3:** `read:jira-user`, development major version. `manage:jira-configuration` was rejected on least-privilege grounds (see M3 results §3).
+**Scope changes so far:**
+- M3 added `read:jira-user`.
+- M4 added `read:workflow:jira` (read-only; approved 23 Nov). `manage:jira-configuration` was rejected.
+- Both are in development only. Production gets them at the scope freeze, **with user approval**.
+
+**Deferred from M3/M4 (reason → dependency → target):**
+| Item | Why deferred | Depends on | Target |
+|---|---|---|---|
+| Inbox keyset pagination (beyond the 300 oldest candidates) | Not needed for gate correctness | — | M8/M10 |
+| Live duplicate-submission check (same request id) | Covered by the unique key + tests; the UI prevents double submits | A second client | M10 |
+| Multi-reviewer test with real accounts | The demo site has one reviewer | Clean site + a second user (user action) | C1 rehearsal |
+| Opt-in automatic clearance for **AI-mode** CLEAR on protected transitions | Strict by design in g1; needs an explicit admin policy + audit | Admin policy UI | M8 |
+| Per-project / per-transition gate policies | One global mode is enough for MVP | Settings UX | Should (post-MVP) |
+| `gate_events` retention purge (30 days) | Low volume in development | Reconciler | M10 |
+| Separation-of-duties change history shown in the UI | Recorded and audited; only the current value is shown | — | M8 |
+
+**Recommended next milestone: M5 RECORD.**
+1. **It closes the product loop** (DETECT → REVIEW → DECIDE → ENFORCE → **RECORD**). Decisions become a customer-owned, published Confluence register.
+2. **It fixes the biggest remaining operational risk.** Stage 1 showed that uninstalling the app loses its storage, and the gate then blocks approved work (fail-closed). Recovery from the register restores approvals.
+3. **Its Confluence scopes must be decided before the 4 Dec scope freeze.**
+
+In parallel, the user actions on the critical path remain open: the clean site, the production-deploy approval and the privacy-policy host (§5).
 
 ## 1. Calendar and principles
 - **Planned internal deadline: submit on Mon 21 Dec**, keeping Tue 22 Dec morning as buffer only.

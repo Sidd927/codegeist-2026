@@ -18,11 +18,12 @@ import { ProcessingSummary } from '../review/ProcessingSummary.jsx';
 import { Assignment } from '../review/Assignment.jsx';
 import { DecisionForm } from '../review/DecisionForm.jsx';
 import { History } from '../review/History.jsx';
+import { GatePreview } from '../review/GatePreview.jsx';
 
 const S = copy.screening;
 const LABELS = { document: copy.review.documentLabel, summary: copy.review.summaryHeading, description: copy.review.descriptionHeading, noDescription: copy.review.noDescription };
 
-function DecisionZone({ issueKey, review, onChanged }) {
+function DecisionZone({ issueKey, review, gate, onChanged }) {
   return (
     <section className="a25-zone a25-zone--decision" aria-labelledby="a25-decision-title">
       <h2 id="a25-decision-title" className="a25-zone__title">
@@ -38,6 +39,12 @@ function DecisionZone({ issueKey, review, onChanged }) {
           </div>
           {review.approvedForContent ? <p className="a25-subtle a25-small">{copy.review.decision.currentApproval(copy.states[review.status])}</p> : null}
           <Assignment issueKey={issueKey} review={review} onChanged={onChanged} />
+          {gate ? (
+            <>
+              <div className="a25-zone__divider" />
+              <GatePreview gate={gate} />
+            </>
+          ) : null}
           <div className="a25-zone__divider" />
           <DecisionForm issueKey={issueKey} review={review} onRecorded={onChanged} />
           <div className="a25-zone__divider" />
@@ -129,7 +136,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
     );
   }
 
-  const { issue, document: doc, screening, review } = data;
+  const { issue, document: doc, screening, review, gate } = data;
   const displayState = screening.state;
   const recheck = onRecheck
     ? async () => {
@@ -204,7 +211,7 @@ export function ReviewView({ resource, onBack, onOpenIssue, onRecheck }) {
           <MarginZone screening={screening} activeId={activeId} onActivate={setActiveId} onRecheck={recheck} />
         </section>
 
-        <DecisionZone issueKey={issue.key} review={review} onChanged={refresh} />
+        <DecisionZone issueKey={issue.key} review={review} gate={gate} onChanged={refresh} />
       </div>
     </div>
   );

@@ -5,12 +5,14 @@ import { createJiraAdapter } from './backend/adapters/jira.js';
 import { createDeskServices } from './backend/services/desk.js';
 import * as repos from './backend/repositories/sql-repositories.js';
 import { buildScreening, buildReview, requestMigration } from './backend/handlers/events.js';
+import { buildGate } from './backend/handlers/gate.js';
 import { configFor, settingsFromEnv } from './backend/lib/config.js';
 import { log, errorFacts } from './backend/lib/logger.js';
 import { ok, toEnvelope, AppError, ErrorCode } from './backend/lib/errors.js';
 import * as validate from './backend/lib/validate.js';
 
 export { onIssueEvent, onLifecycle, screeningConsumer, maintenanceConsumer, reconcileSchedule } from './backend/handlers/events.js';
+export { gateValidator } from './backend/handlers/gate.js';
 
 const resolver = new Resolver();
 
@@ -21,7 +23,8 @@ function servicesFor(context) {
   const siteId = context?.cloudId ? String(context.cloudId) : null;
   const screening = buildScreening(context?.environmentType, siteId);
   const review = buildReview(context?.environmentType, siteId);
-  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings: { ...settings, signingKey: siteId ? settings.signingKey : null }, review }) };
+  const gate = buildGate(context);
+  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings: { ...settings, signingKey: siteId ? settings.signingKey : null }, review, gate }) };
 }
 
 function define(key, fn) {
@@ -51,6 +54,10 @@ define('getReviewers', ({ services, payload, context }) => services.reviewers(pa
 define('assignReview', ({ services, payload, context }) => services.assign(payload, actor(context)));
 define('recordDecision', ({ services, payload, context }) => services.decide(payload, actor(context)));
 define('verifyRecord', ({ services, payload, context }) => services.verifyRecord(payload.issueKey, actor(context)));
+// M4: workflow gate administration (Jira administrators only, checked server-side).
+define('getGateOverview', ({ services }) => services.gateOverview());
+define('setGateMode', ({ services, payload, context }) => services.setGateMode(payload, actor(context)));
+define('setSeparationOfDuties', ({ services, payload, context }) => services.setSeparationOfDuties(payload, actor(context)));
 // Panel: the issue comes from the Forge context. Desk: a validated key; access is checked as the user.
 define('requestRescreen', ({ services, context, payload }) => services.requestRescreen({ extensionIssue: context?.extension?.issue, issueKey: payload.issueKey }));
 

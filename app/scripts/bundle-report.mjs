@@ -29,3 +29,11 @@ for (const surface of ['panel', 'desk']) {
 writeFileSync(join(dist, 'bundle-report.json'), JSON.stringify(report, null, 2));
 const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 for (const [s, r] of Object.entries(report)) process.stdout.write(`${s}: INITIAL ${kb(r.initial.raw)} (gzip ${kb(r.initial.gzip)}) [${r.initialFiles.join(', ')}] · all ${r.files} files · JS ${kb(r.js.raw)} (gzip ${kb(r.js.gzip)}) · CSS ${kb(r.css.raw)} (gzip ${kb(r.css.gzip)}) · total gzip ${kb(r.total.gzip)}\n`);
+
+// Budgets (FRONTEND_ARCHITECTURE; initial gzip). Exceeding one fails the build (and CI).
+const BUDGET_GZIP = { panel: 200 * 1024, desk: 400 * 1024 };
+const over = Object.entries(BUDGET_GZIP).filter(([s, max]) => report[s].initial.gzip > max);
+if (over.length) {
+  for (const [s, max] of over) process.stderr.write(`Bundle budget exceeded: ${s} initial gzip ${kb(report[s].initial.gzip)} > ${kb(max)}\n`);
+  process.exit(1);
+}
