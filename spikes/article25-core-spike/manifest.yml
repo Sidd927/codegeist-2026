@@ -1,0 +1,105 @@
+# Article25 Stage 1 core spike (Spikes B, C, F). NOT the product.
+# app.id is filled in by `forge register`.
+modules:
+  sql:
+    - key: main
+      engine: mysql
+  jira:issuePanel:
+    - key: a25-spike-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: Article25 spike
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+
+  jira:globalPage:
+    - key: a25-spike-jira-page
+      resource: page
+      resolver:
+        function: resolver
+      render: native
+      title: Article25 spike (Jira)
+
+  confluence:globalPage:
+    - key: a25-spike-confluence-page
+      resource: page
+      resolver:
+        function: resolver
+      render: native
+      title: Article25 spike (Confluence)
+      route: a25-spike
+
+  # Spike C1: expression validator reading an issue entity property (fast, but property may be user-writable)
+  # Spike C2: lambda validator reading app-only Forge KVS (authoritative state)
+  jira:workflowValidator:
+    - key: a25-validator-expression
+      name: Article25 gate (expression / issue property)
+      description: SPIKE C1 - allows the transition only if issue property
+        article25-review.state is APPROVED or APPROVED_WITH_CONDITIONS.
+      expression: "issue.properties['article25-review'] != null && ['APPROVED',
+        'APPROVED_WITH_CONDITIONS'].includes(issue.properties['article25-review\
+        '].state)"
+      errorMessage: "Article25 (C1 expression): privacy review not approved for this
+        work item."
+      projectTypes:
+        - company-managed
+        - team-managed
+    - key: a25-validator-lambda
+      name: Article25 gate (lambda / KVS)
+      description: SPIKE C2 - allows the transition only if the app-stored review
+        state is APPROVED or APPROVED_WITH_CONDITIONS.
+      function: validator
+      projectTypes:
+        - company-managed
+        - team-managed
+
+  trigger:
+    - key: a25-installed
+      function: migrate
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+    - key: a25-issue-created
+      function: onIssueCreated
+      events:
+        - avi:jira:created:issue
+      filter:
+        ignoreSelf: true
+
+  function:
+    - key: migrate
+      handler: index.onInstalled
+    - key: resolver
+      handler: index.handler
+    - key: validator
+      handler: validator.run
+    - key: onIssueCreated
+      handler: trigger.onIssueCreated
+
+resources:
+  - key: panel
+    path: src/frontend/panel.jsx
+  - key: page
+    path: src/frontend/page.jsx
+
+permissions:
+  scopes:
+    - read:jira-work # read issues, comments; required for lambda validators
+    - write:jira-work # issue properties, comments, create review task, links
+    - read:jira-user # reviewer group membership check
+    - storage:app # Forge KVS
+    - search:confluence # CQL search (v1 /wiki/rest/api/search)
+    - read:page:confluence # v2 GET /pages/{id}
+    - write:page:confluence # v2 POST/PUT /pages (policy page, register page)
+    - read:space:confluence # v2 GET /spaces
+
+app:
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
+  runtime:
+    name: nodejs24.x
+  id: ari:cloud:ecosystem::app/a6a87625-08ce-466e-9322-016c9af89fa8

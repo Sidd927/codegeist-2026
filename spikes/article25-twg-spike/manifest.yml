@@ -1,0 +1,28 @@
+# Article25 Stage 1 Spike E: Teamwork Graph connectivity. Separate app so TWG scopes (org-admin consent) stay isolated.
+modules:
+  jira:issuePanel:
+    - key: a25-twg-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: Article25 TWG spike
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: panel
+    path: src/frontend/panel.jsx
+permissions:
+  scopes:
+    - read:graph:user:atlassian
+    - read:graph:team:atlassian
+    - read:graph:team-type:atlassian
+    - read:graph:issue:jira
+    - read:graph:goal:atlassian
+    - read:graph:page:confluence
+app:
+  runtime:
+    name: nodejs24.x
+  id: ari:cloud:ecosystem::app/c19fa884-2c79-47af-9a7c-bb6aea4f1b01

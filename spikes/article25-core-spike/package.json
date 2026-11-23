@@ -1,0 +1,17 @@
+{
+  "name": "article25-core-spike",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Article25 Stage 1 spike: Jira/Confluence integration, workflow validator, privacy register. Not production code.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@forge/api": "8.5.0",
+    "@forge/bridge": "7.3.0",
+    "@forge/kvs": "2.1.2",
+    "@forge/react": "12.5.0",
+    "@forge/resolver": "2.0.2",
+    "@forge/sql": "^4.0.10",
+    "react": "^18.3.1"
+  }
+}
