@@ -310,6 +310,7 @@ Other checks:
 - **CLEAR is not automatically allowed on protected transitions** (strict by design). Teams must protect only transitions that need a human decision. Opt-in automatic clearance for **AI-mode** CLEAR is deferred.
 - **Condition confirmation is an attestation**, not automated verification.
 - **Monitor mode still blocks when Article25 cannot read its own configuration** (fail closed).
+  - *Final audit amendment (23 Nov 2026):* narrowed. Monitor mode now blocks only if the **mode itself** cannot be read. Any other evaluation failure in monitor mode is allowed and recorded as "would block". See [FINAL_READINESS_AUDIT.md §9](FINAL_READINESS_AUDIT.md#9-deployment-migration-and-rollback).
 - **No per-project or per-transition policy:** one global mode, and protection is wherever the rule is placed.
 - **Health check limits:**
   - it scans up to 1,000 workflows (20 pages × 50) and doesn't page further;

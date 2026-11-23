@@ -146,3 +146,17 @@ Carried from `docs/privacy-policy-review.md` §3. The product must not ship mark
 - a developer controller/processor role.
 
 These claims require review first.
+
+---
+
+## Final audit amendment (23 Nov 2026)
+Details: [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) §6.
+- **Key scope.** Forge environment variables belong to the app environment. In production one Ed25519 key signs every site's records. Each record names its site, so records cannot be moved across sites. Key compromise or loss is a **vendor** incident.
+- **Trust anchors.** The current key, the previous key during a handover, and the **public** keys of retired keys (`A25_RECORD_TRUSTED_KEYS`, not secret). Trust is still never derived from database contents.
+- **Restore lock.** An `in_progress` marker is written before any restore write. While a restore is being verified, applied or is incomplete:
+  - the gate blocks (`RESTORE_INCOMPLETE`);
+  - no decision, assignment, system decision or signature is written.
+
+  A rejected confirm is logged as `restore_rejected` and cannot mask an incomplete restore. Restores run in resumable rounds of at most 18 s.
+- **Monitor mode.** Infrastructure failures no longer block in monitor mode. Enforce mode, or an unreadable mode, remains fail-closed.
+- **Accepted risk (unchanged).** Restoring an older genuine archive after an uninstall cannot be detected. Every restored approval is re-checked against the current text.

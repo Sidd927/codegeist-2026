@@ -504,6 +504,25 @@ About 1.07 KB per decision before assignments and settings. Verification is line
 
 ---
 
+## 16b. Final audit amendment (23 Nov 2026)
+Full details: [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) §5–§6.
+- **Live reinstall/restore: done.** It ran in an isolated custom development environment (`recovery`) on the same site, with its own key and the development key's public half as an anchor.
+  - export → offline `VALID` → uninstall → reinstall (all 15 migrations re-applied, empty record) → restore (*Restored and verified*, 1.2–1.5 s) → whole-chain *verified* → automatic re-check → gate preview.
+  - Result: the Ed25519 approval of unchanged text *would be allowed*; the pre-M5 approval *would be blocked* (no legacy key in that environment).
+  - A one-character tampered archive was refused live.
+  - The recovery installation was removed afterwards. Development was not touched except for one more export.
+- **Defects found and fixed (with regression tests):**
+  - no restore-in-progress marker, so signatures and decisions could interleave with restored history;
+  - a rejected confirm masked a partial restore and reopened the gate;
+  - archives signed by a retired or lost key could never be restored → `A25_RECORD_TRUSTED_KEYS`;
+  - large restores could not finish within Forge's 25 s limit → batched, resumable rounds;
+  - unlabelled gate reasons;
+  - misleading "not backed up" after a restore.
+- **Scenario 6 (key loss) amendment.** In production one key signs every site, so the vendor fixes a key loss once by listing the old public key. Per-site adoption remains available.
+- **§19 (Confluence register):** closed. The owner chose the archive-only design.
+- **§15 benchmark:** superseded by the committed `npm run bench`. On Apple M5 with Node 24.22, verifying 5,000 decisions takes 223 ms and the archive is 6.2 MB.
+- **Deploy incident (§11):** root cause and fix in the audit, §9. Monitor mode no longer blocks on evaluation failures, and the schema self-heals within seconds.
+
 ## 17. Deferred work (prioritised)
 
 | Priority | Item | Why deferred |

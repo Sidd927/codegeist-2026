@@ -64,6 +64,10 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-G7 | Works in company-managed and team-managed projects. | M | ✅ live, M4 (A25GC, A25GT; bulk transitions per issue) |
 | FR-G8 (M4) | **Conditional approvals** never authorise a protected transition until a reviewer confirms the conditions by recording Approve for the current text. | M | ✅ live, M4 |
 
+> **Final audit amendment (23 Nov 2026):**
+> - **FR-G6:** monitor mode now never blocks, even when the evaluation itself fails. The gate re-reads only the stored mode; enforce, or an unreadable mode, still blocks. This fixes the M5 deploy incident.
+> - **FR-G5:** coverage counts only this environment's validator.
+
 ### 2.4 Record (ledger, register, recovery)
 | ID | Requirement | P | Basis |
 |---|---|---|---|
@@ -86,6 +90,20 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 > - **FR-L8:** ⏭ not needed. Restore enumerates from the archive. It would need `write:jira-work`, and Stage 1 showed issue properties are editable by users.
 > - **New FR-L9 (M5):** **Record page** listing decisions on visible work items with their signature and backup status; account IDs only for reviewers. ✅ live.
 > - **New FR-L10 (M5):** **key lifecycle**: rotation with a handover is co-signed; after a key loss, old approvals are blocked (`RECORD_KEY_UNTRUSTED`) until an admin adopts the previous key by its exact fingerprint. ✅ tested.
+
+> **Final audit amendment (23 Nov 2026)** · details in [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md)
+> - **FR-L2 / FR-L3:** **closed, not built.** The owner chose the archive-only design (no Confluence scopes, no multi-app installation, no preview shared storage). The Record page plus signed archives are the register.
+> - **FR-L5:** ✅ **live-verified** in an isolated Forge environment:
+>   - export → offline verification → uninstall → reinstall (empty) → restore → whole-chain verification → automatic re-check → gate preview;
+>   - only the Ed25519 approval of unchanged text was allowed.
+>
+>   Two fail-open paths found in this audit are fixed:
+>   - no marker while a restore was being written;
+>   - a rejected confirm masking a partial restore.
+>
+>   Large restores now run in resumable rounds.
+> - **New FR-L11:** **retired keys by their public half** (`A25_RECORD_TRUSTED_KEYS`): archives and approvals signed by a rotated-out or lost key stay verifiable and restorable without keeping its private key. ✅ tested and live.
+> - **FR-L10 note:** in production one key signs every site (environment variables are per environment), so key loss is handled once by the vendor through FR-L11. Per-site adoption by fingerprint remains available.
 
 ### 2.5 Administration and onboarding
 | ID | Requirement | P | Basis |

@@ -12,6 +12,7 @@
 | M3 Review (inbox, Margin workspace, assignment, four decisions, evidence-locked approval, signed record) | ✅ Done (development) | `milestone-m3-review` (#5) | [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md) |
 | **M4 Enforce** (workflow validator, policy g1, monitor/enforce, audited settings, verified coverage health check, CI) | ✅ **Done (development)** | `milestone-m4-enforce` (#6) | [M4_ENFORCE_RESULTS.md](M4_ENFORCE_RESULTS.md) |
 | **M5 Record & Recovery** (Ed25519 ledger v3, trusted-key lifecycle, signed archive + offline verifier, verified restore, Record page, retention) | ✅ **Done (development)**; Confluence register **BLOCKED** on scope approval | `milestone-m5-record` (#7) | [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md) |
+| **Final readiness audit** (CI, live isolated reinstall/restore, crypto audit, 11 defects fixed, README, judge guide) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) |
 | Onboarding, admin polish, release | Planned | — | phases 9–12 below |
 
 **Scope changes so far:**
@@ -34,6 +35,25 @@
 | Live uninstall → reinstall → restore rehearsal | Would wipe dev evidence | A separate Forge environment | Before C1 rehearsal |
 | Recovery group and dual control for restore | Restore is Jira-admin only today | Product decision | M8 |
 | Paged export/verify for very large stores (≳ 50,000 decisions) | Not needed at MVP scale | — | M10 |
+
+**Recommended next (after the final readiness audit, 23 Nov):** the release blockers B1–B7 in [FINAL_READINESS_AUDIT.md §13](FINAL_READINESS_AUDIT.md#13-release-blockers). All of them need you:
+- production deploy + Sharing;
+- frozen scopes, **4 Dec**;
+- a production signing key;
+- the clean-site rehearsal;
+- the AI-in-production decision;
+- the privacy policy URL;
+- the submission.
+
+In parallel I can build P1 work that needs no new scope:
+1. a Get-started checklist;
+2. an inline separation-of-duties hint for admins;
+3. a cold-start bundle trim;
+4. publishing the standalone verifier.
+
+The Confluence decision is made: **archive only**. The live reinstall/restore is **done** in the isolated `recovery` environment.
+
+> *Historical (after M5, kept for the record):*
 
 **Recommended next (after M5, 23 Nov): M8 onboarding and clean-site rehearsal**, preceded by one decision from you:
 1. **Confluence scopes (before the 4 Dec scope freeze):** keep the archive only, or approve `read:page` + `write:page:confluence` for the register (options in [M5_RECORD_RESULTS.md §19](M5_RECORD_RESULTS.md)).
