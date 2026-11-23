@@ -1,6 +1,6 @@
 # 16 — Spike E: Teamwork Graph Results
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net · **Status of TWG API:** Preview
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net · **Status of TWG API:** Preview
 **App:** `article25-twg-spike` (`c19fa884-2c79-47af-9a7c-bb6aea4f1b01`), isolated from the core spike so its org-level scopes don't affect other tests. Code in `spikes/article25-twg-spike/`.
 **Data:** queries ran as the signed-in user over seeded demo-site data and our synthetic issues.
 

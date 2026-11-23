@@ -1,6 +1,6 @@
 # 14 — Spike C: Jira Workflow Validator Results (most critical spike)
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net · **Data:** synthetic only
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net · **Data:** synthetic only
 **Module:** `jira:workflowValidator` (**Preview**, [docs](https://developer.atlassian.com/platform/forge/manifest-reference/modules/jira-workflow-validator/))
 **Code:** `spikes/article25-core-spike/` (`manifest.yml`, `src/validator.js`, `src/review.js`)
 

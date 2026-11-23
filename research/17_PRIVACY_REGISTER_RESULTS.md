@@ -1,6 +1,6 @@
 # 17 — Spike F: Confluence Privacy Register Results
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net · **Space:** A25 (id 3473411) · **Page:** "Article25 Privacy Register (SPIKE)" id **3538945** · **Data:** synthetic only
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net · **Space:** A25 (id 3473411) · **Page:** "Article25 Privacy Register (SPIKE)" id **3538945** · **Data:** synthetic only
 **Code:** `spikes/article25-core-spike/src/register.js`
 
 ## Verdict

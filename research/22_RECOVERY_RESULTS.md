@@ -1,6 +1,6 @@
 # 22 — C3 Recovery Integrity: Hash Chain + Authorised Recovery
 
-**Date:** 2026-11-22 · **Site:** one-atlas-psvy.atlassian.net (demo, synthetic data only) · **App:** `article25-core-spike`, development env, v3.5.0 · **Installation:** `59e18718…` (after the uninstall/reinstall in this test)
+**Date:** 2026-11-22 · **Site:** <dev-site>.atlassian.net (demo, synthetic data only) · **App:** `article25-core-spike`, development env, v3.5.0 · **Installation:** `59e18718…` (after the uninstall/reinstall in this test)
 **Result: ✅ C3 recovery integrity PASSED.** 21/21 unit tests and 13 live checks passed. **One residual risk is documented and accepted** (§5).
 
 Evidence sources: `forge logs` entries with `"evidence":"recoveryVerify|recoveryConfirm|chainExport"`, in-app audit log rows 1–6 and 30002–30008, REST responses quoted below, and `node --test test/chain.test.mjs` output.
