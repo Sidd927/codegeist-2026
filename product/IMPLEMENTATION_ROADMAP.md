@@ -14,7 +14,8 @@
 | **M5 Record & Recovery** (Ed25519 ledger v3, trusted-key lifecycle, signed archive + offline verifier, verified restore, Record page, retention) | ✅ **Done (development)**; Confluence register **BLOCKED** on scope approval | `milestone-m5-record` (#7) | [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md) |
 | **Final readiness audit** (CI, live isolated reinstall/restore, crypto audit, 11 defects fixed, README, judge guide) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [FINAL_READINESS_AUDIT.md](FINAL_READINESS_AUDIT.md) |
 | **P1 experience** (Get started, separation-of-duties guidance, bundles −55%, parallel loading, real-browser contrast check in CI) | ✅ **Done (development)** | `milestone-m5-record` (#7) | [P1_EXPERIENCE_RESULTS.md](P1_EXPERIENCE_RESULTS.md) |
-| Release (blockers B1–B7 need the owner), remaining P2 polish | Planned | — | [FINAL_READINESS_AUDIT.md §13–14](FINAL_READINESS_AUDIT.md) |
+| **Competition package** (runbook, AI memo, privacy policy rewrite, clean-site rehearsal, 3:57 demo film from real footage, Devpost draft and checklist) | ✅ **Done** (awaiting your decisions) | `milestone-m5-record` (#7) | [RELEASE_READINESS.md](RELEASE_READINESS.md) |
+| Release: production, Sharing, clean site, YouTube, submission | **Needs you**: decisions 1–11 in [RELEASE_READINESS.md §4](RELEASE_READINESS.md#4-decisions-and-actions-that-need-you-in-order) | — | [PRODUCTION_RUNBOOK.md](PRODUCTION_RUNBOOK.md) |
 
 **Scope changes so far:**
 - M3 added `read:jira-user`.

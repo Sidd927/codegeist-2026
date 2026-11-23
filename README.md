@@ -140,6 +140,8 @@ Forge environment variables belong to the app **environment**, not to a site. In
   - [M4 enforce](product/M4_ENFORCE_RESULTS.md)
   - [M5 record](product/M5_RECORD_RESULTS.md)
   - [**final readiness audit**](product/FINAL_READINESS_AUDIT.md)
-- Judges: [install guide (draft, not yet rehearsed)](docs/JUDGE_INSTALL.md)
+- Judges: [install guide](docs/JUDGE_INSTALL.md) · [clean-site rehearsal](docs/CLEAN_SITE_REHEARSAL.md)
+- Release: [readiness and approvals](product/RELEASE_READINESS.md) · [production runbook](product/PRODUCTION_RUNBOOK.md) · [AI decision memo](product/AI_PRODUCTION_DECISION.md) · [privacy policy draft](docs/privacy-policy.md)
+- Submission: [Devpost draft](submission/DEVPOST_FINAL_SUBMISSION.md) · [checklist](submission/SUBMISSION_CHECKLIST.md) · [demo film notes](submission/video/VIDEO_PRODUCTION_NOTES.md)
 
 Article25 helps teams run their own privacy reviews. It does not give legal advice, and its findings are prompts for a human decision.
