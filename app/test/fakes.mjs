@@ -126,7 +126,7 @@ export function createFakeRepos() {
   const dec = []; // stored as SQL would store them (JSON columns serialised)
   const asg = [];
   const chn = [];
-  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false };
+  const failures = { decisionInsert: false, chainInsert: false, gateSnapshot: false, gateSnapshotDelayMs: 0, gateEventsInsert: false, settingsRead: false, schemaMissing: false, restoreChainAfter: null };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const parseD = (r) => r && { ...clone(r), conditions: JSON.parse(r.conditions), questions: JSON.parse(r.questions), signal_set: JSON.parse(r.signal_set), detail: r.detail ? JSON.parse(r.detail) : null };
   const decisions = {
@@ -204,7 +204,7 @@ export function createFakeRepos() {
     forIssue: async (issueId, limit = 10) => clone(gev.filter((e) => e.issue_id === issueId).sort((a, b) => b.at - a.at || b.id - a.id).slice(0, limit)),
     summary: async (since) => Object.entries(gev.filter((e) => e.at >= since).reduce((m, e) => ({ ...m, [e.verdict]: (m[e.verdict] ?? 0) + 1 }), {})).map(([verdict, n]) => ({ verdict, n })),
   };
-  async function gateSnapshot(issueId) {
+  async function gateSnapshot(issueId, now = Date.now()) {
     if (failures.gateSnapshotDelayMs) await new Promise((r) => setTimeout(r, failures.gateSnapshotDelayMs));
     if (failures.schemaMissing) throw new Error("Table 'gate_events' doesn't exist");
     if (failures.gateSnapshot) throw new Error('sql unavailable');
@@ -219,6 +219,11 @@ export function createFakeRepos() {
       latest: parseD(d), latestHuman: parseD(h),
       latestRecord: rec(d) ? JSON.parse(rec(d).record) : null, humanRecord: rec(h) ? JSON.parse(rec(h).record) : null,
       mode: g?.value ?? null, modeSeq: g ? g.seq : 0,
+      restore: (() => {
+        const last = [...lev].filter((e) => e.type === 'restore').sort((a, b) => b.at - a.at || b.id - a.id)[0];
+        if (last?.outcome === 'failed_partial') return 'incomplete';
+        return sessions.some((x) => x.used_at === null && x.expires_at > now) ? 'in_progress' : null;
+      })(),
     };
   }
   async function gateTablesReachable() {
@@ -226,5 +231,129 @@ export function createFakeRepos() {
     if (failures.gateSnapshot) throw new Error('sql unavailable');
     return { s: sev.length, g: gev.length, c: chn.length };
   }
-  return { repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable }, items, scr, use, counters, spendState, dec, asg, chn, sev, gev, failures };
+
+  // ---- M5: keys, successions, checkpoints, ledger events, recovery sessions, transfers ----
+  const keys = [];
+  const succ = [];
+  const cps = [];
+  const lev = [];
+  const sessions = [];
+  const xfer = [];
+  const recordKeys = {
+    all: async () => clone(keys),
+    async insert(k) {
+      if (keys.some((x) => x.kid === k.kid)) return false;
+      keys.push({ kid: k.kid, alg: k.alg, publicKey: k.publicKey, registeredAt: k.registeredAt, selfSig: k.selfSig });
+      return true;
+    },
+  };
+  const keySuccessions = {
+    all: async () => clone(succ),
+    async insert(x) {
+      if (succ.some((y) => y.fromKid === x.fromKid && y.toKid === x.toKid)) return false;
+      succ.push({ fromKid: x.fromKid, toKid: x.toKid, at: x.at, toSig: x.toSig, fromSig: x.fromSig ?? null });
+      return true;
+    },
+  };
+  const trustMaterial = async () => ({ registry: clone(keys), successions: clone(succ) });
+  const checkpoints = {
+    all: async () => clone([...cps].sort((a, b) => a.seq - b.seq)).map((c) => ({ ...c, siteId: null })),
+    async insert(c) {
+      if (cps.some((x) => x.seq === c.seq && x.purpose === c.purpose && x.kid === c.kid)) return false;
+      cps.push({ seq: c.seq, hash: c.hash, kid: c.kid, at: c.at, purpose: c.purpose, sig: c.sig });
+      return true;
+    },
+  };
+  const ledgerEvents = {
+    async insert(e) {
+      lev.push({ id: lev.length + 1, at: e.at, type: e.type, actor: e.actor ?? null, outcome: e.outcome, head_seq: e.headSeq ?? null, digest: e.digest ?? null, summary: e.summary ?? null });
+    },
+    latest: async (type) => clone([...lev].filter((e) => e.type === type).sort((a, b) => b.at - a.at || b.id - a.id)[0] ?? null),
+    recent: async (limit = 10) => clone([...lev].sort((a, b) => b.at - a.at || b.id - a.id).slice(0, limit)),
+  };
+  const recoverySessions = {
+    async insert(x) {
+      sessions.push({ token_hash: x.tokenHash, actor: x.actor, digest: x.digest, created_at: x.createdAt, expires_at: x.expiresAt, used_at: null });
+    },
+    async consume({ tokenHash, actor, now }) {
+      const x = sessions.find((y) => y.token_hash === tokenHash && y.actor === actor && y.used_at === null && y.expires_at > now);
+      if (!x) return null;
+      x.used_at = now;
+      return clone(x);
+    },
+    async expireAll(now) {
+      for (const x of sessions) if (x.used_at === null && x.expires_at > now) x.expires_at = now;
+    },
+    active: async (now) => sessions.some((x) => x.used_at === null && x.expires_at > now),
+  };
+  const storeCounts = async () => ({ decisions: dec.length, chain: chn.length, assignments: asg.length });
+  const exportReads = {
+    chain: async () => [...chn].sort((a, b) => a.seq - b.seq).map((c) => JSON.parse(c.record)),
+    decisions: async () => [...dec].sort((a, b) => String(a.issue_id).localeCompare(String(b.issue_id)) || a.seq - b.seq).map(parseD),
+    assignments: async () => clone([...asg].sort((a, b) => String(a.issue_id).localeCompare(String(b.issue_id)) || a.seq - b.seq)),
+    settings: async () => clone([...sev].sort((a, b) => a.setting.localeCompare(b.setting) || a.seq - b.seq)),
+  };
+  let restoredChain = 0;
+  const restoreWrites = {
+    async chain(r) {
+      if (failures.restoreChainAfter !== null && restoredChain >= failures.restoreChainAfter) throw new Error('sql unavailable');
+      if (chn.some((c) => c.seq === r.seq || c.decision_id === r.decisionId)) return false;
+      restoredChain++;
+      chn.push({ seq: r.seq, decision_id: r.decisionId, record: JSON.stringify(r), record_hash: r.hash });
+      chn.sort((a, b) => a.seq - b.seq);
+      return true;
+    },
+    async decision(d) {
+      return decisions.insert({ issueId: d.issue_id, seq: d.seq, decisionId: d.decision_id, requestId: d.request_id, kind: d.kind, decision: d.decision, rationale: d.rationale, conditions: d.conditions, questions: d.questions, decidedBy: d.decided_by, decidedAt: d.decided_at, screeningId: d.screening_id, fp: d.fp, pipelineVersion: d.pipeline_version, outcome: d.outcome, signalSet: d.signal_set, detail: d.detail });
+    },
+    async assignment(a) {
+      return assignments.insert({ issueId: a.issue_id, seq: a.seq, assignee: a.assignee, assignedBy: a.assigned_by, assignedAt: a.assigned_at, requestId: a.request_id });
+    },
+    async setting(x) {
+      return settingsEvents.insert({ setting: x.setting, seq: x.seq, value: x.value, changedBy: x.changed_by, changedAt: x.changed_at, requestId: x.request_id, note: x.note });
+    },
+  };
+  const transfers = {
+    async put(x) {
+      if (xfer.some((y) => y.transfer_id === x.transferId && y.idx === x.idx)) return false;
+      xfer.push({ transfer_id: x.transferId, idx: x.idx, kind: x.kind, actor: x.actor, data: x.data, created_at: x.createdAt });
+      return true;
+    },
+    get: async (id, idx) => clone(xfer.find((y) => y.transfer_id === id && y.idx === idx) ?? null),
+    async meta(id) {
+      const rows = xfer.filter((y) => y.transfer_id === id);
+      if (!rows.length) return { n: 0, actor: null, actor2: null, kind: null, created_at: null };
+      const actors = rows.map((y) => y.actor).sort();
+      return { n: rows.length, actor: actors[0], actor2: actors.at(-1), kind: rows.map((y) => y.kind).sort()[0], created_at: Math.min(...rows.map((y) => y.created_at)) };
+    },
+    all: async (id) => clone(xfer.filter((y) => y.transfer_id === id).sort((a, b) => a.idx - b.idx).map((y) => ({ idx: y.idx, data: y.data }))),
+    async purge(before) {
+      const n = xfer.length;
+      for (let i = xfer.length - 1; i >= 0; i--) if (xfer[i].created_at < before) xfer.splice(i, 1);
+      return n - xfer.length;
+    },
+  };
+  async function registerRows(limit = 500) {
+    return [...dec].sort((a, b) => b.decided_at - a.decided_at || b.seq - a.seq).slice(0, limit).map((d) => {
+      const c = chn.find((x) => x.decision_id === d.decision_id);
+      const rec = c ? JSON.parse(c.record) : null;
+      return { issue_id: String(d.issue_id), seq: d.seq, kind: d.kind, decision: d.decision, decided_by: d.decided_by, decided_at: d.decided_at, fp: d.fp, outcome: d.outcome, decision_id: d.decision_id, chainSeq: c ? c.seq : null, recordVersion: rec?.v ?? null, kid: rec?.kid ?? null };
+    });
+  }
+  async function purgeGateEvents(before) {
+    const n = gev.length;
+    for (let i = gev.length - 1; i >= 0; i--) if (gev[i].at < before) gev.splice(i, 1);
+    return n - gev.length;
+  }
+  function wipe() {
+    // Simulates an uninstall + reinstall: Forge storage is gone (environment variables survive).
+    for (const arr of [dec, asg, chn, sev, gev, keys, succ, cps, lev, sessions, xfer]) arr.length = 0;
+    items.clear();
+    scr.clear();
+    restoredChain = 0;
+  }
+  return {
+    repos: { workItems, screenings, usage, spend, decisions, assignments, chain, inboxCandidates, settingsEvents, gateEvents, gateSnapshot, gateTablesReachable, recordKeys, keySuccessions, trustMaterial, checkpoints, ledgerEvents, recoverySessions, storeCounts, exportReads, restoreWrites, transfers, registerRows, purgeGateEvents },
+    items, scr, use, counters, spendState, dec, asg, chn, sev, gev, keys, succ, cps, lev, sessions, xfer, failures, wipe,
+  };
 }

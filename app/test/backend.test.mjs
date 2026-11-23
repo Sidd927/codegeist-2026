@@ -13,6 +13,7 @@ import { adfToBlocks } from '../src/core/text.js';
 import { createDeskServices } from '../src/backend/services/desk.js';
 import { createReviewService } from '../src/backend/services/review.js';
 import { createGateService } from '../src/backend/services/gate.js';
+import { createLedgerService } from '../src/backend/services/ledger.js';
 
 const silentLog = { info() {}, warn() {}, error() {} };
 const ADF = {
@@ -54,9 +55,10 @@ const svc = (opts = {}) => {
   const screening = { aiAvailable: false, requestManual: async () => ({ status: 'queued' }) };
   const jira = fakeJira(opts);
   const settings = settingsFromEnv({});
-  const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
-  const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test' });
-  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review, gate });
+  const ledger = createLedgerService({ repos: fake.repos, log: silentLog, settings, siteId: 'site-test' });
+  const review = createReviewService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
+  const gate = createGateService({ repos: fake.repos, jira, log: silentLog, settings, siteId: 'site-test', ledger });
+  return createDeskServices({ jira, config: configFor('DEVELOPMENT'), log: silentLog, repos: fake.repos, screening, settings, review, gate, ledger });
 };
 
 // ---- logger: content-free by construction
@@ -181,7 +183,7 @@ test('presenter: queued/screening and failed states never present a result as cu
   assert.equal(presentScreening({ state: 'SCREENED', screened_fp: 'a' }, null).state, 'NOT_SCREENED');
 });
 test('screening, decisions and the workflow gate are on; the register stays off until its milestone', () => {
-  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: true, register: false });
+  assert.deepEqual(FEATURES, { screening: true, decisions: true, gate: true, register: false, record: true });
 });
 
 test('version-aware: a stored result from an older pipeline version is shown as rescreening required', () => {
