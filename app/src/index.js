@@ -8,7 +8,7 @@ import { buildScreening, buildReview, buildLedger, requestMigration } from './ba
 import { buildGate } from './backend/handlers/gate.js';
 import { configFor, settingsFromEnv } from './backend/lib/config.js';
 import { log, errorFacts } from './backend/lib/logger.js';
-import { ok, toEnvelope, AppError, ErrorCode } from './backend/lib/errors.js';
+import { ok, toEnvelope, AppError, ErrorCode, isSqlExecutionError } from './backend/lib/errors.js';
 import * as validate from './backend/lib/validate.js';
 
 export { onIssueEvent, onLifecycle, screeningConsumer, maintenanceConsumer, reconcileSchedule } from './backend/handlers/events.js';
@@ -38,6 +38,9 @@ function define(key, fn) {
       return ok(data);
     } catch (e) {
       const envelope = toEnvelope(e);
+      // Fresh install or pending upgrade: queue the (idempotent) migration now instead of waiting for
+      // the lifecycle event, and tell the user it is setting up rather than "something went wrong".
+      if (envelope.error.code === 'SETTING_UP' || isSqlExecutionError(e)) await requestMigration().catch(() => undefined);
       log[envelope.error.code === 'INTERNAL' ? 'error' : 'warn']({ evt: 'resolver.failed', resolver: key, code: envelope.error.code, status: e?.status, ...(envelope.error.code === 'INTERNAL' ? errorFacts(e) : {}), ms: Date.now() - t0, env: deps.config.name });
       return envelope;
     }

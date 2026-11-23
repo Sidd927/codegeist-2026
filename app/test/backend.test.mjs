@@ -74,6 +74,13 @@ test('logger rejects unsafe strings and non-numeric metrics', () => {
 // ---- errors
 test('error envelope hides internal error details and marks retryable codes', () => {
   assert.deepEqual(toEnvelope(new Error('db password=secret')), { ok: false, error: { code: 'INTERNAL', message: 'Something went wrong in Article25. Try again.', retryable: true } });
+  // Final audit: a missing table (first minutes after install) is a retryable SETTING_UP, not a generic failure,
+  // and the raw SQL message is never echoed.
+  const setup = toEnvelope(new Error("Table 'article25.decisions' doesn't exist"));
+  assert.deepEqual([setup.error.code, setup.error.retryable, /article25\.decisions/.test(setup.error.message)], ['SETTING_UP', true, false]);
+  const forgeShape = Object.assign(new Error('Unknown SQL execution error'), { code: 'SQL_EXECUTION_ERROR', context: { debug: { errno: 1146 } } });
+  assert.equal(toEnvelope(forgeShape).error.code, 'SETTING_UP');
+  assert.equal(toEnvelope(Object.assign(new Error('Unknown SQL execution error'), { code: 'SQL_EXECUTION_ERROR' })).error.code, 'INTERNAL');
   assert.equal(toEnvelope(new AppError(ErrorCode.NOT_AUTHORISED)).error.retryable, false);
   assert.deepEqual(ok({ a: 1 }), { ok: true, data: { a: 1 } });
 });
@@ -169,7 +176,8 @@ test('settings are refused for non-admins and when the admin check fails (fail c
   await assert.rejects(svc({ admin: false }).settingsOverview(), (e) => e.code === 'NOT_AUTHORISED');
   await assert.rejects(svc({ adminThrows: true }).settingsOverview(), (e) => e.code === 'NOT_AUTHORISED');
   const s = await svc({ admin: true }).settingsOverview();
-  assert.equal(s.sections.length, 6);
+  // Only sections that exist (the unbuilt "What is already approved" placeholder was removed at the final audit).
+  assert.deepEqual(s.sections.map((x) => x.key), ['scope', 'people', 'ai', 'record', 'gate']);
   assert.equal(s.screening.ai, 'off');
 });
 test('app context reports roles without personal identifiers', async () => {

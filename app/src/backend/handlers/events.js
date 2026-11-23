@@ -13,6 +13,7 @@ import * as repos from '../repositories/sql-repositories.js';
 import { applyMigrations } from '../db/schema.js';
 import { configFor, settingsFromEnv } from '../lib/config.js';
 import { log } from '../lib/logger.js';
+import { isSchemaMissing, isSqlExecutionError } from '../lib/errors.js';
 
 export const SCREENING_QUEUE = 'a25-screening';
 export const MAINTENANCE_QUEUE = 'a25-maintenance';
@@ -72,7 +73,6 @@ export function classifyChange(event) {
   return items.every((it) => name(it)) ? 'irrelevant' : 'unknown';
 }
 
-const isSchemaMissing = (e) => /doesn'?t exist|no such table|unknown table/i.test(String(e?.message ?? e));
 
 export async function onIssueEvent(event, context) {
   const issueId = String(event?.issue?.id ?? '');
@@ -164,6 +164,7 @@ export async function reconcileSchedule(event, context) {
     // Archive transfers are temporary (they contain decision data): keep them one hour at most.
     await repos.transfers.purge(Date.now() - 3600 * 1000).catch(() => 0);
   } catch (e) {
+    if (isSqlExecutionError(e)) await maintenanceQueue.push({ body: { type: 'migrate' } }).catch(() => undefined); // self-heal a fresh install
     log.error({ evt: 'reconcile.failed', code: e?.code ?? 'INTERNAL' });
   }
 }
