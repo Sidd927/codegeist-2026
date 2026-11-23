@@ -145,6 +145,15 @@ Validator handler:
 
 Any exception → block with "Article25 couldn't verify the privacy status. Try again or contact your admin." **[VERIFIED fail-closed pattern]**. Target ≤ 500 ms p95 (one indexed SELECT plus one INSERT).
 
+> **M4 amendment (implemented, 23 Nov 2026).** See [M4_ENFORCE_RESULTS.md](M4_ENFORCE_RESULTS.md) §2–§4.
+> - The payload carries the issue **key** and no user. The validator reads the issue **as the app** (identity + current text), then runs **one SQL statement**: work item ⨝ latest decision ⨝ latest human decision ⨝ both signed chain records ⨝ gate mode.
+> - The pure `core/gate.js` re-derives the status with the desk's `deriveReviewStatus`, compares the **current text fingerprint**, and verifies the signed record for the approval (O(1)).
+> - Mode comes from the append-only `settings_events` (default monitor).
+> - The issue state is **not** stored in `work_items` for the gate; it is derived, so the desk and the gate cannot disagree.
+> - Deadline 9 s → `TIMEOUT`. Platform crash and 25 s timeout were verified live to block.
+> - Measured in-function median 234 ms, p90 336 ms.
+> - Module key `article25-gate` (not `privacy-gate`). Scope `read:workflow:jira` (read-only) is used only by the admin health check.
+
 ### 5.3 Decision (FR-R5…R8, FR-L1)
 Forge SQL transactions are **[UNVERIFIED]**, so decisions use **ordered, idempotent, reconcilable writes**:
 1. **Authorise:**

@@ -28,6 +28,12 @@ KVS is used only for the recovery nonce (TTL semantics) **[VERIFIED]**. App-envi
 
 Every write is a single `INSERT IGNORE` at `expectedSeq + 1`. Duplicates are idempotent, and concurrent writers get exactly one winner.
 
+**M4 tables (implemented, migrations v008–v009):**
+- `settings_events` (PK `(setting, seq)`, unique `request_id`): an append-only admin settings log. Settings: `gate.mode` (monitor|enforce, default monitor) and `review.separation_of_duties` (on|off, default on; replaces the M3 environment variable). Each change is its own audit record.
+- `gate_events`: content-free validator evaluations (issue ID, project key, numeric status IDs, mode, verdict, reason, policy version, decision sequence, 16-character content reference, ms).
+
+**M4 scope change:** `read:workflow:jira` (granular, **read-only**, Beta in Atlassian's spec), approved by the user on 23 Nov 2026. It is used only by the admin health check, to find which workflow transitions carry the Article25 gate. `manage:jira-configuration` was rejected (it includes configuration writes).
+
 **M3 scope change:** `read:jira-user` was added, used for reviewer-group membership (`/user/groups`), reviewer names (`/user/bulk`) and reviewer search (`/user/search`). Listing group members (`/group/member`) would need the admin-level `manage:jira-configuration`, so that scope was **not** requested.
 
 ## 2. Decision model and state machine
@@ -39,7 +45,8 @@ Every write is a single `INSERT IGNORE` at `expectedSeq + 1`. Duplicates are ide
 > - `RECONFIRMED` and `STALE` are stored as the system decisions `APPROVAL_RECONFIRMED` and `APPROVAL_INVALIDATED`.
 > - The **review status is derived** from the latest decision plus the current content fingerprint (`core/review.js`), not stored separately. That avoids a second write that could be half-applied (Forge SQL has single-statement atomicity only).
 > - Derived statuses: `NOT_SCREENED`, `AWAITING_SCREENING`, `SCREENING_FAILED`, `AWAITING_REVIEW`, `NOT_REQUIRED`, `APPROVED`, `APPROVED_WITH_CONDITIONS`, `NEEDS_MORE_INFORMATION`, `REJECTED`, `APPROVAL_STALE`, `PENDING_RECHECK` (text edited, re-check not finished: the approval does **not** cover it) and `CHANGED_SINCE_DECISION`.
-> - The gate column below is still the M4 design; **no gate is active in M3**.
+> - The gate column below was the M4 design; **no gate is active in M3**.
+> - **M4 amendment:** the gate is live, and the policy is stricter than the column below. **Only a verified human APPROVED decision on the current text allows** (`CLEARED_AUTO` / CLEAR does **not** pass a protected transition), and APPROVED_WITH_CONDITIONS blocks until conditions are confirmed. Full matrix: [M4_ENFORCE_RESULTS.md §4](M4_ENFORCE_RESULTS.md).
 > - Evidence: [M3_REVIEW_RESULTS.md](M3_REVIEW_RESULTS.md).
 
 **Work-item states and gate effect** (default policy):
