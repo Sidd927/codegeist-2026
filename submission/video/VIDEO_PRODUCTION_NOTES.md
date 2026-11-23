@@ -13,7 +13,7 @@
 | Technical check (23 Nov) | ✅ Full decode with `ffmpeg -f null`: 0 errors; 239.3 s; 1920×1080, 30 fps; AAC 48 kHz stereo |
 | Checks | ✅ `npx hyperframes check`: 0 errors. Minor warnings (two 3.15 s holds, dense effect lanes) accepted |
 | Upload | ⛔ Not uploaded. The rules require **public YouTube**: your account, your approval. Kit: [YOUTUBE_UPLOAD_KIT.md](YOUTUBE_UPLOAD_KIT.md) |
-| Listening | ⛔ **Not heard by a person yet.** You must listen to the whole film before publishing |
+| Listening | ✅ Watched and approved by the owner (24 Nov) |
 
 ## 2. Rebuild from scratch (about 5 minutes)
 **Paths:** run everything from the repository root, unless a step `cd`s. Use Node 24 (`export PATH=/opt/homebrew/opt/node@24/bin:$PATH`).

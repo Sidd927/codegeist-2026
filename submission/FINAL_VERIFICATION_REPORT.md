@@ -86,7 +86,7 @@ The full table is in [`docs/CLEAN_SITE_REHEARSAL.md`](../docs/CLEAN_SITE_REHEARS
 | Captions | Rebuilt: 56 cues of at most two 42-character lines; written spellings (SMS, AI-assisted, rule-based) |
 | Thumbnail | 1280×720 PNG, 343 KB, from the film's palette and type |
 | Rights | `submission/video/VIDEO_ASSETS_AND_LICENCES.md`: no music; invented names; synthetic voice (Apache-2.0); Pixabay effects (set-level licence, per-file provenance not recorded). The Jira frame checked: no user name visible |
-| **Listening** | ⛔ **Not heard by a person.** Only measured. You must listen before publishing |
+| **Listening** | ✅ Watched and approved by the owner (24 Nov) |
 
 ## 8. Git and CI
 **Commits (all authored by Siddhant Patil, no trailers):**

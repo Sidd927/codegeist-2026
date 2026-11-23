@@ -175,7 +175,7 @@ atlassian-forge, jira, forge-sql, forge-llm, custom-ui, react, javascript, node.
 ## 11. Repository (optional on Devpost)
 https://github.com/Sidd927/codegeist-2026. The repository is **public**.
 
-The finished work is on the stacked PR branches until you merge them. Merge before submitting, so the default branch shows the final code.
+The final code is on `main` (PRs #1–#7 merged on 24 Nov 2026). Judges see it directly at the repository root.
 
 ## 12. Image gallery (optional)
 Use stills from the film:

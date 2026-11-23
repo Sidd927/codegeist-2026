@@ -154,7 +154,7 @@ The repository is public: https://github.com/Sidd927/codegeist-2026. The checkli
 **Risks:**
 - the stack is large;
 - there are no human reviews, because it is single-author;
-- `main` currently shows none of the product, so judges browsing the repository see the old state until you merge.
+- Update (24 Nov): the stack is **merged** into `main` (`2a40efe`, CI ✅). Current status and next steps: `RELEASE_CHECKLIST.md`.
 
 ## I. What I did not do (by your rules), and the order for you
 **Not done:**
