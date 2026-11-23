@@ -534,7 +534,7 @@ export const copy = {
     sectionsLabel: 'Settings sections',
     sections: {
       scope: { title: 'Scope and policy', body: 'Which projects are checked and which outcomes need a human decision.' },
-      people: { title: 'People', body: 'Reviewer group, recovery group and separation of duties.' },
+      people: { title: 'People', body: 'Reviewer group and separation of duties. Restoring the decision record is limited to Jira administrators.' },
       inventory: { title: 'What is already approved', body: 'Approved vendors and the data categories each project already processes.' },
       ai: { title: 'AI', body: 'Whether AI-assisted checks are used, which model, and a daily budget.' },
       register: { title: 'Decision register', body: 'Where the customer-owned record of decisions is published in Confluence.' },

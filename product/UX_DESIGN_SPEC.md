@@ -147,6 +147,8 @@ Three zones at ≥ 1024 px:
 - **Conflict (FR-R8):** modal "This item changed while you were reviewing. Reload to see the latest check." [Reload].
 
 ### 3.5 Decisions (ledger) — FR-L4, L7
+> **M5 amendment (implemented):** the page is called **Record** (`/record`), a read-only table with columns Work item (key, summary, content ref) · Decision · Decided by · When · Signed record (Ed25519 with kid / Legacy (HMAC) / Pending) · In backup (Yes / Not yet), 25 per page. Above it: the signing summary and the last export. Integrity verification moved to Settings → Decision record and recovery (whole record) and to review History (per item, plus "Download signed record" for reviewers). The Register column (Confluence) and Export CSV are replaced by the signed archive; filters and row expand are deferred. The design below is kept for reference.
+
 - Header: integrity card, "Record verified · 27 decisions · head #27 (a1b2c3d4) · checked just now · [Verify again]". When verification fails: error section message, "Record integrity problem: <first error>. Contact your admin." (Shown to everyone; this is a security signal.)
 - Table (ADS dynamic table):
   - columns: `#` · Work item · Decision · Decider · When · Conditions · Register (✓ published / ⟳ pending / ! failed);
@@ -182,6 +184,17 @@ Left sub-navigation (vertical) + content. One save per section (optimistic concu
 | Gate | Per-project health table: project · last evaluation · allowed/blocked counts (7 d) · status · setup steps · **Monitor mode** toggle (confirm dialog: "Transitions will be allowed and logged as 'would have blocked'.") |
 | Gate (**M4, implemented**) | **Per-workflow verified coverage** instead of per-project: workflow · project type · Complete/Gaps · protected statuses · gated transitions · transitions into a protected status **without** the gate. Also: mode banner (monitoring = dashed information, "NOT blocked"; enforcing = solid danger), overall status, confirmed switch with a reason, dependency checks, recent checks, change history. In the workspace: a **Protected transitions** block (verdict, reason, recent checks); in the panel: a one-line gate state. |
 | Recovery | Visible to recovery admins. Two-step flow exactly as verified (doc 22): Verify → report (valid / complete / anchors / approvals to restore / untrusted claims) → Confirm (expires in 10 min) |
+
+> **M5 amendment (implemented):** Register and Recovery are one Settings section, **Decision record and recovery**, for Jira admins. It contains:
+> - **Keys:** current kid, fingerprint to pin, legacy key present, untrusted previous key with "Adopt" by typed fingerprint.
+> - **Integrity:** count, last full verification, Verify the whole record.
+> - **Backup:** last export, records not in any export, Download signed archive, with Copy archive / Show archive text fallbacks and honest "we cannot see whether you saved it" copy.
+> - **Restore:** file or paste → report → explicit confirm; shown only when the store is empty or a restore is resumable.
+> - **If Article25 is removed:** guidance.
+> - **External register:** Not connected (BLOCKED).
+> - **Recent record events.**
+>
+> Live screenshots: `product/m5-evidence/`.
 | Audit | Read-only list: time · actor · action · result |
 
 ### 3.8 About (non-reviewers, non-admins)

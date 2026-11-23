@@ -76,6 +76,17 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-L7 | Decision export (CSV/JSON). | S | [PROPOSED] |
 | FR-L8 | Receipts indexed via `jira:entityProperty` for full-site enumeration at recovery. | L | doc 22 §5 |
 
+> **M5 amendment (implemented in development, 23 Nov 2026).** See [M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md). The original rows above are kept as written.
+> - **FR-L1:** new records are **Ed25519-signed (ledger v3)** and continue the v2 HMAC chain. The legacy prefix is made publicly verifiable by a signed attestation checkpoint. Key trust comes only from encrypted environment variables, with signed key successions for rotation. ✅ live.
+> - **FR-L2 / FR-L3 (Confluence register):** ⛔ **BLOCKED.** Needs `read:page:confluence` + `write:page:confluence`, a Confluence installation and multi-app compatibility (approval request in M5 §19). The design is kept (outbox, read-only page, checkpoint anchor), and the gate never depends on it.
+> - **FR-L4:** ✅ live. "Verify the whole record" in Settings, a per-item Verify in History, and the last verification time.
+> - **FR-L5:** ✅ implemented, tested in integration (live reinstall not run). Source: a **signed archive** (upload or paste), not Confluence. Two steps, empty store, single-use token bound to the user and the archive digest, re-verify at confirm, gate-safe order with `RESTORE_INCOMPLETE`, resumable, outcome classified, re-screen after restore. **Deviation:** restricted to **Jira administrators**; a separate recovery-admin group is deferred (M8). Restore is resumable rather than all-or-nothing, and the gate stays closed until it completes.
+> - **FR-L6:** ✅ extended with `ledger_events` (export, verify, restore check, restore, key adoption).
+> - **FR-L7:** ✅ **upgraded**: a signed JSON archive (chunked) plus an offline verifier (`scripts/verify-archive.mjs`, pinned fingerprint), and a single-decision signed record for reviewers. CSV is not provided.
+> - **FR-L8:** ⏭ not needed. Restore enumerates from the archive. It would need `write:jira-work`, and Stage 1 showed issue properties are editable by users.
+> - **New FR-L9 (M5):** **Record page** listing decisions on visible work items with their signature and backup status; account IDs only for reviewers. ✅ live.
+> - **New FR-L10 (M5):** **key lifecycle**: rotation with a handover is co-signed; after a key loss, old approvals are blocked (`RECORD_KEY_UNTRUSTED`) until an admin adopts the previous key by its exact fingerprint. ✅ tested.
+
 ### 2.5 Administration and onboarding
 | ID | Requirement | P | Basis |
 |---|---|---|---|
@@ -85,7 +96,7 @@ IDs are stable and referenced by the other documents. Priority: **M** = Must (MV
 | FR-A4 | **AI settings:** AI on/off, daily budget, model (one of the active models from `list()`; default `claude-haiku-5-5`). | M | models [VERIFIED] 22 Nov |
 | FR-A5 | **Inventory editor:** approved vendors (site-wide), known data categories per project. | M | [PROPOSED] |
 | FR-A6 | **Sample scenario:** load a sample inventory and, with explicit confirmation, create 3 sample work items (benign, review-required, DPIA-likely) in a chosen in-scope project. | M | issue create [VERIFIED] |
-| FR-A7 | Reviewer group and recovery group are configurable, and the existence of each group is validated. | M | [PROPOSED] |
+| FR-A7 | Reviewer group and recovery group are configurable, and the existence of each group is validated. | M | [PROPOSED] **M5 amendment:** restore is Jira-admin only for now; the recovery group is deferred to M8. |
 | FR-A8 | Settings require Jira **Administer** global permission, checked server-side for the calling user. | M | [PROPOSED]; permission check [UNVERIFIED] scope |
 
 ### 2.6 Work-item panel (requester surface)

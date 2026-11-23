@@ -83,6 +83,13 @@ Each criterion is testable. "Verified" means a test (unit/component) or a script
 - [ ] Manual edits outside the register markers survive republishing.
 - [ ] The integrity badge shows Verified, and shows the first error when the local chain is tampered with in a test environment.
 
+> **M5 amendment (23 Nov 2026), status against M7/M9:** delivered as **M5 Record & Recovery**, with an archive-based design instead of Confluence ([M5_RECORD_RESULTS.md](M5_RECORD_RESULTS.md)).
+> - [x] Chain tests pass; `RECONFIRMED`/`INVALIDATED` records are covered. *(M3–M5; 169 backend tests)*
+> - [ ] Confluence register table, checkpoint, receipt, outage retry and manual-edit protection: **BLOCKED** (scope approval, M5 §19).
+> - [x] The integrity badge shows Verified, and shows errors when tampered. *(M5: Settings "Verify the whole record", live; tamper tests)*
+> - [x] Independent verification without Jira. *(M5: offline verifier, live VALID / NOT VALID)*
+> - [~] M9 recovery: export, verify and restore with classification and re-screen are implemented and integration-tested. **The live uninstall/reinstall re-run is pending** (in a separate environment, to protect dev evidence).
+
 ### M8 Onboarding, settings, inventory, sample (FR-A1…A8)
 - [ ] A fresh install shows Get started to admins. Progress persists across reloads.
 - [ ] Group validation rejects non-existent groups.

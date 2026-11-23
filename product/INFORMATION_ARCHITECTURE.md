@@ -45,6 +45,8 @@ There is no standalone "dashboard". Metrics appear only where they prompt an act
 ### 3.2 Top-level desk navigation (horizontal tabs in the page header)
 `Inbox (n)` · `Decisions` · `Settings` (admins only). The tab `Get started` replaces `Inbox` until setup is complete for admins. Reviewers who aren't admins never see Settings.
 
+> **M5 amendment (implemented):** the route is `/record` (tab **Record**), not `/decisions`. The tabs are now `Overview · Inbox · Record · Settings`. `/settings/register` and `/settings/recovery` are combined into one Settings section, **Decision record and recovery** (Jira admins; the recovery group is deferred). The Confluence "View register" link does not exist yet (register BLOCKED on scopes).
+
 ### 3.3 Cross-surface links
 | From | To | Trigger |
 |---|---|---|
