@@ -92,6 +92,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     else if (ledger.mode === 'none') decideReason = 'NOT_CONFIGURED';
     else if (sodOn && (doc.reporterId === actorId || doc.assigneeId === actorId)) decideReason = 'SOD';
     else if (!sameContent) decideReason = view.state === 'SCREENING' ? 'CHECKING' : 'STALE_EVIDENCE';
+    // Only the caller's OWN relation is returned (never who else reported or is assigned).
+    const youAre = decideReason === 'SOD' ? (doc.reporterId === actorId && doc.assigneeId === actorId ? 'reporter_assignee' : doc.reporterId === actorId ? 'reporter' : 'assignee') : null;
     return {
       status: r.status.status,
       approvedForContent: r.status.approvedForContent,
@@ -101,7 +103,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       decisions: r.decisions.map((d) => presentDecision(d, people, isReviewer, anchors)).reverse(),
       assignments: r.assignments.map((a) => ({ seq: a.seq, assignee: person(people, a.assignee, isReviewer), assignedBy: person(people, a.assigned_by, isReviewer), assignedAt: a.assigned_at })).reverse(),
       binding: sameContent ? { screeningId: stored.row.screening_id, fp: stored.row.screened_fp } : null,
-      permissions: { isReviewer, canDecide: decideReason === null, decideReason, canAssign: isReviewer },
+      permissions: { isReviewer, canDecide: decideReason === null, decideReason, youAre, canAssign: isReviewer },
     };
   }
 
@@ -177,7 +179,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       const view = presentScreening(stored.row, stored.screening, buildScreeningText(doc).fingerprint);
       // The gate preview reads as the app, but only after the as-user read above succeeded.
       const [rb, gatePreview] = await Promise.all([reviewBlock(doc, stored, view, actorId), gate.preview(doc.key)]);
-      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null }, gate: gatePreview, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
+      const you = { isReviewer: rb.permissions.isReviewer, decideReason: rb.permissions.decideReason, youAre: rb.permissions.youAre };
+      return { access: 'granted', issue, screening: view, review: { status: rb.status, assignee: rb.assignee ? { name: rb.assignee.name } : null, latest: rb.decisions[0] ?? null, you }, gate: gatePreview, features: FEATURES, ai: aiActive() ? 'on' : 'off' };
     },
 
     /** Review workspace (Margin): current text, latest screening, and the review. */
@@ -398,6 +401,34 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
         })),
         total: mine.length, page: p, pages,
         signing: st?.signing ?? 'none', lastExport: st?.lastExport ? { at: st.lastExport.at, headSeq: st.lastExport.headSeq } : null, isReviewer,
+      };
+    },
+
+    /**
+     * Get started (Jira admins only): every line is a server-side fact, never an assumption.
+     * Coverage comes from the same workflow scan as the gate health check, so installing the app is
+     * never presented as protection. Nothing here is cached: it is read fresh on every call.
+     */
+    async setupStatus(actorId) {
+      await requireAdmin();
+      const [health, st, youAreMember, sodOn] = await Promise.all([
+        gate.health(),
+        ledger.status().catch(() => null),
+        review.isReviewer(actorId).catch(() => null),
+        review.separationOfDutiesOn().catch(() => null),
+      ]);
+      const wf = health.coverage.workflows ?? [];
+      const ran = health.activity ? Object.values(health.activity).reduce((a, b) => a + Number(b || 0), 0) : null;
+      return {
+        reviewers: { group: settings.reviewerGroup, youAreMember },
+        signing: ledger.mode,
+        screening: { ai: aiActive() ? 'on' : 'off', scope: settings.scopeProjects.length ? 'projects' : 'all', projects: settings.scopeProjects },
+        gate: {
+          overall: health.overall, mode: health.mode.mode, database: health.checks.database, coverage: health.coverage.status, coverageError: health.coverage.error ?? null,
+          protectedWorkflows: wf.filter((w) => w.coverage === 'complete').length, gapWorkflows: wf.filter((w) => w.coverage !== 'complete').length, checksLast7Days: ran,
+        },
+        separationOfDuties: sodOn === null ? 'unknown' : sodOn ? 'on' : 'off',
+        record: st ? { decisions: st.counts.decisions, lastExportAt: st.lastExport?.at ?? null, notBackedUp: st.notInLastExport } : null,
       };
     },
 

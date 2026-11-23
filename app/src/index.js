@@ -60,6 +60,7 @@ define('recordDecision', ({ services, payload, context }) => services.decide(pay
 define('verifyRecord', ({ services, payload, context }) => services.verifyRecord(payload.issueKey, actor(context)));
 // M4: workflow gate administration (Jira administrators only, checked server-side).
 define('getGateOverview', ({ services }) => services.gateOverview());
+define('getSetupStatus', ({ services, context }) => services.setupStatus(actor(context)));
 define('setGateMode', ({ services, payload, context }) => services.setGateMode(payload, actor(context)));
 define('setSeparationOfDuties', ({ services, payload, context }) => services.setSeparationOfDuties(payload, actor(context)));
 // M5: decision record & recovery (admin endpoints are checked server-side; register is per-viewer).
