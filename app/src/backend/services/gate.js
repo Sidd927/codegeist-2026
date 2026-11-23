@@ -22,13 +22,15 @@ export const GATE_MODULE_KEY = 'article25-gate';
 class Deadline extends Error {}
 const withDeadline = (p, ms) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Deadline()), ms))]);
 
-export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, deadlineMs = 9000, auditMs = 1500, appId = null }) {
-  const signing = { signingKey: settings.signingKey ?? null, siteId: siteId ?? null };
+export function createGateService({ repos, jira, log, clock = () => Date.now(), settings, siteId, ledger, deadlineMs = 9000, auditMs = 1500, appId = null }) {
 
   /** Read and evaluate one issue. Throws on infrastructure failure (callers decide what that means). */
   async function evaluateIssue(issueKey) {
     const doc = await jira.getIssueForScreening(issueKey); // as app: identity + current text
-    const snap = await repos.gateSnapshot(String(doc.id));
+    // One SQL statement for the issue's state, and the trusted signing keys (anchored only by the
+    // keys in encrypted environment variables), in parallel.
+    const [snap, trust] = await Promise.all([repos.gateSnapshot(String(doc.id), clock()), ledger.trust()]);
+    const signing = { siteId: siteId ?? null, keys: trust.keys, hmacKey: trust.hmacKey };
     const currentFp = buildScreeningText(doc).fingerprint;
     const evaluation = evaluateGate({ ...snap, currentFp, inScope: settings.isProjectInScope(doc.projectKey), signing });
     const mode = GATE_MODES.includes(snap.mode) ? snap.mode : snap.mode === null ? DEFAULT_GATE_MODE : 'enforce'; // unknown stored value → strictest
@@ -115,7 +117,7 @@ export function createGateService({ repos, jira, log, clock = () => Date.now(), 
     } catch (e) {
       checks.database = /doesn'?t exist|no such table|unknown table/i.test(String(e?.message)) ? 'migration_missing' : 'unavailable';
     }
-    checks.signing = signing.signingKey && signing.siteId ? 'configured' : 'missing';
+    checks.signing = siteId && ledger.mode !== 'none' ? 'configured' : 'missing';
     let mode = { mode: 'unknown', seq: 0, isDefault: false, changedAt: null };
     try {
       const m = await currentMode();

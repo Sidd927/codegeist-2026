@@ -4,7 +4,7 @@ import Resolver from '@forge/resolver';
 import { createJiraAdapter } from './backend/adapters/jira.js';
 import { createDeskServices } from './backend/services/desk.js';
 import * as repos from './backend/repositories/sql-repositories.js';
-import { buildScreening, buildReview, requestMigration } from './backend/handlers/events.js';
+import { buildScreening, buildReview, buildLedger, requestMigration } from './backend/handlers/events.js';
 import { buildGate } from './backend/handlers/gate.js';
 import { configFor, settingsFromEnv } from './backend/lib/config.js';
 import { log, errorFacts } from './backend/lib/logger.js';
@@ -22,9 +22,10 @@ function servicesFor(context) {
   const settings = settingsFromEnv();
   const siteId = context?.cloudId ? String(context.cloudId) : null;
   const screening = buildScreening(context?.environmentType, siteId);
-  const review = buildReview(context?.environmentType, siteId);
-  const gate = buildGate(context);
-  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings: { ...settings, signingKey: siteId ? settings.signingKey : null }, review, gate }) };
+  const ledger = buildLedger(siteId);
+  const review = buildReview(context?.environmentType, siteId, ledger);
+  const gate = buildGate(context, { ledger });
+  return { config, jira, services: createDeskServices({ jira, config, log, repos, screening, settings, review, gate, ledger }) };
 }
 
 function define(key, fn) {
@@ -58,6 +59,17 @@ define('verifyRecord', ({ services, payload, context }) => services.verifyRecord
 define('getGateOverview', ({ services }) => services.gateOverview());
 define('setGateMode', ({ services, payload, context }) => services.setGateMode(payload, actor(context)));
 define('setSeparationOfDuties', ({ services, payload, context }) => services.setSeparationOfDuties(payload, actor(context)));
+// M5: decision record & recovery (admin endpoints are checked server-side; register is per-viewer).
+define('getRecordStatus', ({ services }) => services.recordStatus());
+define('verifyLedger', ({ services, context }) => services.verifyLedger(actor(context)));
+define('exportArchive', ({ services, context }) => services.exportArchive(actor(context)));
+define('getTransferChunk', ({ services, payload, context }) => services.transferChunk(payload, actor(context)));
+define('uploadArchiveChunk', ({ services, payload, context }) => services.uploadChunk(payload, actor(context)));
+define('beginRestore', ({ services, payload, context }) => services.beginRestore(payload, actor(context)));
+define('confirmRestore', ({ services, payload, context }) => services.confirmRestore(payload, actor(context)));
+define('adoptPreviousKey', ({ services, payload }) => services.adoptPreviousKey(payload));
+define('getDecisionRecord', ({ services, payload, context }) => services.decisionRecord(payload, actor(context)));
+define('getRegister', ({ services, payload, context }) => services.register(payload, actor(context)));
 // Panel: the issue comes from the Forge context. Desk: a validated key; access is checked as the user.
 define('requestRescreen', ({ services, context, payload }) => services.requestRescreen({ extensionIssue: context?.extension?.issue, issueKey: payload.issueKey }));
 

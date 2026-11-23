@@ -323,12 +323,14 @@ const pickDecision = (r, p) =>
  * the latest human decision, both signed chain records, and the current gate mode.
  * Statement-level consistency: no interleaving write can produce a mixed snapshot.
  */
-export async function gateSnapshot(issueId) {
+export async function gateSnapshot(issueId, now = Date.now()) {
   const r = await one(
     `SELECT w.issue_id AS w_issue_id, w.project_key AS w_project_key, w.state AS w_state, w.outcome AS w_outcome, w.screening_id AS w_screening_id, w.screened_fp AS w_screened_fp,
             ${decisionCols('d')}, ${decisionCols('h')},
             cd.record AS cd_record, ch.record AS ch_record,
-            g.value AS g_mode, g.seq AS g_seq
+            g.value AS g_mode, g.seq AS g_seq,
+            (SELECT le.outcome FROM ledger_events le WHERE le.type = 'restore' ORDER BY le.at DESC, le.id DESC LIMIT 1) AS r_outcome,
+            (SELECT COUNT(*) FROM recovery_sessions rs WHERE rs.used_at IS NULL AND rs.expires_at > ?) AS r_open
      FROM (SELECT 1 AS one) base
      LEFT JOIN work_items w ON w.issue_id = ?
      LEFT JOIN (SELECT MAX(seq) AS max_seq FROM decisions WHERE issue_id = ?) dm ON 1 = 1
@@ -339,7 +341,7 @@ export async function gateSnapshot(issueId) {
      LEFT JOIN chain ch ON ch.decision_id = h.decision_id
      LEFT JOIN (SELECT MAX(seq) AS max_seq FROM settings_events WHERE setting = 'gate.mode') gm ON 1 = 1
      LEFT JOIN settings_events g ON g.setting = 'gate.mode' AND g.seq = gm.max_seq`,
-    issueId, issueId, issueId, issueId, issueId,
+    now, issueId, issueId, issueId, issueId, issueId,
   );
   if (!r) throw new Error('gate snapshot returned no row');
   const record = (x) => (x ? JSON.parse(x) : null);
@@ -351,8 +353,138 @@ export async function gateSnapshot(issueId) {
     humanRecord: record(r.ch_record),
     mode: r.g_mode ?? null,
     modeSeq: r.g_seq === null || r.g_seq === undefined ? 0 : Number(r.g_seq),
+    // M5: a restore that stopped part-way, or one being verified right now, closes the gate.
+    restore: r.r_outcome === 'failed_partial' ? 'incomplete' : Number(r.r_open ?? 0) > 0 ? 'in_progress' : null,
   };
 }
 
 /** Lightweight dependency probe for the health check (all gate tables reachable). */
 export const gateTablesReachable = () => one('SELECT (SELECT COUNT(*) FROM settings_events) AS s, (SELECT COUNT(*) FROM gate_events WHERE at > 0 LIMIT 1) AS g, (SELECT COUNT(*) FROM chain) AS c');
+
+// ---- M5 RECORD & RECOVERY ------------------------------------------------------------------------
+const parseKey = (r) => r && { kid: r.kid, alg: r.alg, publicKey: r.public_key, registeredAt: r.registered_at, selfSig: r.self_sig };
+const parseSuccession = (r) => r && { fromKid: r.from_kid, toKid: r.to_kid, at: r.at, toSig: r.to_sig, fromSig: r.from_sig ?? null };
+const parseCheckpoint = (r) => r && { siteId: null, seq: Number(r.seq), hash: r.hash, kid: r.kid, at: r.at, purpose: r.purpose, sig: r.sig };
+
+export const recordKeys = {
+  all: async () => (await many('SELECT kid, alg, public_key, registered_at, self_sig FROM record_keys ORDER BY registered_at ASC')).map(parseKey),
+  async insert(k) {
+    const r = await run('INSERT IGNORE INTO record_keys (kid, alg, public_key, registered_at, self_sig) VALUES (?, ?, ?, ?, ?)', k.kid, k.alg, k.publicKey, k.registeredAt, k.selfSig);
+    return affected(r) === 1;
+  },
+};
+
+export const keySuccessions = {
+  all: async () => (await many('SELECT from_kid, to_kid, at, to_sig, from_sig FROM key_successions')).map(parseSuccession),
+  async insert(s) {
+    const r = await run('INSERT IGNORE INTO key_successions (from_kid, to_kid, at, to_sig, from_sig) VALUES (?, ?, ?, ?, ?)', s.fromKid, s.toKid, s.at, s.toSig, s.fromSig ?? null);
+    return affected(r) === 1;
+  },
+};
+
+/** Trust material for the gate: registry + successions in one statement. */
+export async function trustMaterial() {
+  const rows = await many(
+    `SELECT 'k' AS t, kid AS a, alg AS b, public_key AS c, registered_at AS d, self_sig AS e, NULL AS f FROM record_keys
+     UNION ALL SELECT 's' AS t, from_kid, to_kid, at, to_sig, from_sig, NULL FROM key_successions`,
+  );
+  return {
+    registry: rows.filter((r) => r.t === 'k').map((r) => ({ kid: r.a, alg: r.b, publicKey: r.c, registeredAt: r.d, selfSig: r.e })),
+    successions: rows.filter((r) => r.t === 's').map((r) => ({ fromKid: r.a, toKid: r.b, at: r.c, toSig: r.d, fromSig: r.e ?? null })),
+  };
+}
+
+export const checkpoints = {
+  all: async () => (await many('SELECT seq, hash, kid, at, purpose, sig FROM checkpoints ORDER BY seq ASC, id ASC')).map(parseCheckpoint),
+  async insert(c) {
+    const r = await run('INSERT IGNORE INTO checkpoints (seq, hash, kid, at, purpose, sig) VALUES (?, ?, ?, ?, ?, ?)', c.seq, c.hash, c.kid, c.at, c.purpose, c.sig);
+    return affected(r) === 1;
+  },
+};
+
+export const ledgerEvents = {
+  async insert(e) {
+    await run('INSERT INTO ledger_events (at, type, actor, outcome, head_seq, digest, summary) VALUES (?, ?, ?, ?, ?, ?, ?)', e.at, e.type, e.actor ?? null, e.outcome, e.headSeq ?? null, e.digest ?? null, e.summary ? JSON.stringify(e.summary) : null);
+  },
+  latest: async (type) => {
+    const r = await one('SELECT id, at, type, actor, outcome, head_seq, digest, summary FROM ledger_events WHERE type = ? ORDER BY at DESC, id DESC LIMIT 1', type);
+    return r && { ...r, at: Number(r.at), head_seq: r.head_seq === null ? null : Number(r.head_seq), summary: r.summary ? JSON.parse(r.summary) : null };
+  },
+  recent: async (limit = 10) => (await many(`SELECT id, at, type, actor, outcome, head_seq, digest, summary FROM ledger_events ORDER BY at DESC, id DESC LIMIT ${Number(limit) | 0}`)).map((r) => ({ ...r, at: Number(r.at), head_seq: r.head_seq === null ? null : Number(r.head_seq), summary: r.summary ? JSON.parse(r.summary) : null })),
+};
+
+export const recoverySessions = {
+  async insert(s) {
+    await run('INSERT INTO recovery_sessions (token_hash, actor, digest, created_at, expires_at) VALUES (?, ?, ?, ?, ?)', s.tokenHash, s.actor, s.digest, s.createdAt, s.expiresAt);
+  },
+  /** Atomically consume a session: succeeds once, for the same actor, before expiry. */
+  async consume({ tokenHash, actor, now }) {
+    const r = await run('UPDATE recovery_sessions SET used_at = ? WHERE token_hash = ? AND actor = ? AND used_at IS NULL AND expires_at > ?', now, tokenHash, actor, now);
+    if (affected(r) !== 1) return null;
+    return one('SELECT token_hash, actor, digest, created_at, expires_at, used_at FROM recovery_sessions WHERE token_hash = ?', tokenHash);
+  },
+  /** Invalidate all open sessions (a new verification supersedes older ones). */
+  expireAll: (now) => run('UPDATE recovery_sessions SET expires_at = ? WHERE used_at IS NULL AND expires_at > ?', now, now),
+  active: (now) => one('SELECT COUNT(*) AS n FROM recovery_sessions WHERE used_at IS NULL AND expires_at > ?', now).then((r) => Number(r?.n ?? 0) > 0),
+};
+
+/** Counts that decide whether the decision store is empty (restore is only allowed into an empty store). */
+export const storeCounts = () => one('SELECT (SELECT COUNT(*) FROM decisions) AS decisions, (SELECT COUNT(*) FROM chain) AS chain, (SELECT COUNT(*) FROM assignments) AS assignments');
+
+/** Full export reads (ordered). */
+export const exportReads = {
+  chain: async () => (await many('SELECT seq, record FROM chain ORDER BY seq ASC')).map((r) => JSON.parse(r.record)),
+  decisions: async () => (await many('SELECT * FROM decisions ORDER BY issue_id ASC, seq ASC')).map(parseDecision),
+  assignments: async () => (await many('SELECT * FROM assignments ORDER BY issue_id ASC, seq ASC')).map(parseAssignment),
+  settings: async () => many('SELECT setting, seq, value, changed_by, changed_at, request_id, note FROM settings_events ORDER BY setting ASC, seq ASC'),
+};
+
+/** Restore writes (each INSERT IGNORE: idempotent and resumable). Returns true when inserted. */
+export const restoreWrites = {
+  async chain(record) {
+    const r = await run('INSERT IGNORE INTO chain (seq, decision_id, record, record_hash, created_at) VALUES (?, ?, ?, ?, ?)', record.seq, record.decisionId, JSON.stringify(record), record.hash, Date.parse(record.decidedAt) || 0);
+    return affected(r) === 1;
+  },
+  async decision(d) {
+    const r = await run(
+      `INSERT IGNORE INTO decisions (issue_id, seq, decision_id, request_id, kind, decision, rationale, conditions, questions, decided_by, decided_at, screening_id, fp, pipeline_version, outcome, signal_set, detail)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      d.issue_id, d.seq, d.decision_id, d.request_id, d.kind, d.decision, d.rationale ?? null, JSON.stringify(d.conditions ?? []), JSON.stringify(d.questions ?? []),
+      d.decided_by ?? null, d.decided_at, d.screening_id, d.fp, d.pipeline_version, d.outcome ?? null, JSON.stringify(d.signal_set ?? {}), d.detail ? JSON.stringify(d.detail) : null,
+    );
+    return affected(r) === 1;
+  },
+  async assignment(a) {
+    const r = await run('INSERT IGNORE INTO assignments (issue_id, seq, assignee, assigned_by, assigned_at, request_id) VALUES (?, ?, ?, ?, ?, ?)', a.issue_id, a.seq, a.assignee ?? null, a.assigned_by, a.assigned_at, a.request_id);
+    return affected(r) === 1;
+  },
+  async setting(s) {
+    const r = await run('INSERT IGNORE INTO settings_events (setting, seq, value, changed_by, changed_at, request_id, note) VALUES (?, ?, ?, ?, ?, ?, ?)', s.setting, s.seq, s.value, s.changed_by, s.changed_at, s.request_id, s.note ?? null);
+    return affected(r) === 1;
+  },
+};
+
+/** Retention: delete gate events older than `before` (bounded batch). */
+export const purgeGateEvents = async (before, limit = 1000) => affected(await run(`DELETE FROM gate_events WHERE at < ? LIMIT ${Number(limit) | 0}`, before));
+
+export const transfers = {
+  async put({ transferId, idx, kind, actor, data, createdAt }) {
+    const r = await run('INSERT IGNORE INTO transfer_chunks (transfer_id, idx, kind, actor, data, created_at) VALUES (?, ?, ?, ?, ?, ?)', transferId, idx, kind, actor, data, createdAt);
+    return affected(r) === 1;
+  },
+  get: (transferId, idx) => one('SELECT transfer_id, idx, kind, actor, data, created_at FROM transfer_chunks WHERE transfer_id = ? AND idx = ?', transferId, idx),
+  meta: (transferId) => one('SELECT COUNT(*) AS n, MIN(actor) AS actor, MAX(actor) AS actor2, MIN(kind) AS kind, MIN(created_at) AS created_at FROM transfer_chunks WHERE transfer_id = ?', transferId),
+  all: async (transferId) => many('SELECT idx, data FROM transfer_chunks WHERE transfer_id = ? ORDER BY idx ASC', transferId),
+  purge: async (before) => affected(await run('DELETE FROM transfer_chunks WHERE created_at < ? LIMIT 2000', before)),
+};
+
+/** The public register: decisions newest first with their anchor (record version and key id). */
+export const registerRows = async (limit = 500) =>
+  (await many(
+    `SELECT d.issue_id, d.seq, d.kind, d.decision, d.decided_by, d.decided_at, d.fp, d.outcome, d.decision_id, c.seq AS chain_seq, c.record AS chain_record
+     FROM decisions d LEFT JOIN chain c ON c.decision_id = d.decision_id
+     ORDER BY d.decided_at DESC, d.issue_id ASC, d.seq DESC LIMIT ${Number(limit) | 0}`,
+  )).map((r) => {
+    const rec = r.chain_record ? JSON.parse(r.chain_record) : null;
+    return { issue_id: String(r.issue_id), seq: Number(r.seq), kind: r.kind, decision: r.decision, decided_by: r.decided_by, decided_at: Number(r.decided_at), fp: r.fp, outcome: r.outcome, decision_id: r.decision_id, chainSeq: r.chain_seq === null ? null : Number(r.chain_seq), recordVersion: rec?.v ?? null, kid: rec?.kid ?? null };
+  });

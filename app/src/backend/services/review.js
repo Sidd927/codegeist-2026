@@ -9,15 +9,14 @@
 //  - anchoring in the signed chain is idempotent; unanchored decisions are repaired by the reconciler.
 import { AppError, ErrorCode } from '../lib/errors.js';
 import { validateDecisionInput, decisionIdOf, signalSetOf, materialChange, isApprovingDecision, deriveReviewStatus } from '../../core/review.js';
-import { buildRecord, genesis, verifyHistory } from '../../core/chain-core.js';
 import { buildScreeningText } from '../../core/screening-text.js';
 import { createSettingsService } from './settings.js';
 
 const REQUEST_ID = /^[A-Za-z0-9:_-]{8,100}$/;
 const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
 
-export function createReviewService({ repos, jira, log, clock = () => Date.now(), settings, siteId }) {
-  const { decisions, assignments, chain, workItems } = repos;
+export function createReviewService({ repos, jira, log, clock = () => Date.now(), settings, ledger }) {
+  const { decisions, assignments, workItems } = repos;
   const groupCache = new Map();
   const settingsSvc = createSettingsService({ repos, log, clock });
 
@@ -63,31 +62,8 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     return n;
   };
 
-  // ---- signed record ------------------------------------------------------------------------
-  /** Append one decision to the signed hash chain. Idempotent (unique decision_id); retries seq races. */
-  async function anchor(d) {
-    if (!settings.signingKey) return { anchored: false, reason: 'no_signing_key' };
-    const existing = await chain.byDecision(d.decision_id);
-    if (existing) return { anchored: true, seq: existing.seq };
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const head = await chain.head();
-      const seq = head ? Number(head.seq) + 1 : 1;
-      const record = buildRecord(settings.signingKey, {
-        siteId,
-        seq,
-        prevHash: head ? head.record_hash : genesis(siteId),
-        decisionId: d.decision_id,
-        issueKey: d.issue_id, // the stable numeric issue id (keys change when issues move)
-        state: d.decision,
-        conditions: d.decision === 'NEEDS_MORE_INFORMATION' ? d.questions : d.conditions,
-        decidedBy: d.decided_by ?? 'system',
-        decidedAt: new Date(d.decided_at).toISOString(),
-      });
-      if (await chain.insert({ seq, decisionId: d.decision_id, record, recordHash: record.hash, createdAt: clock() })) return { anchored: true, seq };
-      if (await chain.byDecision(d.decision_id)) return { anchored: true, seq: (await chain.byDecision(d.decision_id)).seq };
-    }
-    return { anchored: false, reason: 'contention' };
-  }
+  // ---- signed record (delegated to the ledger service, M5) ----------------------------------------
+  const anchor = (d) => ledger.anchor(d);
 
   async function insertDecision(row) {
     const decisionId = decisionIdOf({
@@ -145,7 +121,9 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
     const rid = requestIdOf(requestId);
     const exp = expectedSeqOf(expectedSeq);
     await requireReviewer(actorId);
-    if (!settings.signingKey) throw new AppError(ErrorCode.NOT_CONFIGURED); // fail closed: no unsigned decisions
+    if (ledger.mode === 'none') throw new AppError(ErrorCode.NOT_CONFIGURED); // fail closed: no unsigned decisions
+    // While a restore is being verified or applied, new decisions would collide with restored history.
+    if (await repos.recoverySessions.active(clock())) throw new AppError(ErrorCode.CONFLICT, 'A restore of the decision record is in progress. Try again in a few minutes.');
 
     const doc = await jira.getIssueDocument(issueKey); // as-user browse check
     if ((await separationOfDutiesOn()) && (doc.reporterId === actorId || doc.assigneeId === actorId)) throw new AppError(ErrorCode.SOD_BLOCKED);
@@ -214,29 +192,19 @@ export function createReviewService({ repos, jira, log, clock = () => Date.now()
   }
 
   // ---- record integrity ---------------------------------------------------------------------
-  /** Repair partial failures: anchor decisions that were inserted but not chained. */
+  /** Repair partial failures: anchor decisions that were inserted but not chained. Never while a
+   *  restore is in progress or incomplete (it would interleave new records with restored history). */
   async function repairChain(limit = 25) {
+    if (await repos.recoverySessions.active(clock())) return 0;
+    const lastRestore = await repos.ledgerEvents.latest('restore').catch(() => null);
+    if (lastRestore?.outcome === 'failed_partial') return 0;
     let repaired = 0;
     for (const d of await decisions.unanchored(limit)) if ((await anchor(d)).anchored) repaired++;
     return repaired;
   }
 
-  /** Verify the signed chain and that each of this issue's rows still matches its chain record. */
-  async function verify(issueId) {
-    if (!settings.signingKey) return { status: 'not_configured' };
-    const records = await chain.all();
-    const v = verifyHistory(settings.signingKey, siteId, records, {});
-    const rows = issueId ? await decisions.list(issueId) : [];
-    const problems = [];
-    for (const r of rows) {
-      const recomputed = decisionIdOf({ issueId: r.issue_id, seq: r.seq, kind: r.kind, decision: r.decision, rationale: r.rationale, conditions: r.conditions, questions: r.questions, decidedBy: r.decided_by, decidedAt: r.decided_at, screeningId: r.screening_id, fp: r.fp, pipelineVersion: r.pipeline_version, outcome: r.outcome });
-      if (recomputed !== r.decision_id) problems.push({ seq: r.seq, problem: 'row_changed' });
-      const rec = records.find((x) => x.decisionId === r.decision_id);
-      if (!rec) problems.push({ seq: r.seq, problem: 'not_anchored' });
-      else if (rec.state !== r.decision || rec.issueKey !== r.issue_id) problems.push({ seq: r.seq, problem: 'record_mismatch' });
-    }
-    return { status: v.valid && problems.filter((p) => p.problem !== 'not_anchored').length === 0 ? (problems.length ? 'pending_anchor' : 'verified') : 'problem', chainLength: records.length, head: v.head?.seq ?? 0, errors: v.errors.slice(0, 5), problems };
-  }
+  /** Verify the ledger and this issue's decision rows against their signed records. */
+  const verify = (issueId) => ledger.verify({ issueId });
 
   /** Everything the workspace needs about the review of one issue (decisions, assignment, status). */
   async function reviewOf(issueId, { item, currentFp }) {

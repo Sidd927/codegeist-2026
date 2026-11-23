@@ -3,6 +3,7 @@
 //  - every read of findings or review data is preceded by an AS-USER Jira check;
 //  - account ids leave the server only for reviewers (who need them to assign); others see names only;
 //  - all review rules (who may decide/assign, binding, concurrency) live in services/review.js.
+import { randomBytes } from 'node:crypto';
 import { AppError, ErrorCode } from '../lib/errors.js';
 import { FEATURES, APP_VERSION } from '../lib/config.js';
 import { adfToBlocks } from '../../core/text.js';
@@ -22,7 +23,12 @@ const VIEW_FILTER = {
   all: () => true,
 };
 
-export function createDeskServices({ jira, config, log, repos, screening, settings, review, gate }) {
+const EXPORT_CHUNK = 1_000_000; // chars per download chunk (≤ ~3 MB UTF-8; responses are limited to 5 MB)
+const UPLOAD_CHUNK = 100_000; // chars per upload chunk (≤ ~300 KB UTF-8; requests are limited to 500 KB)
+const MAX_CHUNKS = 200;
+const TRANSFER_ID = /^[0-9a-f]{32}$/;
+
+export function createDeskServices({ jira, config, log, repos, screening, settings, review, gate, ledger }) {
   async function safeIsAdmin() {
     try {
       return await jira.isJiraAdmin();
@@ -76,7 +82,7 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     const sameContent = Boolean(stored.row && stored.row.state === 'SCREENED' && stored.row.screened_fp === currentFp && view.result);
     let decideReason = null;
     if (!isReviewer) decideReason = 'NOT_REVIEWER';
-    else if (!settings.signingKey) decideReason = 'NOT_CONFIGURED';
+    else if (ledger.mode === 'none') decideReason = 'NOT_CONFIGURED';
     else if (sodOn && (doc.reporterId === actorId || doc.assigneeId === actorId)) decideReason = 'SOD';
     else if (!sameContent) decideReason = view.state === 'SCREENING' ? 'CHECKING' : 'STALE_EVIDENCE';
     return {
@@ -119,6 +125,22 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
     } catch (e) {
       log.warn({ evt: 'gate.events.read_failed', code: e?.code ?? 'INTERNAL' });
       return [];
+    }
+  }
+
+  /** Reassemble an upload this admin created (exactly `chunks` parts, 0..n-1) and parse it. */
+  async function assembleUpload(payload, actorId) {
+    const transferId = String(payload?.transferId ?? '');
+    const n = Number(payload?.chunks);
+    if (!TRANSFER_ID.test(transferId) || !Number.isInteger(n) || n < 1 || n > MAX_CHUNKS) throw new AppError(ErrorCode.INVALID_INPUT);
+    const meta = await repos.transfers.meta(transferId);
+    if (Number(meta?.n ?? 0) !== n || meta.actor !== actorId || meta.actor2 !== actorId || meta.kind !== 'upload') throw new AppError(ErrorCode.INVALID_INPUT, 'The upload is incomplete. Upload the archive again.');
+    const parts = await repos.transfers.all(transferId);
+    if (parts.some((p, i) => Number(p.idx) !== i)) throw new AppError(ErrorCode.INVALID_INPUT, 'The upload is incomplete. Upload the archive again.');
+    try {
+      return JSON.parse(parts.map((p) => p.data).join(''));
+    } catch {
+      throw new AppError(ErrorCode.INVALID_INPUT, 'That file is not an Article25 archive.');
     }
   }
 
@@ -252,6 +274,124 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
       return { status: r.status };
     },
 
+    // ---- M5: decision record & recovery ---------------------------------------------------------
+    /** Record status (admins): signing keys (fingerprints only), head, last export/verify/restore. */
+    async recordStatus() {
+      await requireAdmin();
+      const [st, events] = await Promise.all([ledger.status(), repos.ledgerEvents.recent(10).catch(() => [])]);
+      const people = await peopleMap(events.map((e) => e.actor));
+      return {
+        ...st,
+        events: events.map((e) => ({ at: e.at, type: e.type, outcome: e.outcome, headSeq: e.head_seq, by: e.actor ? people.get(e.actor)?.displayName || 'Unknown user' : 'Article25', digest: e.digest ? e.digest.slice(0, 12) : null })),
+        externalRegister: { status: 'not_enabled', reason: 'needs_confluence_scopes' },
+      };
+    },
+
+    /** Verify the whole ledger and every decision (admins); the result is recorded. */
+    async verifyLedger(actorId) {
+      await requireAdmin();
+      return ledger.verify({ record: true, actor: actorId });
+    },
+
+    /** Signed archive export (admins), delivered in chunks. */
+    async exportArchive(actorId) {
+      await requireAdmin();
+      const archive = await ledger.exportArchive({ actor: actorId });
+      const text = JSON.stringify(archive);
+      const chunks = Math.ceil(text.length / EXPORT_CHUNK);
+      if (chunks > MAX_CHUNKS) throw new AppError(ErrorCode.INTERNAL, 'The archive is too large to export in one transfer.');
+      const transferId = randomBytes(16).toString('hex');
+      const now = Date.now();
+      for (let i = 0; i < chunks; i++) await repos.transfers.put({ transferId, idx: i, kind: 'export', actor: actorId, data: text.slice(i * EXPORT_CHUNK, (i + 1) * EXPORT_CHUNK), createdAt: now });
+      return { transferId, chunks, bytes: Buffer.byteLength(text), digest: archive.digest, head: archive.head, counts: archive.counts, createdAt: archive.createdAt };
+    },
+
+    /** One chunk of an export this admin created. */
+    async transferChunk(payload, actorId) {
+      await requireAdmin();
+      const transferId = String(payload?.transferId ?? '');
+      const idx = Number(payload?.idx);
+      if (!TRANSFER_ID.test(transferId) || !Number.isInteger(idx) || idx < 0 || idx >= MAX_CHUNKS) throw new AppError(ErrorCode.INVALID_INPUT);
+      const row = await repos.transfers.get(transferId, idx);
+      if (!row || row.kind !== 'export' || row.actor !== actorId) throw new AppError(ErrorCode.NOT_FOUND, 'This export is not available. Export again.');
+      return { idx, data: row.data };
+    },
+
+    /** Upload one chunk of an archive to restore (admins). Chunks are immutable once written. */
+    async uploadChunk(payload, actorId) {
+      await requireAdmin();
+      const transferId = String(payload?.transferId ?? '');
+      const idx = Number(payload?.idx);
+      const data = payload?.data;
+      if (!TRANSFER_ID.test(transferId) || !Number.isInteger(idx) || idx < 0 || idx >= MAX_CHUNKS || typeof data !== 'string' || data.length === 0 || data.length > UPLOAD_CHUNK) throw new AppError(ErrorCode.INVALID_INPUT);
+      const meta = await repos.transfers.meta(transferId);
+      if (Number(meta?.n ?? 0) > 0 && (meta.actor !== actorId || meta.actor2 !== actorId || meta.kind !== 'upload')) throw new AppError(ErrorCode.NOT_AUTHORISED);
+      const inserted = await repos.transfers.put({ transferId, idx, kind: 'upload', actor: actorId, data, createdAt: Date.now() });
+      if (!inserted) {
+        const existing = await repos.transfers.get(transferId, idx);
+        if (existing?.data !== data) throw new AppError(ErrorCode.CONFLICT, 'This part of the upload was already received with different content. Start the upload again.');
+      }
+      return { idx, received: true };
+    },
+
+    /** Step 1 of restore: verify the uploaded archive (admins). */
+    async beginRestore(payload, actorId) {
+      await requireAdmin();
+      const archive = await assembleUpload(payload, actorId);
+      const r = await ledger.beginRestore({ actor: actorId, archive });
+      return { report: r.report, token: r.token, resume: r.resume ?? false };
+    },
+
+    /** Step 2 of restore: confirm with the single-use token (admins). */
+    async confirmRestore(payload, actorId) {
+      await requireAdmin();
+      const archive = await assembleUpload(payload, actorId);
+      return ledger.confirmRestore({ actor: actorId, token: payload?.token, archive });
+    },
+
+    /** After a key LOSS: adopt a previous key as predecessor, bound to its typed fingerprint (admins). */
+    async adoptPreviousKey(payload) {
+      await requireAdmin();
+      const kid = String(payload?.kid ?? '');
+      if (!/^k[0-9a-f]{16}$/.test(kid)) throw new AppError(ErrorCode.INVALID_INPUT);
+      return ledger.adoptPredecessor({ kid, fingerprint: payload?.fingerprint });
+    },
+
+    /** One decision's signed record, for independent verification (reviewers who can see the issue). */
+    async decisionRecord(payload, actorId) {
+      if (!(await review.isReviewer(actorId))) throw new AppError(ErrorCode.NOT_AUTHORISED);
+      const doc = await jira.getIssueDocument(validate.issueKey(payload?.issueKey)); // as-user browse check
+      const seq = Number(payload?.seq);
+      if (!Number.isInteger(seq) || seq < 1) throw new AppError(ErrorCode.INVALID_INPUT);
+      const row = (await repos.decisions.list(doc.id)).find((d) => Number(d.seq) === seq);
+      if (!row) throw new AppError(ErrorCode.NOT_FOUND, 'That decision does not exist.');
+      return ledger.recordBundle(row);
+    },
+
+    /** The decision register: every decision on work items the caller can see, newest first. */
+    async register(raw, actorId) {
+      const page = Number(raw?.page ?? 1);
+      if (!Number.isInteger(page) || page < 1 || page > 1000) throw new AppError(ErrorCode.INVALID_INPUT);
+      const [rows, st, isReviewer] = await Promise.all([repos.registerRows(500), ledger.status().catch(() => null), review.isReviewer(actorId)]);
+      const visible = rows.length ? await jira.visibleIssues([...new Set(rows.map((r) => r.issue_id))]) : new Map();
+      const mine = rows.filter((r) => visible.has(r.issue_id));
+      const pages = Math.max(1, Math.ceil(mine.length / 25));
+      const p = Math.min(page, pages);
+      const slice = mine.slice((p - 1) * 25, p * 25);
+      const people = await peopleMap(slice.map((r) => r.decided_by));
+      const exportedHead = st?.lastExport?.headSeq ?? 0;
+      return {
+        items: slice.map((r) => ({
+          key: visible.get(r.issue_id).key, summary: visible.get(r.issue_id).summary, seq: r.seq, kind: r.kind, decision: r.decision,
+          decidedBy: r.kind === 'human' ? person(people, r.decided_by, isReviewer) : null, decidedAt: r.decided_at, outcome: r.outcome, contentRef: String(r.fp).slice(0, 8),
+          record: r.chainSeq ? { seq: r.chainSeq, format: r.recordVersion === 3 ? 'ed25519' : r.recordVersion === 2 ? 'legacy' : 'unknown', kid: r.kid } : null,
+          inLastExport: Boolean(r.chainSeq && r.chainSeq <= exportedHead),
+        })),
+        total: mine.length, page: p, pages,
+        signing: st?.signing ?? 'none', lastExport: st?.lastExport ? { at: st.lastExport.at, headSeq: st.lastExport.headSeq } : null, isReviewer,
+      };
+    },
+
     /** Workflow gate overview (Jira admins only): health, coverage, mode, recent checks, settings history. */
     async gateOverview() {
       await requireAdmin();
@@ -320,7 +460,8 @@ export function createDeskServices({ jira, config, log, repos, screening, settin
           youAreReviewer,
           separationOfDuties: await review.separationOfDutiesOn(),
           separationOfDutiesSetting: await review.separationOfDutiesSetting().then((x) => ({ value: x.value ?? 'on', seq: x.seq, isDefault: x.isDefault })).catch(() => null),
-          recordSigning: settings.signingKey ? 'configured' : 'missing',
+          recordSigning: ledger.mode === 'none' ? 'missing' : 'configured',
+          recordFormat: ledger.mode,
         },
       };
     },
