@@ -2,13 +2,13 @@
 // Jira, derives each review status, applies the filters, orders by urgency → severity → age and
 // paginates. This view only renders that result and sends filter changes back.
 import { useState } from 'react';
-import Button from '@atlaskit/button/new';
 import { api } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState, StatusLozenge } from '../../shared/components/States.jsx';
 import { findingLabel, duration } from '../../shared/findings.js';
 import { copy } from '../../shared/copy/en.js';
 import { useRouter } from '../router.jsx';
+import { Button } from '../../shared/components/ui.jsx';
 
 const VIEWS = ['attention', 'awaiting', 'changed', 'needs-info', 'decided', 'all'];
 const SEVERITIES = ['DPIA_LIKELY', 'REVIEW_REQUIRED', 'NEEDS_INFO', 'INVENTORY_UPDATE', 'CLEAR'];

@@ -2,7 +2,6 @@
 // Renders the backend's screening state for the context issue. It never decides a privacy outcome;
 // loading, failed and unavailable states are always visually distinct from results.
 import { useEffect, useState } from 'react';
-import Button from '@atlaskit/button/new';
 import { api } from '../shared/api.js';
 import { useResource, usePolling } from '../shared/useResource.js';
 import { getContext, openDesk, reportFirstContent } from '../shared/platform.js';
@@ -11,6 +10,7 @@ import { ModeNote, RuleTrace, DeltaChips, FindingsList, OpenQuestions, CheckedAt
 import { whyLine, relativeTime } from '../shared/findings.js';
 import { StatusLozenge } from '../shared/components/States.jsx';
 import { copy } from '../shared/copy/en.js';
+import { Button } from '../shared/components/ui.jsx';
 
 const S = copy.screening;
 

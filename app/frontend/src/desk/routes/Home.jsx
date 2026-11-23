@@ -1,11 +1,10 @@
 // Desk overview (entry point). Explains the loop, shows the caller's access and this site's setup,
 // and illustrates the Margin review with a clearly labelled fictional example (no decision controls).
 import { useState } from 'react';
-import Heading from '@atlaskit/heading';
-import Lozenge from '@atlaskit/lozenge';
 import { copy } from '../../shared/copy/en.js';
 import { EvidenceDocument, MarginNotes } from '../../shared/components/Margin.jsx';
 import { StatusLozenge } from '../../shared/components/States.jsx';
+import { Heading, Lozenge } from '../../shared/components/ui.jsx';
 
 // Fictional, synthetic example. It is not stored, not linked to any work item, and has no decision.
 const EXAMPLE = {

@@ -1,10 +1,8 @@
 // Standard async states (UX_DESIGN_SPEC §4): loading skeletons, error with retry, empty state,
 // and the status header used by the panel and the workspace.
-import Lozenge from '@atlaskit/lozenge';
-import SectionMessage from '@atlaskit/section-message';
-import Button from '@atlaskit/button/new';
 import { stateDisplay } from '../states.js';
 import { copy } from '../copy/en.js';
+import { Button, Lozenge, SectionMessage } from './ui.jsx';
 
 export function Skeleton({ lines = 3, label = copy.common.loading }) {
   return (

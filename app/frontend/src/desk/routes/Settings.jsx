@@ -1,15 +1,13 @@
 // Settings entry point (UX_DESIGN_SPEC §3.7). Access is decided server-side on every call; the nav
 // only hides the link. Sections are listed with their real status; configuration arrives later.
 import { useState } from 'react';
-import Lozenge from '@atlaskit/lozenge';
-import Button from '@atlaskit/button/new';
-import SectionMessage from '@atlaskit/section-message';
 import { api, newRequestId } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState } from '../../shared/components/States.jsx';
 import { copy } from '../../shared/copy/en.js';
 import { GateSettings } from '../settings/GateSettings.jsx';
 import { RecordSettings } from '../settings/RecordSettings.jsx';
+import { Button, Lozenge, SectionMessage } from '../../shared/components/ui.jsx';
 
 /** Audited admin switch for separation of duties (server re-checks admin rights). */
 function SodControl({ setting, onChanged, client = api }) {

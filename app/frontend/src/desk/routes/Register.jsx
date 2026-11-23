@@ -2,14 +2,13 @@
 // with the signature status of its record and whether it is in a downloaded backup. Read-only:
 // decisions cannot be edited or deleted. Filtering to visible work items happens on the server.
 import { useState } from 'react';
-import Button from '@atlaskit/button/new';
-import Lozenge from '@atlaskit/lozenge';
 import { api } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState, EmptyState, StatusLozenge } from '../../shared/components/States.jsx';
 import { relativeTime } from '../../shared/findings.js';
 import { copy } from '../../shared/copy/en.js';
 import { useRouter } from '../router.jsx';
+import { Button, Lozenge } from '../../shared/components/ui.jsx';
 
 const R = copy.record;
 const LABEL = (d) => (d.decision === 'APPROVAL_INVALIDATED' ? 'APPROVAL_STALE' : d.decision === 'APPROVAL_RECONFIRMED' ? 'APPROVED' : d.decision);

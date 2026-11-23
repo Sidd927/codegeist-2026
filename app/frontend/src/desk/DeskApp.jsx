@@ -1,6 +1,5 @@
 // Article25 desk (Jira global page): product identity, navigation and routed views.
 import { useEffect, useRef } from 'react';
-import Lozenge from '@atlaskit/lozenge';
 import { useRouter } from './router.jsx';
 import { useResource } from '../shared/useResource.js';
 import { api } from '../shared/api.js';
@@ -12,6 +11,7 @@ import { Review } from './routes/Review.jsx';
 import { Settings } from './routes/Settings.jsx';
 import { Register } from './routes/Register.jsx';
 import { NotFound } from './routes/NotFound.jsx';
+import { Lozenge } from '../shared/components/ui.jsx';
 
 const NAV = [
   { name: 'home', path: '/', label: copy.nav.home },

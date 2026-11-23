@@ -3,8 +3,6 @@
 // the screened text. The decision zone renders the server's review block: status, reviewer,
 // decision form (only when the server says this user may decide) and the append-only history.
 import { useMemo, useState } from 'react';
-import Button from '@atlaskit/button/new';
-import SectionMessage from '@atlaskit/section-message';
 import { api } from '../../shared/api.js';
 import { useResource, usePolling } from '../../shared/useResource.js';
 import { openIssue } from '../../shared/platform.js';
@@ -19,6 +17,7 @@ import { Assignment } from '../review/Assignment.jsx';
 import { DecisionForm } from '../review/DecisionForm.jsx';
 import { History } from '../review/History.jsx';
 import { GatePreview } from '../review/GatePreview.jsx';
+import { Button, SectionMessage } from '../../shared/components/ui.jsx';
 
 const S = copy.screening;
 const LABELS = { document: copy.review.documentLabel, summary: copy.review.summaryHeading, description: copy.review.descriptionHeading, noDescription: copy.review.noDescription };

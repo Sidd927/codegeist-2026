@@ -2,15 +2,13 @@
 // server). Signing keys (fingerprints only), integrity, signed backup, verified restore, key-loss
 // recovery and honest guidance about what removing Article25 does.
 import { useRef, useState } from 'react';
-import Button from '@atlaskit/button/new';
-import Lozenge from '@atlaskit/lozenge';
-import SectionMessage from '@atlaskit/section-message';
 import { api, newTransferId } from '../../shared/api.js';
 import { useResource } from '../../shared/useResource.js';
 import { Skeleton, ErrorState } from '../../shared/components/States.jsx';
 import { relativeTime } from '../../shared/findings.js';
 import { downloadText, copyText, readFileText } from '../../shared/download.js';
 import { copy } from '../../shared/copy/en.js';
+import { Button, Lozenge, SectionMessage } from '../../shared/components/ui.jsx';
 
 const R = copy.record;
 const UPLOAD_CHUNK = 100_000; // characters (requests are limited to 500 KB)

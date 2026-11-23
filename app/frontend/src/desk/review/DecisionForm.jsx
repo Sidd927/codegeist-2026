@@ -4,10 +4,9 @@
 //  - the last decision sequence they saw (optimistic concurrency),
 //  - a request id reused across retries of the same submission (idempotency).
 import { useRef, useState } from 'react';
-import Button from '@atlaskit/button/new';
-import SectionMessage from '@atlaskit/section-message';
 import { api, newRequestId } from '../../shared/api.js';
 import { copy } from '../../shared/copy/en.js';
+import { Button, SectionMessage } from '../../shared/components/ui.jsx';
 
 const D = copy.review.decision;
 export const DECISIONS = ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'NEEDS_MORE_INFORMATION', 'REJECTED'];
